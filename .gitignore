@@ -9,4 +9,11 @@ wheels/
 # Virtual environments
 .venv
 
+*.db
+data/
+models/
+
 docs/
+
+# Node
+node_modules/

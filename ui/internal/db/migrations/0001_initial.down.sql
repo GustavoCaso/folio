@@ -1,0 +1,2 @@
+DROP TABLE IF EXISTS highlights;
+DROP TABLE IF EXISTS jobs;

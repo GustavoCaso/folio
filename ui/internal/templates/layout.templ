@@ -1,0 +1,27 @@
+package templates
+
+templ Layout(title string) {
+	<!DOCTYPE html>
+	<html lang="en">
+	<head>
+		<meta charset="UTF-8"/>
+		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+		<title>{ title } — Folio</title>
+		<style>
+			body { font-family: sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
+			nav a { margin-right: 1rem; }
+			.status { font-size: 0.8em; color: #666; }
+			.status-PENDING    { color: #999; }
+			.status-PROCESSING { color: #0066cc; }
+			.status-DONE       { color: #006600; }
+			.status-FAILED     { color: #cc0000; }
+			mark.highlight     { background: #ffe066; cursor: pointer; border-radius: 2px; }
+			mark.highlight img { outline: 3px solid #ffeb3b; outline-offset: 2px; background: transparent; }
+		</style>
+	</head>
+	<body>
+		<nav><a href="/">Documents</a></nav>
+		{ children... }
+	</body>
+	</html>
+}

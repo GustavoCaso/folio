@@ -1,0 +1,66 @@
+package templates
+
+import "fmt"
+import "github.com/GustavoCaso/folio/ui/internal/db"
+
+templ Documents(jobs []db.Job, watchJobID string) {
+	@Layout("Documents") {
+		<h1>Documents</h1>
+		<form method="POST" action="/documents" enctype="multipart/form-data">
+			<input type="file" name="document" accept=".pdf" required/>
+			<button type="submit">Upload</button>
+		</form>
+
+		if len(jobs) > 0 {
+			<ul>
+				for _, job := range jobs {
+					<li id={ "job-" + job.ID }>
+						<strong>{ job.Filename }</strong>
+						<span class={ "status status-" + job.Status }>{ job.Status }</span>
+						if job.Status == "PROCESSING" && job.PagesTotal > 0 {
+							<span class="status">
+								({ fmt.Sprintf("%d/%d pages", job.PagesDone, job.PagesTotal) })
+							</span>
+						}
+						if job.Status == "DONE" {
+							— <a href={ templ.SafeURL("/read/" + job.ID) }>Read</a>
+						}
+						if job.Status == "FAILED" {
+							<span class="status">{ job.Error }</span>
+						}
+					</li>
+				}
+			</ul>
+		}
+
+		if watchJobID != "" {
+			<div id="watch-config" data-job-id={ watchJobID } style="display:none"></div>
+			<script>
+				(function() {
+					const jobID = document.getElementById("watch-config").dataset.jobId;
+					const es = new EventSource("/jobs/" + jobID + "/watch");
+					es.addEventListener("status", function(e) {
+						const d = JSON.parse(e.data);
+						const li = document.getElementById("job-" + jobID);
+						if (li && d.Stage) {
+							let s = li.querySelector(".live-stage");
+							if (!s) {
+								s = document.createElement("span");
+								s.className = "status live-stage";
+								li.appendChild(s);
+							}
+							let text = d.Stage;
+							if (d.Message) text += " — " + d.Message;
+							if (d.PagesTotal) text += " (" + d.PagesDone + "/" + d.PagesTotal + ")";
+							s.textContent = text;
+						}
+						if (d.Status === "DONE" || d.Status === "FAILED") {
+							es.close();
+							window.location.reload();
+						}
+					});
+				})();
+			</script>
+		}
+	}
+}

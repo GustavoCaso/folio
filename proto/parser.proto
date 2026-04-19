@@ -1,0 +1,43 @@
+syntax = "proto3";
+
+package parser;
+
+option go_package = "github.com/GustavoCaso/folio/ui/internal/parser/proto";
+
+// ParserService is stateless. The caller sends PDF bytes in chunks and receives
+// status updates and markdown bytes back on the same stream. No state is retained
+// after the stream closes.
+service ParserService {
+  rpc ConvertDocument(stream ConvertChunk) returns (stream ConvertResult);
+}
+
+// ConvertChunk is sent by the caller (Go UI) to the parser.
+// The first message must be a ConvertMeta, followed by one or more data messages.
+message ConvertChunk {
+  oneof payload {
+    ConvertMeta meta = 1;
+    bytes data       = 2;
+  }
+}
+
+message ConvertMeta {
+  string filename = 1;  // original filename, used to infer format
+}
+
+// ConvertResult is streamed back by the parser.
+// StatusUpdate messages arrive before and after the markdown chunks.
+message ConvertResult {
+  oneof payload {
+    StatusUpdate status  = 1;
+    bytes markdown_chunk = 2;
+  }
+}
+
+message StatusUpdate {
+  string status      = 1;  // PROCESSING | DONE | FAILED
+  int32 pages_done   = 2;
+  int32 pages_total  = 3;
+  string error       = 4;
+  string stage       = 5;  // received | loading | processing | exporting
+  string message     = 6;  // human-readable detail
+}

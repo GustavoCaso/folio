@@ -1,0 +1,22 @@
+services:
+  ui:
+    build: ./ui
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./data:/data
+    environment:
+      - PARSER_GRPC_ADDR=parser:50051
+      - DB_PATH=/data/folio.db
+      - DATA_DIR=/data
+    depends_on:
+      - parser
+
+  parser:
+    build: ./parser
+    volumes:
+      - ./models:/root/.cache  # Docling model weights cache
+      - ./models/rapidocr:/app/.venv/lib/python3.12/site-packages/rapidocr/models
+    environment:
+      - GRPC_PORT=50051
+      - NUM_WORKERS=2
