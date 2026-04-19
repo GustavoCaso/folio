@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"errors"
+	"log/slog"
 	"net/http"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
@@ -13,10 +15,18 @@ type Handlers struct {
 	hub     *hub.Hub
 	parser  *parserclient.Client
 	dataDir string
+	// logger is used only by background goroutines (e.g. runConversion) that
+	// outlive the originating request and therefore can't use
+	// logging.LoggerFrom. Request-scoped code should pull the logger — with
+	// request_id attached by middleware — from r.Context() instead.
+	logger *slog.Logger
 }
 
-func Register(store *db.Store, h *hub.Hub, pc *parserclient.Client, dataDir string) *http.ServeMux {
-	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir}
+func Register(store *db.Store, h *hub.Hub, pc *parserclient.Client, dataDir string, logger *slog.Logger) (*http.ServeMux, error) {
+	if logger == nil {
+		return nil, errors.New("handlers.Register: logger is required")
+	}
+	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir, logger: logger}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)
@@ -26,5 +36,5 @@ func Register(store *db.Store, h *hub.Hub, pc *parserclient.Client, dataDir stri
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)
 	mux.HandleFunc("DELETE /highlights/{id}", hs.DeleteHighlight)
 
-	return mux
+	return mux, nil
 }

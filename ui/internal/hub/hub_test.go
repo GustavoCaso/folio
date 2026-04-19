@@ -2,13 +2,32 @@ package hub_test
 
 import (
 	"encoding/json"
+	"io"
+	"log/slog"
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 )
 
+var testLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+func newHub(t *testing.T) *hub.Hub {
+	t.Helper()
+	h, err := hub.New(testLogger)
+	if err != nil {
+		t.Fatalf("hub.New: %v", err)
+	}
+	return h
+}
+
+func TestNewRequiresLogger(t *testing.T) {
+	if _, err := hub.New(nil); err == nil {
+		t.Fatal("expected error for nil logger")
+	}
+}
+
 func TestPublishReachesSubscriber(t *testing.T) {
-	h := hub.New()
+	h := newHub(t)
 	ch := h.Subscribe("job-1")
 	defer h.Unsubscribe("job-1", ch)
 
@@ -29,7 +48,7 @@ func TestPublishReachesSubscriber(t *testing.T) {
 }
 
 func TestPublishDoesNotReachUnrelatedJob(t *testing.T) {
-	h := hub.New()
+	h := newHub(t)
 	ch := h.Subscribe("job-1")
 	defer h.Unsubscribe("job-1", ch)
 
@@ -39,12 +58,11 @@ func TestPublishDoesNotReachUnrelatedJob(t *testing.T) {
 	case <-ch:
 		t.Fatal("received unexpected event for unrelated job")
 	default:
-		// correct: nothing received
 	}
 }
 
 func TestPublishCarriesStageAndMessage(t *testing.T) {
-	h := hub.New()
+	h := newHub(t)
 	ch := h.Subscribe("job-3")
 	defer h.Unsubscribe("job-3", ch)
 
@@ -93,7 +111,7 @@ func TestStatusEventJSONShape(t *testing.T) {
 }
 
 func TestUnsubscribeStopsDelivery(t *testing.T) {
-	h := hub.New()
+	h := newHub(t)
 	ch := h.Subscribe("job-1")
 	h.Unsubscribe("job-1", ch)
 
@@ -103,6 +121,5 @@ func TestUnsubscribeStopsDelivery(t *testing.T) {
 	case <-ch:
 		t.Fatal("received event after unsubscribe")
 	default:
-		// correct
 	}
 }

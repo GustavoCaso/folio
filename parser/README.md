@@ -33,6 +33,7 @@ Environment variables:
 | `NUM_WORKERS` | `2` | Parallel conversion workers |
 | `PDF_LAYOUT_BATCH_SIZE` | docling default | Docling layout batch size |
 | `PDF_OCR_BATCH_SIZE` | docling default | Docling OCR batch size |
+| `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 
 ### Docker
 

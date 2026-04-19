@@ -21,7 +21,8 @@ message ConvertChunk {
 }
 
 message ConvertMeta {
-  string filename = 1;  // original filename, used to infer format
+  string filename   = 1;  // original filename, used to infer format
+  string request_id = 2;  // caller-assigned correlation id; surfaced in parser logs
 }
 
 // ConvertResult is streamed back by the parser.

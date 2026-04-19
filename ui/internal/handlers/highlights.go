@@ -5,6 +5,7 @@ import (
 	"net/http"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/logging"
 )
 
 type createHighlightRequest struct {
@@ -19,8 +20,11 @@ type createHighlightRequest struct {
 }
 
 func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
+	log := logging.LoggerFrom(r.Context())
+
 	var req createHighlightRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Warn("invalid highlight JSON", logging.Err(err))
 		http.Error(w, "invalid JSON", http.StatusBadRequest)
 		return
 	}
@@ -36,9 +40,17 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 		Note:         req.Note,
 	})
 	if err != nil {
+		log.Error("create highlight failed", logging.Err(err), "job_id", req.JobID)
 		http.Error(w, "failed to save highlight", http.StatusInternalServerError)
 		return
 	}
+
+	log.Info("highlight created",
+		"job_id", req.JobID,
+		"highlight_id", created.ID,
+		"start_block_id", req.StartBlockID,
+		"end_block_id", req.EndBlockID,
+	)
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
@@ -46,10 +58,13 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) DeleteHighlight(w http.ResponseWriter, r *http.Request) {
+	log := logging.LoggerFrom(r.Context())
 	id := r.PathValue("id")
 	if err := h.store.DeleteHighlight(r.Context(), id); err != nil {
+		log.Error("delete highlight failed", logging.Err(err), "highlight_id", id)
 		http.Error(w, "failed to delete highlight", http.StatusInternalServerError)
 		return
 	}
+	log.Info("highlight deleted", "highlight_id", id)
 	w.WriteHeader(http.StatusNoContent)
 }
