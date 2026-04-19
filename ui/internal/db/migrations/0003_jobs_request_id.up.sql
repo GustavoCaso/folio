@@ -1,0 +1,1 @@
+ALTER TABLE jobs ADD COLUMN request_id TEXT NOT NULL DEFAULT '';

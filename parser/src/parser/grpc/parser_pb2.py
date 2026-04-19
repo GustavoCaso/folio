@@ -24,7 +24,7 @@ _sym_db = _symbol_database.Default()
 
 
 
-DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cparser.proto\x12\x06parser\"N\n\x0c\x43onvertChunk\x12#\n\x04meta\x18\x01 \x01(\x0b\x32\x13.parser.ConvertMetaH\x00\x12\x0e\n\x04\x64\x61ta\x18\x02 \x01(\x0cH\x00\x42\t\n\x07payload\"\x1f\n\x0b\x43onvertMeta\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\"\\\n\rConvertResult\x12&\n\x06status\x18\x01 \x01(\x0b\x32\x14.parser.StatusUpdateH\x00\x12\x18\n\x0emarkdown_chunk\x18\x02 \x01(\x0cH\x00\x42\t\n\x07payload\"v\n\x0cStatusUpdate\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\npages_done\x18\x02 \x01(\x05\x12\x13\n\x0bpages_total\x18\x03 \x01(\x05\x12\r\n\x05\x65rror\x18\x04 \x01(\t\x12\r\n\x05stage\x18\x05 \x01(\t\x12\x0f\n\x07message\x18\x06 \x01(\t2S\n\rParserService\x12\x42\n\x0f\x43onvertDocument\x12\x14.parser.ConvertChunk\x1a\x15.parser.ConvertResult(\x01\x30\x01\x42\x37Z5github.com/GustavoCaso/folio/ui/internal/parser/protob\x06proto3')
+DESCRIPTOR = _descriptor_pool.Default().AddSerializedFile(b'\n\x0cparser.proto\x12\x06parser\"N\n\x0c\x43onvertChunk\x12#\n\x04meta\x18\x01 \x01(\x0b\x32\x13.parser.ConvertMetaH\x00\x12\x0e\n\x04\x64\x61ta\x18\x02 \x01(\x0cH\x00\x42\t\n\x07payload\"3\n\x0b\x43onvertMeta\x12\x10\n\x08\x66ilename\x18\x01 \x01(\t\x12\x12\n\nrequest_id\x18\x02 \x01(\t\"\\\n\rConvertResult\x12&\n\x06status\x18\x01 \x01(\x0b\x32\x14.parser.StatusUpdateH\x00\x12\x18\n\x0emarkdown_chunk\x18\x02 \x01(\x0cH\x00\x42\t\n\x07payload\"v\n\x0cStatusUpdate\x12\x0e\n\x06status\x18\x01 \x01(\t\x12\x12\n\npages_done\x18\x02 \x01(\x05\x12\x13\n\x0bpages_total\x18\x03 \x01(\x05\x12\r\n\x05\x65rror\x18\x04 \x01(\t\x12\r\n\x05stage\x18\x05 \x01(\t\x12\x0f\n\x07message\x18\x06 \x01(\t2S\n\rParserService\x12\x42\n\x0f\x43onvertDocument\x12\x14.parser.ConvertChunk\x1a\x15.parser.ConvertResult(\x01\x30\x01\x42\x37Z5github.com/GustavoCaso/folio/ui/internal/parser/protob\x06proto3')
 
 _globals = globals()
 _builder.BuildMessageAndEnumDescriptors(DESCRIPTOR, _globals)
@@ -35,11 +35,11 @@ if not _descriptor._USE_C_DESCRIPTORS:
   _globals['_CONVERTCHUNK']._serialized_start=24
   _globals['_CONVERTCHUNK']._serialized_end=102
   _globals['_CONVERTMETA']._serialized_start=104
-  _globals['_CONVERTMETA']._serialized_end=135
-  _globals['_CONVERTRESULT']._serialized_start=137
-  _globals['_CONVERTRESULT']._serialized_end=229
-  _globals['_STATUSUPDATE']._serialized_start=231
-  _globals['_STATUSUPDATE']._serialized_end=349
-  _globals['_PARSERSERVICE']._serialized_start=351
-  _globals['_PARSERSERVICE']._serialized_end=434
+  _globals['_CONVERTMETA']._serialized_end=155
+  _globals['_CONVERTRESULT']._serialized_start=157
+  _globals['_CONVERTRESULT']._serialized_end=249
+  _globals['_STATUSUPDATE']._serialized_start=251
+  _globals['_STATUSUPDATE']._serialized_end=369
+  _globals['_PARSERSERVICE']._serialized_start=371
+  _globals['_PARSERSERVICE']._serialized_end=454
 # @@protoc_insertion_point(module_scope)

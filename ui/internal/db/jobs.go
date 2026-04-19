@@ -10,6 +10,7 @@ import (
 type Job struct {
 	ID         string
 	Filename   string
+	RequestID  string
 	Status     string
 	PagesDone  int
 	PagesTotal int
@@ -19,30 +20,30 @@ type Job struct {
 	UpdatedAt  time.Time
 }
 
-func (s *Store) CreateJob(ctx context.Context, filename string) (Job, error) {
+func (s *Store) CreateJob(ctx context.Context, filename, requestID string) (Job, error) {
 	now := time.Now().UTC()
 	id := uuid.NewString()
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO jobs (id, filename, status, created_at, updated_at)
-		 VALUES (?, ?, 'PENDING', ?, ?)`,
-		id, filename, now.Format(time.RFC3339), now.Format(time.RFC3339),
+		`INSERT INTO jobs (id, filename, request_id, status, created_at, updated_at)
+		 VALUES (?, ?, ?, 'PENDING', ?, ?)`,
+		id, filename, requestID, now.Format(time.RFC3339), now.Format(time.RFC3339),
 	)
 	if err != nil {
 		return Job{}, err
 	}
-	return Job{ID: id, Filename: filename, Status: "PENDING", CreatedAt: now, UpdatedAt: now}, nil
+	return Job{ID: id, Filename: filename, RequestID: requestID, Status: "PENDING", CreatedAt: now, UpdatedAt: now}, nil
 }
 
 func (s *Store) GetJob(ctx context.Context, id string) (Job, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, filename, status, pages_done, pages_total, error, output_path, created_at, updated_at
+		`SELECT id, filename, request_id, status, pages_done, pages_total, error, output_path, created_at, updated_at
 		 FROM jobs WHERE id = ?`, id)
 	return scanJob(row)
 }
 
 func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, filename, status, pages_done, pages_total, error, output_path, created_at, updated_at
+		`SELECT id, filename, request_id, status, pages_done, pages_total, error, output_path, created_at, updated_at
 		 FROM jobs ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -92,7 +93,7 @@ func scanJob(s scanner) (Job, error) {
 	var j Job
 	var createdAt, updatedAt string
 	err := s.Scan(
-		&j.ID, &j.Filename, &j.Status,
+		&j.ID, &j.Filename, &j.RequestID, &j.Status,
 		&j.PagesDone, &j.PagesTotal,
 		&j.Error, &j.OutputPath,
 		&createdAt, &updatedAt,

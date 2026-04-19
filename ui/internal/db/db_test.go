@@ -14,7 +14,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 	defer store.Close()
 
-	job, err := store.CreateJob(context.Background(), "book.pdf")
+	job, err := store.CreateJob(context.Background(), "book.pdf", "req-123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -24,6 +24,9 @@ func TestCreateAndGetJob(t *testing.T) {
 	if job.Status != "PENDING" {
 		t.Fatalf("expected PENDING, got %s", job.Status)
 	}
+	if job.RequestID != "req-123" {
+		t.Fatalf("expected request_id req-123, got %q", job.RequestID)
+	}
 
 	got, err := store.GetJob(context.Background(), job.ID)
 	if err != nil {
@@ -31,6 +34,9 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 	if got.Filename != "book.pdf" {
 		t.Fatalf("expected book.pdf, got %s", got.Filename)
+	}
+	if got.RequestID != "req-123" {
+		t.Fatalf("expected request_id req-123 after read, got %q", got.RequestID)
 	}
 }
 
@@ -41,7 +47,7 @@ func TestUpdateJobProgress(t *testing.T) {
 	}
 	defer store.Close()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf")
+	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
 	if err := store.UpdateJobProgress(context.Background(), job.ID, "PROCESSING", 5, 100); err != nil {
 		t.Fatal(err)
 	}
@@ -62,7 +68,7 @@ func TestMarkJobDone(t *testing.T) {
 	}
 	defer store.Close()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf")
+	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
 	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
@@ -83,7 +89,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 	}
 	defer store.Close()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf")
+	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
 
 	h := db.Highlight{
 		JobID:        job.ID,
@@ -123,7 +129,7 @@ func TestDeleteHighlight(t *testing.T) {
 	}
 	defer store.Close()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf")
+	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
 	h, _ := store.CreateHighlight(context.Background(), db.Highlight{
 		JobID: job.ID, StartBlockID: "intro", EndBlockID: "intro", StartPos: 0, EndPos: 10, Text: "text",
 	})

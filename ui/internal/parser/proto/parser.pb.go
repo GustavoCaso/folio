@@ -107,7 +107,8 @@ func (*ConvertChunk_Data) isConvertChunk_Payload() {}
 
 type ConvertMeta struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
-	Filename      string                 `protobuf:"bytes,1,opt,name=filename,proto3" json:"filename,omitempty"` // original filename, used to infer format
+	Filename      string                 `protobuf:"bytes,1,opt,name=filename,proto3" json:"filename,omitempty"`                    // original filename, used to infer format
+	RequestId     string                 `protobuf:"bytes,2,opt,name=request_id,json=requestId,proto3" json:"request_id,omitempty"` // caller-assigned correlation id; surfaced in parser logs
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -145,6 +146,13 @@ func (*ConvertMeta) Descriptor() ([]byte, []int) {
 func (x *ConvertMeta) GetFilename() string {
 	if x != nil {
 		return x.Filename
+	}
+	return ""
+}
+
+func (x *ConvertMeta) GetRequestId() string {
+	if x != nil {
+		return x.RequestId
 	}
 	return ""
 }
@@ -325,9 +333,11 @@ const file_parser_proto_rawDesc = "" +
 	"\fConvertChunk\x12)\n" +
 	"\x04meta\x18\x01 \x01(\v2\x13.parser.ConvertMetaH\x00R\x04meta\x12\x14\n" +
 	"\x04data\x18\x02 \x01(\fH\x00R\x04dataB\t\n" +
-	"\apayload\")\n" +
+	"\apayload\"H\n" +
 	"\vConvertMeta\x12\x1a\n" +
-	"\bfilename\x18\x01 \x01(\tR\bfilename\"s\n" +
+	"\bfilename\x18\x01 \x01(\tR\bfilename\x12\x1d\n" +
+	"\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\"s\n" +
 	"\rConvertResult\x12.\n" +
 	"\x06status\x18\x01 \x01(\v2\x14.parser.StatusUpdateH\x00R\x06status\x12'\n" +
 	"\x0emarkdown_chunk\x18\x02 \x01(\fH\x00R\rmarkdownChunkB\t\n" +

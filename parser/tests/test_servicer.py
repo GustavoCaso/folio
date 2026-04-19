@@ -6,10 +6,12 @@ from parser.grpc import parser_pb2
 from parser.servicer import ParserServicer
 
 
-def _make_stream(filename: str, data: bytes):
+def _make_stream(filename: str, data: bytes, request_id: str = ""):
     """Build an async iterator simulating a gRPC request stream."""
     chunks = [
-        parser_pb2.ConvertChunk(meta=parser_pb2.ConvertMeta(filename=filename)),
+        parser_pb2.ConvertChunk(
+            meta=parser_pb2.ConvertMeta(filename=filename, request_id=request_id)
+        ),
         parser_pb2.ConvertChunk(data=data),
     ]
 
@@ -75,6 +77,33 @@ async def test_convert_document_emits_stage_transitions():
 
     loading = next(r.status for r in results if r.HasField("status") and r.status.stage == "loading")
     assert loading.pages_total == 7
+
+
+@pytest.mark.asyncio
+async def test_convert_document_logs_request_id_from_meta(caplog):
+    import json
+    import logging
+
+    from parser.logging_config import JSONFormatter
+
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+    stream = _make_stream("doc.pdf", b"%PDF", request_id="req-xyz")
+
+    fmt = JSONFormatter()
+    with caplog.at_level(logging.INFO, logger="parser.servicer"):
+        with patch("parser.servicer.convert", return_value="# Hi"):
+            async for _ in servicer.ConvertDocument(stream, context):
+                pass
+
+    matching = [
+        json.loads(fmt.format(rec))
+        for rec in caplog.records
+        if rec.name == "parser.servicer" and getattr(rec, "request_id", None) == "req-xyz"
+    ]
+    assert matching, "expected at least one log with request_id=req-xyz"
+    assert any(m["msg"] == "convert received" for m in matching)
+    assert any(m["msg"] == "convert done" for m in matching)
 
 
 @pytest.mark.asyncio

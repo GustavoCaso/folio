@@ -1,13 +1,15 @@
 import asyncio
 import logging
 import tempfile
+import time
+import uuid
 from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
 import grpc
 
-from parser import progress
+from parser.progress import ProgressEvent, attach
 from parser.converter import convert
 from parser.formats.pdf import count_pdf_pages
 from parser.grpc import parser_pb2, parser_pb2_grpc
@@ -29,6 +31,11 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
         request_iterator: AsyncIterator[parser_pb2.ConvertChunk],
         context: grpc.aio.ServicerContext,
     ):
+        # Per-RPC correlation id so every log line for a single conversion
+        # shares the same job_id field.
+        job_id = uuid.uuid4().hex[:8]
+        started = time.monotonic()
+
         # --- Receive all chunks from the caller ---
         meta = None
         buf = bytearray()
@@ -41,8 +48,18 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
                 buf.extend(chunk.data)
 
         if meta is None:
+            logger.warning("missing ConvertMeta", extra={"job_id": job_id})
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Missing ConvertMeta")
             return
+
+        ctx: dict[str, object] = {
+            "job_id": job_id,
+            "file": meta.filename,
+            "bytes": len(buf),
+        }
+        if meta.request_id:
+            ctx["request_id"] = meta.request_id
+        logger.info("convert received", extra=ctx)
 
         suffix = Path(meta.filename).suffix or ".pdf"
 
@@ -66,7 +83,12 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
                 try:
                     pages_total = count_pdf_pages(tmp_path)
                 except Exception:
-                    logger.exception("failed to count pages for %s", meta.filename)
+                    logger.exception(
+                        "count pages failed",
+                        extra={**ctx, "tmp_path": str(tmp_path)},
+                    )
+
+            logger.info("convert loading", extra={**ctx, "pages_total": pages_total})
 
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
@@ -78,9 +100,9 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
             )
 
             loop = asyncio.get_running_loop()
-            progress_q: asyncio.Queue[progress.ProgressEvent] = asyncio.Queue()
+            progress_q: asyncio.Queue[ProgressEvent] = asyncio.Queue()
 
-            with progress.attach(progress_q, loop):
+            with attach(progress_q, loop):
                 convert_task = loop.run_in_executor(
                     self._executor, convert, tmp_path
                 )
@@ -92,6 +114,15 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
                         )
                     except asyncio.TimeoutError:
                         continue
+                    logger.debug(
+                        "convert progress",
+                        extra={
+                            **ctx,
+                            "stage": evt.stage,
+                            "pages_done": evt.pages_done,
+                            "pages_total": evt.pages_total or pages_total,
+                        },
+                    )
                     yield parser_pb2.ConvertResult(
                         status=parser_pb2.StatusUpdate(
                             status="PROCESSING",
@@ -117,6 +148,12 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
 
                 markdown: str = await convert_task
 
+            encoded = markdown.encode("utf-8")
+            logger.info(
+                "convert exporting",
+                extra={**ctx, "md_bytes": len(encoded), "pages_total": pages_total},
+            )
+
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
                     status="PROCESSING",
@@ -128,11 +165,12 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
             )
 
             # --- Stream markdown back in chunks ---
-            encoded = markdown.encode("utf-8")
+            md_chunks = 0
             for i in range(0, len(encoded), _CHUNK_SIZE):
                 yield parser_pb2.ConvertResult(
                     markdown_chunk=encoded[i : i + _CHUNK_SIZE]
                 )
+                md_chunks += 1
 
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
@@ -142,9 +180,19 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
                     pages_total=pages_total,
                 )
             )
+            logger.info(
+                "convert done",
+                extra={
+                    **ctx,
+                    "pages_total": pages_total,
+                    "md_bytes": len(encoded),
+                    "md_chunks": md_chunks,
+                    "dur_ms": int((time.monotonic() - started) * 1000),
+                },
+            )
 
         except Exception as exc:
-            logger.exception("Conversion failed for %s", meta.filename)
+            logger.exception("convert failed", extra=ctx)
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
                     status="FAILED",
