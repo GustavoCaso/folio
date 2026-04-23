@@ -54,7 +54,6 @@ func Execute() {
 		logger.Error("handlers register failed", logging.Err(err))
 		os.Exit(1)
 	}
-	mux.Handle("GET /static/", http.StripPrefix("/static/", http.FileServer(http.Dir("static"))))
 
 	srv := logging.Middleware(logger)(mux)
 
