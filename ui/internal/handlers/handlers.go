@@ -1,6 +1,7 @@
 package handlers
 
 import (
+	"embed"
 	"errors"
 	"log/slog"
 	"net/http"
@@ -9,6 +10,9 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
 )
+
+//go:embed static/highlight.js
+var staticFS embed.FS
 
 type Handlers struct {
 	store   *db.Store
@@ -26,6 +30,7 @@ func Register(store *db.Store, h *hub.Hub, pc *parserclient.Client, dataDir stri
 	if logger == nil {
 		return nil, errors.New("handlers.Register: logger is required")
 	}
+
 	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir, logger: logger}
 	mux := http.NewServeMux()
 
@@ -35,6 +40,8 @@ func Register(store *db.Store, h *hub.Hub, pc *parserclient.Client, dataDir stri
 	mux.HandleFunc("GET /jobs/{jobID}/watch", hs.WatchJob)
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)
 	mux.HandleFunc("DELETE /highlights/{id}", hs.DeleteHighlight)
+
+	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
 
 	return mux, nil
 }
