@@ -8,10 +8,10 @@ description = "Stateless document parser service: converts PDF bytes to markdown
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "docling>=2.80.0",
-  "grpcio>=1.62.0",
-  "grpcio-tools>=1.62.0",
-  "protobuf>=4.25.0",
+  "docling==2.86.0",
+  "grpcio==1.80.0",
+  "grpcio-tools==1.71.2",
+  "protobuf==5.29.6",
 ]
 
 [project.scripts]
@@ -26,7 +26,13 @@ markers = [
 ]
 
 [dependency-groups]
-dev = ["mypy>=1.15.0", "pytest>=8.0.0", "pytest-asyncio>=0.25.0", "ruff>=0.9.0"]
+dev = [
+    "mypy==1.20.0",
+    "protoletariat==3.3.10",
+    "pytest==9.0.3",
+    "pytest-asyncio==1.3.0",
+    "ruff==0.15.10",
+]
 
 [tool.mypy]
 python_version = "3.12"

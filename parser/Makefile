@@ -23,5 +23,8 @@ proto:
 		--python_out=src/parser/grpc \
 		--grpc_python_out=src/parser/grpc \
 		../proto/parser.proto
-	@# Fix generated import
-	@sed -i '' 's/import parser_pb2/from parser.grpc import parser_pb2/' src/parser/grpc/parser_pb2_grpc.py
+	@uv run protol \
+		--in-place \
+		--python-out src/parser/grpc \
+		--create-package \
+		protoc --proto-path=../proto ../proto/parser.proto
