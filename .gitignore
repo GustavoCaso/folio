@@ -17,3 +17,6 @@ docs/
 
 # Node
 node_modules/
+
+# Add CLAUDE.MD file
+!CLAUDE.md
