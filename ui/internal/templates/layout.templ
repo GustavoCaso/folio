@@ -17,11 +17,25 @@ templ Layout(title string) {
 			.status-FAILED     { color: #cc0000; }
 			mark.highlight     { background: #ffe066; cursor: pointer; border-radius: 2px; }
 			mark.highlight img { outline: 3px solid #ffeb3b; outline-offset: 2px; background: transparent; }
+			.error-banner      { background: #fff0f0; border: 1px solid #cc0000; color: #cc0000; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; }
 		</style>
 	</head>
 	<body>
 		<nav><a href="/">Documents</a></nav>
+    <br>
 		{ children... }
 	</body>
 	</html>
+}
+
+templ ErrorBanner(msg string) {
+	if msg != "" {
+		<div class="error-banner" role="alert">{ msg }</div>
+	}
+}
+
+templ ErrorPage(msg string) {
+	@Layout("Error") {
+		@ErrorBanner(msg)
+	}
 }

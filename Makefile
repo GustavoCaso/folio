@@ -1,4 +1,4 @@
-.PHONY: proto
+.PHONY: proto test up down
 
 proto:
 	@cd ui && make proto
@@ -9,7 +9,8 @@ test:
 	@cd ui && make test-js
 	@cd parser && make test
 	
-up:
+up: proto
+	@cd ui && make templ
 	@docker compose -p folio up --build -d 
 	
 down:
