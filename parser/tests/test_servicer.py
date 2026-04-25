@@ -91,10 +91,12 @@ async def test_convert_document_logs_request_id_from_meta(caplog):
     stream = _make_stream("doc.pdf", b"%PDF", request_id="req-xyz")
 
     fmt = JSONFormatter()
-    with caplog.at_level(logging.INFO, logger="parser.servicer"):
-        with patch("parser.servicer.convert", return_value="# Hi"):
-            async for _ in servicer.ConvertDocument(stream, context):
-                pass
+    with (
+        caplog.at_level(logging.INFO, logger="parser.servicer"),
+        patch("parser.servicer.convert", return_value="# Hi"),
+    ):
+        async for _ in servicer.ConvertDocument(stream, context):
+            pass
 
     matching = [
         json.loads(fmt.format(rec))

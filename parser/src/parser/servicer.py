@@ -9,10 +9,10 @@ from pathlib import Path
 
 import grpc
 
-from parser.progress import ProgressEvent, attach
 from parser.converter import convert
 from parser.formats.pdf import count_pdf_pages
 from parser.grpc import parser_pb2, parser_pb2_grpc
+from parser.progress import ProgressEvent, attach
 
 logger = logging.getLogger(__name__)
 
@@ -112,7 +112,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
                         evt = await asyncio.wait_for(
                             progress_q.get(), timeout=_DRAIN_POLL_INTERVAL
                         )
-                    except asyncio.TimeoutError:
+                    except TimeoutError:
                         continue
                     logger.debug(
                         "convert progress",

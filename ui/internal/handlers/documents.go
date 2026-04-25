@@ -58,7 +58,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		renderErr(http.StatusBadRequest, "No document file selected.")
 		return
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	pdfBytes, err := io.ReadAll(file)
 	if err != nil {

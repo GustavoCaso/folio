@@ -39,7 +39,7 @@ func (s *Store) ListHighlights(ctx context.Context, jobID string) ([]Highlight, 
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var out []Highlight
 	for rows.Next() {

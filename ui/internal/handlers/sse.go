@@ -31,7 +31,10 @@ func (h *Handlers) WatchJob(w http.ResponseWriter, r *http.Request) {
 		select {
 		case event := <-ch:
 			data, _ := json.Marshal(event)
-			fmt.Fprintf(w, "event: status\ndata: %s\n\n", data)
+			if _, err := fmt.Fprintf(w, "event: status\ndata: %s\n\n", data); err != nil {
+				log.Debug("sse write failed", "err", err)
+				return
+			}
 			flusher.Flush()
 			if event.Status == "DONE" || event.Status == "FAILED" {
 				log.Debug("sse terminal", "status", event.Status)

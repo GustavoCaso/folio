@@ -54,7 +54,9 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(created)
+	if err := json.NewEncoder(w).Encode(created); err != nil {
+		log.Error("encode highlight response failed", logging.Err(err), "highlight_id", created.ID)
+	}
 }
 
 func (h *Handlers) DeleteHighlight(w http.ResponseWriter, r *http.Request) {

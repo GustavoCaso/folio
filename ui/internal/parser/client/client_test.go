@@ -16,7 +16,7 @@ func TestNewClientBadAddress(t *testing.T) {
 	if err != nil {
 		t.Fatalf("unexpected error: %v", err)
 	}
-	defer c.Close()
+	defer func() { _ = c.Close() }()
 }
 
 func TestNewClientRequiresLogger(t *testing.T) {

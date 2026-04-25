@@ -34,7 +34,11 @@ func Execute() {
 		logger.Error("db open failed", logging.Err(err), "db_path", *dbPath)
 		os.Exit(1)
 	}
-	defer store.Close()
+	defer func() {
+		if err := store.Close(); err != nil {
+			logger.Error("db close failed", logging.Err(err))
+		}
+	}()
 
 	h, err := hub.New(logger.With("component", "hub"))
 	if err != nil {
@@ -47,7 +51,11 @@ func Execute() {
 		logger.Error("grpc dial failed", logging.Err(err), "parser_addr", *parserAddr)
 		os.Exit(1)
 	}
-	defer pc.Close()
+	defer func() {
+		if err := pc.Close(); err != nil {
+			logger.Error("parser client close failed", logging.Err(err))
+		}
+	}()
 
 	mux, err := handlers.Register(store, h, pc, *dataDir, logger.With("component", "handlers"))
 	if err != nil {

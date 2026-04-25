@@ -1,4 +1,5 @@
 import asyncio
+import contextlib
 import logging
 import re
 from contextlib import contextmanager
@@ -25,10 +26,8 @@ class _ProgressLogHandler(logging.Handler):
         evt = _parse(record)
         if evt is None:
             return
-        try:
+        with contextlib.suppress(RuntimeError):
             self._loop.call_soon_threadsafe(self._queue.put_nowait, evt)
-        except RuntimeError:
-            pass
 
 
 def _parse(record: logging.LogRecord) -> ProgressEvent | None:

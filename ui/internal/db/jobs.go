@@ -48,7 +48,7 @@ func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
 	if err != nil {
 		return nil, err
 	}
-	defer rows.Close()
+	defer func() { _ = rows.Close() }()
 
 	var jobs []Job
 	for rows.Next() {

@@ -22,7 +22,7 @@ func newTestStore(t *testing.T) *db.Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { store.Close() })
+	t.Cleanup(func() { _ = store.Close() })
 	return store
 }
 
@@ -46,7 +46,7 @@ func emptyMultipartRequest(t *testing.T) *http.Request {
 	t.Helper()
 	body := &bytes.Buffer{}
 	w := multipart.NewWriter(body)
-	w.Close()
+	_ = w.Close()
 	req := httptest.NewRequest(http.MethodPost, "/documents", body)
 	req.Header.Set("Content-Type", w.FormDataContentType())
 	return req
