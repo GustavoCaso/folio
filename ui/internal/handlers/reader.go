@@ -1,6 +1,8 @@
 package handlers
 
 import (
+	"database/sql"
+	"errors"
 	"net/http"
 	"os"
 
@@ -13,34 +15,58 @@ func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
 	jobID := r.PathValue("jobID")
 	log := logging.LoggerFrom(r.Context()).With("job_id", jobID)
 
+	renderErr := func(status int, msg string) {
+		w.WriteHeader(status)
+		if err := templates.ErrorPage(msg).Render(r.Context(), w); err != nil {
+			log.Error("render error page failed", logging.Err(err))
+		}
+	}
+
 	job, err := h.store.GetJob(r.Context(), jobID)
-	if err != nil || job.OutputPath == "" {
-		log.Warn("document not found", logging.Err(err), "output_path", job.OutputPath)
-		http.Error(w, "document not found or not yet converted", http.StatusNotFound)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			log.Warn("document not found", "job_id", jobID)
+			renderErr(http.StatusNotFound, "Document not found.")
+		} else {
+			log.Error("get job failed", logging.Err(err))
+			renderErr(http.StatusInternalServerError, "Failed to load document. Please try again.")
+		}
+		return
+	}
+
+	if job.OutputPath == "" {
+		log.Warn("document not ready", "status", job.Status)
+		msg := "Document is not ready yet."
+		if job.Status == "FAILED" {
+			msg = "Document conversion failed."
+		}
+		renderErr(http.StatusNotFound, msg)
 		return
 	}
 
 	src, err := os.ReadFile(job.OutputPath)
 	if err != nil {
 		log.Error("read markdown failed", logging.Err(err), "output_path", job.OutputPath)
-		http.Error(w, "failed to read markdown file", http.StatusInternalServerError)
+		renderErr(http.StatusInternalServerError, "Failed to read document. Please try again.")
 		return
 	}
 
 	rendered, err := renderer.Render(src)
 	if err != nil {
 		log.Error("render markdown failed", logging.Err(err))
-		http.Error(w, "failed to render markdown", http.StatusInternalServerError)
+		renderErr(http.StatusInternalServerError, "Failed to render document. Please try again.")
 		return
 	}
 
 	highlights, err := h.store.ListHighlights(r.Context(), jobID)
 	if err != nil {
 		log.Error("list highlights failed", logging.Err(err))
-		http.Error(w, "failed to load highlights", http.StatusInternalServerError)
+		renderErr(http.StatusInternalServerError, "Failed to load highlights. Please try again.")
 		return
 	}
 
 	log.Debug("reader rendered", "highlights", len(highlights), "md_bytes", len(src))
-	templates.Reader(job, rendered, highlights).Render(r.Context(), w)
+	if err := templates.Reader(job, rendered, highlights).Render(r.Context(), w); err != nil {
+		log.Error("render reader failed", logging.Err(err))
+	}
 }

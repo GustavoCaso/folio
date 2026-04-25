@@ -20,26 +20,42 @@ func (h *Handlers) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	jobs, err := h.store.ListJobs(r.Context())
 	if err != nil {
 		log.Error("list jobs failed", logging.Err(err))
-		http.Error(w, "failed to list jobs", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		if renderErr := templates.Documents(nil, "", "Failed to load documents. Please try again.").Render(r.Context(), w); renderErr != nil {
+			log.Error("render error page failed", logging.Err(renderErr))
+		}
 		return
 	}
 	watchJobID := r.URL.Query().Get("job_id")
-	templates.Documents(jobs, watchJobID).Render(r.Context(), w)
+	if err := templates.Documents(jobs, watchJobID, "").Render(r.Context(), w); err != nil {
+		log.Error("render documents failed", logging.Err(err))
+	}
 }
 
 func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	log := logging.LoggerFrom(r.Context())
 
+	renderErr := func(status int, msg string) {
+		jobs, listErr := h.store.ListJobs(r.Context())
+		if listErr != nil {
+			log.Error("list jobs failed during error render", logging.Err(listErr))
+		}
+		w.WriteHeader(status)
+		if err := templates.Documents(jobs, "", msg).Render(r.Context(), w); err != nil {
+			log.Error("render error page failed", logging.Err(err))
+		}
+	}
+
 	if err := r.ParseMultipartForm(128 << 20); err != nil { // 128 MB
 		log.Warn("upload too large", logging.Err(err))
-		http.Error(w, "request too large", http.StatusBadRequest)
+		renderErr(http.StatusBadRequest, "File too large (max 128 MB).")
 		return
 	}
 
 	file, header, err := r.FormFile("document")
 	if err != nil {
 		log.Warn("missing document field", logging.Err(err))
-		http.Error(w, "missing document field", http.StatusBadRequest)
+		renderErr(http.StatusBadRequest, "No document file selected.")
 		return
 	}
 	defer file.Close()
@@ -47,7 +63,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	pdfBytes, err := io.ReadAll(file)
 	if err != nil {
 		log.Error("read upload failed", logging.Err(err), "filename", header.Filename)
-		http.Error(w, "failed to read file", http.StatusInternalServerError)
+		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to read uploaded file. %v", err))
 		return
 	}
 
@@ -55,7 +71,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	job, err := h.store.CreateJob(r.Context(), header.Filename, reqID)
 	if err != nil {
 		log.Error("create job failed", logging.Err(err), "filename", header.Filename)
-		http.Error(w, "failed to create job", http.StatusInternalServerError)
+		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store job. %v", err))
 		return
 	}
 
