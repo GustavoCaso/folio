@@ -17,7 +17,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     convert_cmd = subparsers.add_parser("convert", help="Convert a document directly (no server)")
     convert_cmd.add_argument("input", help="Path to input document")
-    convert_cmd.add_argument("--output", "-o", help="Output path (default: same name with .md)", default=None)
+    convert_cmd.add_argument(
+        "--output", "-o", help="Output path (default: same name with .md)", default=None
+    )
     convert_cmd.set_defaults(func=_convert)
 
     return p

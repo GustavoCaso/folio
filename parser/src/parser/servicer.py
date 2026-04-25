@@ -103,15 +103,11 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
             progress_q: asyncio.Queue[ProgressEvent] = asyncio.Queue()
 
             with attach(progress_q, loop):
-                convert_task = loop.run_in_executor(
-                    self._executor, convert, tmp_path
-                )
+                convert_task = loop.run_in_executor(self._executor, convert, tmp_path)
 
                 while not convert_task.done():
                     try:
-                        evt = await asyncio.wait_for(
-                            progress_q.get(), timeout=_DRAIN_POLL_INTERVAL
-                        )
+                        evt = await asyncio.wait_for(progress_q.get(), timeout=_DRAIN_POLL_INTERVAL)
                     except TimeoutError:
                         continue
                     logger.debug(
@@ -167,9 +163,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
             # --- Stream markdown back in chunks ---
             md_chunks = 0
             for i in range(0, len(encoded), _CHUNK_SIZE):
-                yield parser_pb2.ConvertResult(
-                    markdown_chunk=encoded[i : i + _CHUNK_SIZE]
-                )
+                yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
                 md_chunks += 1
 
             yield parser_pb2.ConvertResult(
