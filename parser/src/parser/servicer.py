@@ -3,7 +3,7 @@ import logging
 import tempfile
 import time
 import uuid
-from collections.abc import AsyncIterator
+from collections.abc import AsyncGenerator, AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
 
@@ -20,7 +20,7 @@ _CHUNK_SIZE = 64 * 1024  # 64 KB per markdown chunk
 _DRAIN_POLL_INTERVAL = 0.5  # seconds
 
 
-class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
+class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[misc]
     """Stateless gRPC servicer. No state is retained between requests."""
 
     def __init__(self, num_workers: int = 2) -> None:
@@ -29,8 +29,8 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
     async def ConvertDocument(  # noqa: N802
         self,
         request_iterator: AsyncIterator[parser_pb2.ConvertChunk],
-        context: grpc.aio.ServicerContext,
-    ):
+        context: grpc.aio.ServicerContext[parser_pb2.ConvertChunk, parser_pb2.ConvertResult],
+    ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
         # Per-RPC correlation id so every log line for a single conversion
         # shares the same job_id field.
         job_id = uuid.uuid4().hex[:8]

@@ -2,6 +2,7 @@ import asyncio
 import contextlib
 import logging
 import re
+from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
@@ -17,7 +18,9 @@ class ProgressEvent:
 
 
 class _ProgressLogHandler(logging.Handler):
-    def __init__(self, queue: asyncio.Queue, loop: asyncio.AbstractEventLoop) -> None:
+    def __init__(
+        self, queue: asyncio.Queue[ProgressEvent], loop: asyncio.AbstractEventLoop
+    ) -> None:
         super().__init__(level=logging.DEBUG)
         self._queue = queue
         self._loop = loop
@@ -54,7 +57,7 @@ def _parse(record: logging.LogRecord) -> ProgressEvent | None:
 
 
 @contextmanager
-def attach(queue: asyncio.Queue, loop: asyncio.AbstractEventLoop):
+def attach(queue: asyncio.Queue[ProgressEvent], loop: asyncio.AbstractEventLoop) -> Iterator[None]:
     handler = _ProgressLogHandler(queue, loop)
     docling_logger = logging.getLogger("docling")
     prev_level = docling_logger.level
