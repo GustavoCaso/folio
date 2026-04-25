@@ -1,0 +1,43 @@
+name: parser
+
+on:
+  pull_request:
+    paths:
+      - "parser/**"
+      - "proto/**"
+      - ".github/workflows/parser.yml"
+  push:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: parser
+
+jobs:
+  python:
+    name: pytest + lint + typecheck
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up uv
+        uses: astral-sh/setup-uv@08807647e7069bb48b6ef5acd8ec9567f424441b
+        with:
+          enable-cache: true
+          cache-dependency-glob: parser/uv.lock
+          python-version: 3.12
+
+      - name: Sync dependencies
+        run: uv sync --frozen
+
+      - name: Lint
+        run: make lint-check
+
+      - name: Format check
+        run: make format-check
+
+      - name: Typecheck
+        run: make typecheck
+
+      - name: Test
+        run: make test
