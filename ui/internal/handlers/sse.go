@@ -30,7 +30,11 @@ func (h *Handlers) WatchJob(w http.ResponseWriter, r *http.Request) {
 	for {
 		select {
 		case event := <-ch:
-			data, _ := json.Marshal(event)
+			data, marshalErr := json.Marshal(event)
+			if marshalErr != nil {
+				log.Warn("sse marshal failed", "err", marshalErr)
+				return
+			}
 			if _, err := fmt.Fprintf(w, "event: status\ndata: %s\n\n", data); err != nil {
 				log.Debug("sse write failed", "err", err)
 				return
