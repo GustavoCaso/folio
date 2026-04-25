@@ -117,7 +117,7 @@ func TestMiddlewareLogsRequestAndPropagatesID(t *testing.T) {
 		}
 		seenReqID = w.Header().Get("X-Request-ID")
 		w.WriteHeader(http.StatusCreated)
-		w.Write([]byte("ok"))
+		_, _ = w.Write([]byte("ok"))
 	})
 
 	srv := Middleware(base)(handler)

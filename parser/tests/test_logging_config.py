@@ -30,9 +30,7 @@ def test_json_formatter_core_fields():
 
 
 def test_json_formatter_includes_extras():
-    out = JSONFormatter().format(
-        _make_record(extras={"job_id": "abc", "pages_done": 3})
-    )
+    out = JSONFormatter().format(_make_record(extras={"job_id": "abc", "pages_done": 3}))
     decoded = json.loads(out)
     assert decoded["job_id"] == "abc"
     assert decoded["pages_done"] == 3
@@ -43,9 +41,15 @@ def test_json_formatter_captures_exception():
         raise ValueError("boom")
     except ValueError:
         import sys
+
         rec = logging.LogRecord(
-            name="parser.x", level=logging.ERROR, pathname=__file__,
-            lineno=1, msg="failed", args=(), exc_info=sys.exc_info(),
+            name="parser.x",
+            level=logging.ERROR,
+            pathname=__file__,
+            lineno=1,
+            msg="failed",
+            args=(),
+            exc_info=sys.exc_info(),
         )
     decoded = json.loads(JSONFormatter().format(rec))
     assert decoded["level"] == "error"

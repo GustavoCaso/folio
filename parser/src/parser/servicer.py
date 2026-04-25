@@ -1,18 +1,23 @@
+from __future__ import annotations
+
 import asyncio
 import logging
 import tempfile
 import time
 import uuid
-from collections.abc import AsyncIterator
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from collections.abc import AsyncGenerator, AsyncIterator
 
 import grpc
 
-from parser.progress import ProgressEvent, attach
 from parser.converter import convert
 from parser.formats.pdf import count_pdf_pages
 from parser.grpc import parser_pb2, parser_pb2_grpc
+from parser.progress import ProgressEvent, attach
 
 logger = logging.getLogger(__name__)
 
@@ -20,7 +25,7 @@ _CHUNK_SIZE = 64 * 1024  # 64 KB per markdown chunk
 _DRAIN_POLL_INTERVAL = 0.5  # seconds
 
 
-class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
+class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[misc]
     """Stateless gRPC servicer. No state is retained between requests."""
 
     def __init__(self, num_workers: int = 2) -> None:
@@ -29,8 +34,8 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
     async def ConvertDocument(  # noqa: N802
         self,
         request_iterator: AsyncIterator[parser_pb2.ConvertChunk],
-        context: grpc.aio.ServicerContext,
-    ):
+        context: grpc.aio.ServicerContext[parser_pb2.ConvertChunk, parser_pb2.ConvertResult],
+    ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
         # Per-RPC correlation id so every log line for a single conversion
         # shares the same job_id field.
         job_id = uuid.uuid4().hex[:8]
@@ -103,16 +108,12 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
             progress_q: asyncio.Queue[ProgressEvent] = asyncio.Queue()
 
             with attach(progress_q, loop):
-                convert_task = loop.run_in_executor(
-                    self._executor, convert, tmp_path
-                )
+                convert_task = loop.run_in_executor(self._executor, convert, tmp_path)
 
                 while not convert_task.done():
                     try:
-                        evt = await asyncio.wait_for(
-                            progress_q.get(), timeout=_DRAIN_POLL_INTERVAL
-                        )
-                    except asyncio.TimeoutError:
+                        evt = await asyncio.wait_for(progress_q.get(), timeout=_DRAIN_POLL_INTERVAL)
+                    except TimeoutError:
                         continue
                     logger.debug(
                         "convert progress",
@@ -167,9 +168,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):
             # --- Stream markdown back in chunks ---
             md_chunks = 0
             for i in range(0, len(encoded), _CHUNK_SIZE):
-                yield parser_pb2.ConvertResult(
-                    markdown_chunk=encoded[i : i + _CHUNK_SIZE]
-                )
+                yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
                 md_chunks += 1
 
             yield parser_pb2.ConvertResult(

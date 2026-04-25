@@ -1,0 +1,60 @@
+name: ui
+
+on:
+  pull_request:
+    paths:
+      - "ui/**"
+      - "proto/**"
+      - ".github/workflows/ui.yml"
+  push:
+    branches: [main]
+
+defaults:
+  run:
+    working-directory: ui
+
+jobs:
+  go:
+    name: go test + lint
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: ui/go.mod
+          cache-dependency-path: ui/go.sum
+
+      - name: Download modules
+        run: go mod download
+
+      - name: Build
+        run: make build
+
+      - name: Test (race)
+        run: make test-race
+
+      - name: golangci-lint
+        uses: golangci/golangci-lint-action@v9
+        with:
+          version: "v2.11.3"
+          working-directory: ui
+
+  js:
+    name: vitest
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up mise
+        uses: jdx/mise-action@v4
+        with:
+          working_directory: ui
+          cache: true
+
+      - name: Install
+        run: mise exec -- pnpm install --frozen-lockfile
+
+      - name: Test
+        run: make test-js

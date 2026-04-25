@@ -8,13 +8,20 @@ from parser import progress
 
 def _record(name: str, msg: str, level: int = logging.DEBUG) -> logging.LogRecord:
     return logging.LogRecord(
-        name=name, level=level, pathname=__file__, lineno=1,
-        msg=msg, args=None, exc_info=None,
+        name=name,
+        level=level,
+        pathname=__file__,
+        lineno=1,
+        msg=msg,
+        args=None,
+        exc_info=None,
     )
 
 
 def test_parse_finished_pages():
-    evt = progress._parse(_record("docling.pipeline.base_pipeline", "Finished converting pages 3/12 time=1.234"))
+    evt = progress._parse(
+        _record("docling.pipeline.base_pipeline", "Finished converting pages 3/12 time=1.234")
+    )
     assert evt is not None
     assert evt.stage == "processing"
     assert evt.pages_done == 3
@@ -22,7 +29,9 @@ def test_parse_finished_pages():
 
 
 def test_parse_initializing_pipeline():
-    evt = progress._parse(_record("docling.document_converter", "Initializing pipeline for StandardPdfPipeline"))
+    evt = progress._parse(
+        _record("docling.document_converter", "Initializing pipeline for StandardPdfPipeline")
+    )
     assert evt is not None
     assert evt.stage == "loading"
 

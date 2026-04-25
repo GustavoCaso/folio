@@ -1,4 +1,4 @@
-.PHONY: build test test-js proto templ
+.PHONY: build test test-js test-race lint lint-check format format-check proto templ
 
 build:
 	go build ./...
@@ -10,15 +10,21 @@ test:
 test-js:
 	@echo "running ui js tests"
 	@mise exec -- pnpm test
-	
+
 test-race:
 	go test ./... -race
 
 lint:
 	golangci-lint run --fix
 
+lint-check:
+	golangci-lint run
+
 format:
 	golangci-lint fmt .
+
+format-check:
+	golangci-lint fmt --diff .
 
 proto:
 	@echo "generating ui proto defintions"

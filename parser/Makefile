@@ -1,4 +1,4 @@
-.PHONY: test lint lint-check format typecheck proto
+.PHONY: test lint lint-check format format-check typecheck proto
 
 test:
 	@echo "running parser tests"
@@ -12,6 +12,9 @@ lint-check:
 
 format:
 	uv run ruff format src/ tests/
+
+format-check:
+	uv run ruff format --check src/ tests/
 
 typecheck:
 	uv run mypy src/

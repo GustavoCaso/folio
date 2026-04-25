@@ -12,7 +12,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	job, err := store.CreateJob(context.Background(), "book.pdf", "req-123")
 	if err != nil {
@@ -45,7 +45,7 @@ func TestUpdateJobProgress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
 	if err := store.UpdateJobProgress(context.Background(), job.ID, "PROCESSING", 5, 100); err != nil {
@@ -66,7 +66,7 @@ func TestMarkJobDone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
 	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
@@ -87,7 +87,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
 
@@ -127,7 +127,7 @@ func TestDeleteHighlight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer store.Close()
+	defer func() { _ = store.Close() }()
 
 	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
 	h, _ := store.CreateHighlight(context.Background(), db.Highlight{

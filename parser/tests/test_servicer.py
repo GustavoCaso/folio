@@ -63,8 +63,10 @@ async def test_convert_document_emits_stage_transitions():
 
     stream = _make_stream("doc.pdf", b"%PDF")
 
-    with patch("parser.servicer.convert", return_value="# Hi"), \
-         patch("parser.servicer.count_pdf_pages", return_value=7):
+    with (
+        patch("parser.servicer.convert", return_value="# Hi"),
+        patch("parser.servicer.count_pdf_pages", return_value=7),
+    ):
         results = []
         async for result in servicer.ConvertDocument(stream, context):
             results.append(result)
@@ -75,7 +77,9 @@ async def test_convert_document_emits_stage_transitions():
     assert "exporting" in stages
     assert "done" in stages
 
-    loading = next(r.status for r in results if r.HasField("status") and r.status.stage == "loading")
+    loading = next(
+        r.status for r in results if r.HasField("status") and r.status.stage == "loading"
+    )
     assert loading.pages_total == 7
 
 
@@ -91,10 +95,12 @@ async def test_convert_document_logs_request_id_from_meta(caplog):
     stream = _make_stream("doc.pdf", b"%PDF", request_id="req-xyz")
 
     fmt = JSONFormatter()
-    with caplog.at_level(logging.INFO, logger="parser.servicer"):
-        with patch("parser.servicer.convert", return_value="# Hi"):
-            async for _ in servicer.ConvertDocument(stream, context):
-                pass
+    with (
+        caplog.at_level(logging.INFO, logger="parser.servicer"),
+        patch("parser.servicer.convert", return_value="# Hi"),
+    ):
+        async for _ in servicer.ConvertDocument(stream, context):
+            pass
 
     matching = [
         json.loads(fmt.format(rec))
