@@ -3,6 +3,7 @@ package handlers_test
 import (
 	"bytes"
 	"context"
+	"fmt"
 	"io"
 	"log/slog"
 	"mime/multipart"
@@ -79,9 +80,19 @@ func TestUploadDocumentError_ShowsBanner(t *testing.T) {
 	}
 }
 
-func TestListDocuments_RendersJobs(t *testing.T) {
+func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
 	store := newTestStore(t)
-	if _, err := store.CreateJob(context.Background(), "report.pdf", ""); err != nil {
+	job1, err := store.CreateJob(t.Context(), "report.pdf", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	job2, err := store.CreateJob(t.Context(), "pending-report.pdf", "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.MarkJobDone(t.Context(), job1.ID, "./whatever"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -95,6 +106,12 @@ func TestListDocuments_RendersJobs(t *testing.T) {
 	body := rec.Body.String()
 	if !strings.Contains(body, "report.pdf") {
 		t.Errorf("expected 'report.pdf' in response, got:\n%s", body)
+	}
+	if !strings.Contains(body, "pending-report.pdf") {
+		t.Errorf("expected 'pending-report.pdf' in response, got:\n%s", body)
+	}
+	if !strings.Contains(body, fmt.Sprintf(`data-job-ids="%s"`, job2.ID)) {
+		t.Errorf("expected data-job-ids attribute with job id, got: %s", body)
 	}
 	if strings.Contains(body, `class="error-banner"`) {
 		t.Errorf("unexpected error-banner on successful list, got:\n%s", body)

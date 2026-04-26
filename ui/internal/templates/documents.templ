@@ -1,33 +1,32 @@
 package templates
 
-import "fmt"
+import "strings"
 import "github.com/GustavoCaso/folio/ui/internal/db"
 
 templ DocumentList(jobs []db.Job) {
 	if len(jobs) > 0 {
 		<ul>
-			for _, job := range jobs {
-				<li id={ "job-" + job.ID }>
-					<strong>{ job.Filename }</strong>
-					<span class={ "status status-" + job.Status }>{ job.Status }</span>
-					if job.Status == "PROCESSING" && job.PagesTotal > 0 {
-						<span class="status">
-							({ fmt.Sprintf("%d/%d pages", job.PagesDone, job.PagesTotal) })
-						</span>
-					}
-					if job.Status == "DONE" {
-						— <a href={ templ.SafeURL("/read/" + job.ID) }>Read</a>
-					}
-					if job.Status == "FAILED" {
-						<span class="status">{ job.Error }</span>
-					}
+			for _, j := range jobs {
+				<li id={ "job-" + j.ID }>
+					<strong class="filename">{ j.Filename }</strong>
+					<span class={ "status status-" + string(j.Status) }>{ string(j.Status) }</span>
+					<span class="detail">
+						if j.Status == "FAILED" {
+							{ j.Error }
+						}
+					</span>
+					<span class="read-link">
+						if j.Status == "DONE" {
+							— <a href={ templ.SafeURL("/read/" + j.ID) }>Read</a>
+						}
+					</span>
 				</li>
 			}
 		</ul>
 	}
 }
 
-templ Documents(jobs []db.Job, watchJobID string, errMsg string) {
+templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 	@Layout("Documents") {
 		@ErrorBanner(errMsg)
 		<h1>Documents</h1>
@@ -38,31 +37,39 @@ templ Documents(jobs []db.Job, watchJobID string, errMsg string) {
 
 		@DocumentList(jobs)
 
-		if watchJobID != "" {
-			<div id="watch-config" data-job-id={ watchJobID } style="display:none"></div>
+		if len(watchJobIDs) > 0 {
+			<div id="watch-config" data-job-ids={ strings.Join(watchJobIDs, ",") } style="display:none"></div>
 			<script>
 				(function() {
-					const jobID = document.getElementById("watch-config").dataset.jobId;
-					const es = new EventSource("/jobs/" + jobID + "/watch");
-					es.addEventListener("status", function(e) {
-						const d = JSON.parse(e.data);
+					const ids = document.getElementById("watch-config").dataset.jobIds.split(",");
+					ids.forEach(function(jobID) {
 						const li = document.getElementById("job-" + jobID);
-						if (li && d.Stage) {
-							let s = li.querySelector(".live-stage");
-							if (!s) {
-								s = document.createElement("span");
-								s.className = "status live-stage";
-								li.appendChild(s);
+						if (!li) return;
+						const es = new EventSource("/jobs/" + jobID + "/watch");
+						es.addEventListener("status", function(e) {
+							const d = JSON.parse(e.data);
+							if (d.Status) {
+								const status = li.querySelector(".status");
+								status.textContent = d.Status;
+								status.className = "status status-" + d.Status;
 							}
-							let text = d.Stage;
-							if (d.Message) text += " — " + d.Message;
-							if (d.PagesTotal) text += " (" + d.PagesDone + "/" + d.PagesTotal + ")";
-							s.textContent = text;
-						}
-						if (d.Status === "DONE" || d.Status === "FAILED") {
-							es.close();
-							window.location.reload();
-						}
+
+							const detail = li.querySelector(".detail");
+							if (d.Status === "DONE") {
+								detail.textContent = "";
+								const link = li.querySelector(".read-link");
+								link.innerHTML = '— <a href="/read/' + jobID + '">Read</a>';
+								es.close();
+							} else if (d.Status === "FAILED") {
+								detail.textContent = d.Error || "";
+								es.close();
+							} else if (d.Stage) {
+								let text = d.Stage;
+								if (d.Message) text += " — " + d.Message;
+								if (d.PagesTotal) text += " (" + d.PagesDone + "/" + d.PagesTotal + ")";
+								detail.textContent = text;
+							}
+						});
 					});
 				})();
 			</script>

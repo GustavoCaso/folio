@@ -21,13 +21,22 @@ func (h *Handlers) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error("list jobs failed", logging.Err(err))
 		w.WriteHeader(http.StatusInternalServerError)
-		if renderErr := templates.Documents(nil, "", "Failed to load documents. Please try again.").Render(r.Context(), w); renderErr != nil {
+		if renderErr := templates.Documents(nil, nil, "Failed to load documents. Please try again.").Render(r.Context(), w); renderErr != nil {
 			log.Error("render error page failed", logging.Err(renderErr))
 		}
 		return
 	}
-	watchJobID := r.URL.Query().Get("job_id")
-	if err := templates.Documents(jobs, watchJobID, "").Render(r.Context(), w); err != nil {
+	watchJobs := []string{}
+	pendingJobs, err := h.store.GetPendingJobs(r.Context())
+	if err != nil {
+		log.Error("get pending jobs failed", logging.Err(err))
+	} else {
+		for _, pendingJob := range pendingJobs {
+			watchJobs = append(watchJobs, pendingJob.ID)
+		}
+	}
+
+	if err := templates.Documents(jobs, watchJobs, "").Render(r.Context(), w); err != nil {
 		log.Error("render documents failed", logging.Err(err))
 	}
 }
@@ -41,7 +50,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 			log.Error("list jobs failed during error render", logging.Err(listErr))
 		}
 		w.WriteHeader(status)
-		if err := templates.Documents(jobs, "", msg).Render(r.Context(), w); err != nil {
+		if err := templates.Documents(jobs, nil, msg).Render(r.Context(), w); err != nil {
 			log.Error("render error page failed", logging.Err(err))
 		}
 	}
@@ -85,7 +94,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// Snapshot the request_id so parser logs link back to the originating upload.
 	go h.runConversion(job.ID, reqID, header.Filename, pdfBytes)
 
-	http.Redirect(w, r, fmt.Sprintf("/?job_id=%s", job.ID), http.StatusSeeOther)
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
 
 func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []byte) {
