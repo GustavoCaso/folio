@@ -20,12 +20,11 @@ def _record(name: str, msg: str, level: int = logging.DEBUG) -> logging.LogRecor
 
 def test_parse_finished_pages():
     evt = progress._parse(
-        _record("docling.pipeline.base_pipeline", "Finished converting pages 3/12 time=1.234")
+        _record("docling.pipeline.base_pipeline", "Stage assemble: run_id=1 pages=[3] time=1.234")
     )
     assert evt is not None
     assert evt.stage == "processing"
     assert evt.pages_done == 3
-    assert evt.pages_total == 12
 
 
 def test_parse_initializing_pipeline():
@@ -51,12 +50,11 @@ async def test_attach_emits_events_to_queue():
 
     with progress.attach(queue, loop):
         logging.getLogger("docling.pipeline.base_pipeline").debug(
-            "Finished converting pages 5/10 time=2.0"
+            "Stage assemble: run_id=1 pages=[5] time=2.0"
         )
         evt = await asyncio.wait_for(queue.get(), timeout=1.0)
 
     assert evt.pages_done == 5
-    assert evt.pages_total == 10
 
 
 @pytest.mark.asyncio
