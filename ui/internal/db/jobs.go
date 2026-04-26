@@ -41,6 +41,27 @@ func (s *Store) GetJob(ctx context.Context, id string) (Job, error) {
 	return scanJob(row)
 }
 
+func (s *Store) GetPendingJobs(ctx context.Context) ([]Job, error) {
+	rows, err := s.db.QueryContext(ctx,
+		`SELECT id, filename, request_id, status, pages_done, pages_total, error, output_path, created_at, updated_at
+		 FROM jobs WHERE status = 'PENDING'`)
+
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var jobs []Job
+	for rows.Next() {
+		j, err := scanJob(rows)
+		if err != nil {
+			return nil, err
+		}
+		jobs = append(jobs, j)
+	}
+	return jobs, rows.Err()
+}
+
 func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, filename, request_id, status, pages_done, pages_total, error, output_path, created_at, updated_at

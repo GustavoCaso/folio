@@ -61,6 +61,67 @@ func TestUpdateJobProgress(t *testing.T) {
 	}
 }
 
+func TestGetPendingJobs(t *testing.T) {
+	store, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+
+	pending1, _ := store.CreateJob(ctx, "a.pdf", "")
+	pending2, _ := store.CreateJob(ctx, "b.pdf", "")
+	processing, _ := store.CreateJob(ctx, "c.pdf", "")
+	done, _ := store.CreateJob(ctx, "d.pdf", "")
+	failed, _ := store.CreateJob(ctx, "e.pdf", "")
+
+	if err := store.UpdateJobProgress(ctx, processing.ID, "PROCESSING", 1, 10); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkJobDone(ctx, done.ID, "/data/d.md"); err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkJobFailed(ctx, failed.ID, "boom"); err != nil {
+		t.Fatal(err)
+	}
+
+	jobs, err := store.GetPendingJobs(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 2 {
+		t.Fatalf("expected 2 pending jobs, got %d", len(jobs))
+	}
+
+	got := map[string]bool{}
+	for _, j := range jobs {
+		if j.Status != "PENDING" {
+			t.Errorf("expected PENDING, got %s for %s", j.Status, j.ID)
+		}
+		got[j.ID] = true
+	}
+	if !got[pending1.ID] || !got[pending2.ID] {
+		t.Fatalf("missing pending jobs in result: %v", got)
+	}
+}
+
+func TestGetPendingJobsEmpty(t *testing.T) {
+	store, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	jobs, err := store.GetPendingJobs(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(jobs) != 0 {
+		t.Fatalf("expected 0 pending jobs, got %d", len(jobs))
+	}
+}
+
 func TestMarkJobDone(t *testing.T) {
 	store, err := db.New(":memory:")
 	if err != nil {

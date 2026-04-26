@@ -20,4 +20,6 @@ CREATE TABLE jobs
 
 INSERT INTO jobs SELECT * FROM old_jobs;
 
+DROP TABLE old_jobs;
+
 PRAGMA foreign_keys=on;

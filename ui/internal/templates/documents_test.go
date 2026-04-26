@@ -10,10 +10,10 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/templates"
 )
 
-func renderDocuments(t *testing.T, jobs []db.Job, watchJobID string) string {
+func renderDocuments(t *testing.T, jobs []db.Job, watchJobIDs ...string) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.Documents(jobs, watchJobID, "").Render(context.Background(), &buf); err != nil {
+	if err := templates.Documents(jobs, watchJobIDs, "").Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()
@@ -39,16 +39,6 @@ func TestDocumentList_RendersIDAndFilename(t *testing.T) {
 		if !strings.Contains(got, want) {
 			t.Errorf("expected %q in output, got: %s", want, got)
 		}
-	}
-}
-
-func TestDocumentList_ProcessingShowsPageCount(t *testing.T) {
-	got := renderDocumentList(t, []db.Job{
-		{ID: "j1", Filename: "doc.pdf", Status: "PROCESSING", PagesDone: 2, PagesTotal: 5},
-	})
-
-	if !strings.Contains(got, "2/5 pages") {
-		t.Errorf("expected '2/5 pages' in output, got: %s", got)
 	}
 }
 
@@ -93,8 +83,8 @@ func TestDocumentList_EmptyRendersNothing(t *testing.T) {
 func TestDocumentsEmbedsJobIDInDataAttribute(t *testing.T) {
 	got := renderDocuments(t, nil, "job-abc-123")
 
-	if !strings.Contains(got, `data-job-id="job-abc-123"`) {
-		t.Errorf("expected data-job-id attribute with job id, got: %s", got)
+	if !strings.Contains(got, `data-job-ids="job-abc-123"`) {
+		t.Errorf("expected data-job-ids attribute with job id, got: %s", got)
 	}
 }
 
@@ -110,10 +100,10 @@ func TestDocumentsScriptHasNoUnrenderedTemplExpression(t *testing.T) {
 }
 
 func TestDocumentsOmitsScriptWhenNoWatchJobID(t *testing.T) {
-	got := renderDocuments(t, nil, "")
+	got := renderDocuments(t, nil)
 
 	if strings.Contains(got, "EventSource") {
-		t.Errorf("expected no EventSource script when watchJobID empty, got: %s", got)
+		t.Errorf("expected no EventSource script when watchJobIDs empty, got: %s", got)
 	}
 }
 
@@ -121,7 +111,7 @@ func TestDocumentsIncludesDocumentList(t *testing.T) {
 	jobs := []db.Job{
 		{ID: "j1", Filename: "alpha.pdf", Status: "DONE"},
 	}
-	got := renderDocuments(t, jobs, "")
+	got := renderDocuments(t, jobs)
 
 	if !strings.Contains(got, `id="job-j1"`) {
 		t.Errorf("expected DocumentList output inside Documents, got: %s", got)
@@ -130,7 +120,7 @@ func TestDocumentsIncludesDocumentList(t *testing.T) {
 
 func TestDocumentsShowsErrorBanner(t *testing.T) {
 	var buf bytes.Buffer
-	if err := templates.Documents(nil, "", "Something went wrong").Render(context.Background(), &buf); err != nil {
+	if err := templates.Documents(nil, nil, "Something went wrong").Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	got := buf.String()
@@ -144,9 +134,60 @@ func TestDocumentsShowsErrorBanner(t *testing.T) {
 }
 
 func TestDocumentsOmitsErrorBannerWhenNoError(t *testing.T) {
-	got := renderDocuments(t, nil, "")
+	got := renderDocuments(t, nil)
 
 	if strings.Contains(got, `class="error-banner"`) {
 		t.Errorf("expected no error-banner element when errMsg empty, got: %s", got)
+	}
+}
+
+func TestDocumentsWatcherScriptMatchesExpected(t *testing.T) {
+	got := renderDocuments(t, nil, "job-1")
+
+	want := `<script>
+				(function() {
+					const ids = document.getElementById("watch-config").dataset.jobIds.split(",");
+					ids.forEach(function(jobID) {
+						const li = document.getElementById("job-" + jobID);
+						if (!li) return;
+						const es = new EventSource("/jobs/" + jobID + "/watch");
+						es.addEventListener("status", function(e) {
+							const d = JSON.parse(e.data);
+							if (d.Status) {
+								const status = li.querySelector(".status");
+								status.textContent = d.Status;
+								status.className = "status status-" + d.Status;
+							}
+
+							const detail = li.querySelector(".detail");
+							if (d.Status === "DONE") {
+								detail.textContent = "";
+								const link = li.querySelector(".read-link");
+								link.innerHTML = '— <a href="/read/' + jobID + '">Read</a>';
+								es.close();
+							} else if (d.Status === "FAILED") {
+								detail.textContent = d.Error || "";
+								es.close();
+							} else if (d.Stage) {
+								let text = d.Stage;
+								if (d.Message) text += " — " + d.Message;
+								if (d.PagesTotal) text += " (" + d.PagesDone + "/" + d.PagesTotal + ")";
+								detail.textContent = text;
+							}
+						});
+					});
+				})();
+			</script>`
+
+	if !strings.Contains(got, want) {
+		t.Errorf("watcher script does not match expected.\nwant:\n%s\n\ngot:\n%s", want, got)
+	}
+}
+
+func TestDocumentsEmbedsMultipleJobIDs(t *testing.T) {
+	got := renderDocuments(t, nil, "job-1", "job-2")
+
+	if !strings.Contains(got, `data-job-ids="job-1,job-2"`) {
+		t.Errorf("expected joined data-job-ids attribute, got: %s", got)
 	}
 }
