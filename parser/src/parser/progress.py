@@ -6,7 +6,7 @@ from collections.abc import Iterator
 from contextlib import contextmanager
 from dataclasses import dataclass
 
-_PAGE_RE = re.compile(r"Finished converting pages (\d+)/(\d+)")
+_STAGE_ASSEMBLE = re.compile(r"Stage assemble: run_id=\d+ pages=\[(\d+)\] .*")
 
 
 @dataclass
@@ -14,7 +14,6 @@ class ProgressEvent:
     stage: str
     message: str
     pages_done: int = 0
-    pages_total: int = 0
 
 
 class _ProgressLogHandler(logging.Handler):
@@ -38,15 +37,15 @@ def _parse(record: logging.LogRecord) -> ProgressEvent | None:
     name = record.name
 
     if name.startswith("docling"):
-        m = _PAGE_RE.search(msg)
-        if m:
-            done, total = int(m.group(1)), int(m.group(2))
-            return ProgressEvent(
-                stage="processing",
-                message=f"converted page {done}/{total}",
-                pages_done=done,
-                pages_total=total,
-            )
+        if "Stage assemble" in msg:
+            m = _STAGE_ASSEMBLE.search(msg)
+            if m:
+                done = int(m.group(1))
+                return ProgressEvent(
+                    stage="processing",
+                    message=f"converted page {done}",
+                    pages_done=done,
+                )
         if "Initializing pipeline" in msg:
             return ProgressEvent(stage="loading", message="initializing pipeline")
         if "Auto OCR model selected" in msg:

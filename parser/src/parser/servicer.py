@@ -121,7 +121,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                             **ctx,
                             "stage": evt.stage,
                             "pages_done": evt.pages_done,
-                            "pages_total": evt.pages_total or pages_total,
+                            "pages_total": pages_total,
                         },
                     )
                     yield parser_pb2.ConvertResult(
@@ -130,7 +130,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                             stage=evt.stage,
                             message=evt.message,
                             pages_done=evt.pages_done,
-                            pages_total=evt.pages_total or pages_total,
+                            pages_total=pages_total,
                         )
                     )
 
@@ -143,7 +143,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                             stage=evt.stage,
                             message=evt.message,
                             pages_done=evt.pages_done,
-                            pages_total=evt.pages_total or pages_total,
+                            pages_total=pages_total,
                         )
                     )
 
