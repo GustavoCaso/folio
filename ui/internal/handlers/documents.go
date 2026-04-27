@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"net/http"
@@ -93,6 +94,45 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// Start conversion in background — does not block the HTTP response.
 	// Snapshot the request_id so parser logs link back to the originating upload.
 	go h.runConversion(job.ID, reqID, header.Filename, pdfBytes)
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (h *Handlers) DeleteDocument(w http.ResponseWriter, r *http.Request) {
+	log := logging.LoggerFrom(r.Context())
+	id := r.PathValue("id")
+
+	renderErr := func(status int, msg string) {
+		w.WriteHeader(status)
+		if err := templates.ErrorPage(msg).Render(r.Context(), w); err != nil {
+			log.Error("render error page failed", logging.Err(err))
+		}
+	}
+
+	job, err := h.store.GetJob(r.Context(), id)
+	if err != nil {
+		log.Warn("delete: job not found", "id", id, logging.Err(err))
+		renderErr(http.StatusNotFound, "job not found")
+		return
+	}
+
+	if job.Status == "PENDING" || job.Status == "PROCESSING" {
+		log.Warn("delete: job not in terminal state", "id", id, "status", job.Status)
+		renderErr(http.StatusConflict, "delete: job not in terminal state")
+		return
+	}
+
+	if err := h.store.DeleteJob(r.Context(), id); err != nil {
+		log.Error("delete: db delete failed", "id", id, logging.Err(err))
+		renderErr(http.StatusInternalServerError, fmt.Sprintf("delete: db delete failed. %v", err))
+		return
+	}
+
+	if job.OutputPath != "" {
+		if err := os.Remove(job.OutputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Error("delete: remove markdown failed", "path", job.OutputPath, logging.Err(err))
+		}
+	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
