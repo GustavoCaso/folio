@@ -36,6 +36,7 @@ func Register(store *db.Store, h *hub.Hub, pc *parserclient.Client, dataDir stri
 
 	mux.HandleFunc("GET /", hs.ListDocuments)
 	mux.HandleFunc("POST /documents", hs.UploadDocument)
+	mux.HandleFunc("POST /documents/{id}/delete", hs.DeleteDocument)
 	mux.HandleFunc("GET /read/{jobID}", hs.ReadDocument)
 	mux.HandleFunc("GET /jobs/{jobID}/watch", hs.WatchJob)
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)

@@ -98,6 +98,11 @@ func (s *Store) MarkJobDone(ctx context.Context, id, outputPath string) error {
 	return err
 }
 
+func (s *Store) DeleteJob(ctx context.Context, id string) error {
+	_, err := s.db.ExecContext(ctx, `DELETE FROM jobs WHERE id = ?`, id)
+	return err
+}
+
 func (s *Store) MarkJobFailed(ctx context.Context, id, errMsg string) error {
 	_, err := s.db.ExecContext(ctx,
 		`UPDATE jobs SET status = 'FAILED', error = ?, updated_at = ? WHERE id = ?`,

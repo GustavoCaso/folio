@@ -3,12 +3,15 @@ package handlers_test
 import (
 	"bytes"
 	"context"
+	"errors"
 	"fmt"
 	"io"
 	"log/slog"
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -77,6 +80,94 @@ func TestUploadDocumentError_ShowsBanner(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), `class="error-banner"`) {
 		t.Errorf("expected error-banner in response, got:\n%s", rec.Body.String())
+	}
+}
+
+func TestDeleteDocument_RejectsPending(t *testing.T) {
+	store := newTestStore(t)
+	job, err := store.CreateJob(context.Background(), "pending.pdf", "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/delete", nil)
+	rec := httptest.NewRecorder()
+	newTestMux(t, store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", rec.Code)
+	}
+}
+
+func TestDeleteDocument_DeletesFailedJob(t *testing.T) {
+	store := newTestStore(t)
+	job, err := store.CreateJob(context.Background(), "failed.pdf", "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkJobFailed(context.Background(), job.ID, "parse error"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/delete", nil)
+	rec := httptest.NewRecorder()
+	newTestMux(t, store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Errorf("expected 303, got %d", rec.Code)
+	}
+
+	_, err = store.GetJob(context.Background(), job.ID)
+	if err == nil {
+		t.Error("expected job to be deleted")
+	}
+}
+
+func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
+	store := newTestStore(t)
+	dir := t.TempDir()
+	mdPath := filepath.Join(dir, "out.md")
+	if err := os.WriteFile(mdPath, []byte("# hello"), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	job, err := store.CreateJob(context.Background(), "done.pdf", "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkJobDone(context.Background(), job.ID, mdPath); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/delete", nil)
+	rec := httptest.NewRecorder()
+
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h, _ := hub.New(logger)
+	mux, _ := handlers.Register(store, h, nil, dir, logger)
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Errorf("expected 303, got %d", rec.Code)
+	}
+
+	if _, err := os.Stat(mdPath); !errors.Is(err, os.ErrNotExist) {
+		t.Error("expected markdown file to be deleted")
+	}
+
+	_, err = store.GetJob(context.Background(), job.ID)
+	if err == nil {
+		t.Error("expected job to be deleted")
+	}
+}
+
+func TestDeleteDocument_NotFound(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/documents/nonexistent-id/delete", nil)
+	rec := httptest.NewRecorder()
+	newTestMux(t, newTestStore(t)).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
 	}
 }
 

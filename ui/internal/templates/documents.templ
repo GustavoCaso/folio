@@ -20,9 +20,26 @@ templ DocumentList(jobs []db.Job) {
 							— <a href={ templ.SafeURL("/read/" + j.ID) }>Read</a>
 						}
 					</span>
+					<span class="delete-action">
+						if j.Status == "DONE" || j.Status == "FAILED" {
+							<form class="delete-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/delete") }
+								data-filename={ j.Filename }>
+								<button type="submit">Delete</button>
+							</form>
+						}
+					</span>
 				</li>
 			}
 		</ul>
+		<script>
+			document.querySelectorAll('form.delete-form').forEach(function(form) {
+				form.addEventListener('submit', function(e) {
+					if (!confirm('Delete ' + form.dataset.filename + ' ?')) {
+						e.preventDefault();
+					}
+				});
+			});
+		</script>
 	}
 }
 
@@ -41,6 +58,24 @@ templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 			<div id="watch-config" data-job-ids={ strings.Join(watchJobIDs, ",") } style="display:none"></div>
 			<script>
 				(function() {
+					function injectDeleteForm(li, jobID) {
+						const slot = li.querySelector(".delete-action");
+						if (!slot || slot.querySelector("form.delete-form")) return;
+						const filename = li.querySelector(".filename").textContent;
+						const form = document.createElement("form");
+						form.className = "delete-form";
+						form.method = "POST";
+						form.action = "/documents/" + jobID + "/delete";
+						form.dataset.filename = filename;
+						const btn = document.createElement("button");
+						btn.type = "submit";
+						btn.textContent = "Delete";
+						form.appendChild(btn);
+						form.addEventListener("submit", function(e) {
+							if (!confirm("Delete " + filename + " ?")) e.preventDefault();
+						});
+						slot.appendChild(form);
+					}
 					const ids = document.getElementById("watch-config").dataset.jobIds.split(",");
 					ids.forEach(function(jobID) {
 						const li = document.getElementById("job-" + jobID);
@@ -59,9 +94,11 @@ templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 								detail.textContent = "";
 								const link = li.querySelector(".read-link");
 								link.innerHTML = '— <a href="/read/' + jobID + '">Read</a>';
+								injectDeleteForm(li, jobID);
 								es.close();
 							} else if (d.Status === "FAILED") {
 								detail.textContent = d.Error || "";
+								injectDeleteForm(li, jobID);
 								es.close();
 							} else if (d.Stage) {
 								let text = d.Stage;

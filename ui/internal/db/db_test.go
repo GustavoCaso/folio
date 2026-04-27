@@ -183,6 +183,30 @@ func TestCreateAndListHighlights(t *testing.T) {
 	}
 }
 
+func TestDeleteJob(t *testing.T) {
+	store, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+
+	job, err := store.CreateJob(ctx, "test.pdf", "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if err := store.DeleteJob(ctx, job.ID); err != nil {
+		t.Fatalf("DeleteJob: %v", err)
+	}
+
+	_, err = store.GetJob(ctx, job.ID)
+	if err == nil {
+		t.Error("expected error after delete, got nil")
+	}
+}
+
 func TestDeleteHighlight(t *testing.T) {
 	store, err := db.New(":memory:")
 	if err != nil {

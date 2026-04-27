@@ -146,6 +146,24 @@ func TestDocumentsWatcherScriptMatchesExpected(t *testing.T) {
 
 	want := `<script>
 				(function() {
+					function injectDeleteForm(li, jobID) {
+						const slot = li.querySelector(".delete-action");
+						if (!slot || slot.querySelector("form.delete-form")) return;
+						const filename = li.querySelector(".filename").textContent;
+						const form = document.createElement("form");
+						form.className = "delete-form";
+						form.method = "POST";
+						form.action = "/documents/" + jobID + "/delete";
+						form.dataset.filename = filename;
+						const btn = document.createElement("button");
+						btn.type = "submit";
+						btn.textContent = "Delete";
+						form.appendChild(btn);
+						form.addEventListener("submit", function(e) {
+							if (!confirm("Delete " + filename + " ?")) e.preventDefault();
+						});
+						slot.appendChild(form);
+					}
 					const ids = document.getElementById("watch-config").dataset.jobIds.split(",");
 					ids.forEach(function(jobID) {
 						const li = document.getElementById("job-" + jobID);
@@ -164,9 +182,11 @@ func TestDocumentsWatcherScriptMatchesExpected(t *testing.T) {
 								detail.textContent = "";
 								const link = li.querySelector(".read-link");
 								link.innerHTML = '— <a href="/read/' + jobID + '">Read</a>';
+								injectDeleteForm(li, jobID);
 								es.close();
 							} else if (d.Status === "FAILED") {
 								detail.textContent = d.Error || "";
+								injectDeleteForm(li, jobID);
 								es.close();
 							} else if (d.Stage) {
 								let text = d.Stage;
@@ -181,6 +201,42 @@ func TestDocumentsWatcherScriptMatchesExpected(t *testing.T) {
 
 	if !strings.Contains(got, want) {
 		t.Errorf("watcher script does not match expected.\nwant:\n%s\n\ngot:\n%s", want, got)
+	}
+}
+
+func TestDocumentList_ShowsDeleteForDone(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "abc123", Filename: "done.pdf", Status: "DONE"},
+	})
+	if !strings.Contains(body, `/documents/abc123/delete`) {
+		t.Errorf("expected delete link for DONE job, got:\n%s", body)
+	}
+}
+
+func TestDocumentList_ShowsDeleteForFailed(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
+	})
+	if !strings.Contains(body, `/documents/def456/delete`) {
+		t.Errorf("expected delete link for FAILED job, got:\n%s", body)
+	}
+}
+
+func TestDocumentList_NoDeleteForPending(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "ghi789", Filename: "pending.pdf", Status: "PENDING"},
+	})
+	if strings.Contains(body, `/documents/ghi789/delete`) {
+		t.Errorf("expected no delete link for PENDING job, got:\n%s", body)
+	}
+}
+
+func TestDocumentList_NoDeleteForProcessing(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "jkl012", Filename: "processing.pdf", Status: "PROCESSING"},
+	})
+	if strings.Contains(body, `/documents/jkl012/delete`) {
+		t.Errorf("expected no delete link for PROCESSING job, got:\n%s", body)
 	}
 }
 

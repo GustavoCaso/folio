@@ -137,12 +137,48 @@ func DocumentList(jobs []db.Job) templ.Component {
 						return templ_7745c5c3_Err
 					}
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</span></li>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</span> <span class=\"delete-action\">")
+				if templ_7745c5c3_Err != nil {
+					return templ_7745c5c3_Err
+				}
+				if j.Status == "DONE" || j.Status == "FAILED" {
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<form class=\"delete-form\" method=\"POST\" action=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var9 templ.SafeURL
+					templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/documents/" + j.ID + "/delete"))
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 25, Col: 103}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\" data-filename=\"")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					var templ_7745c5c3_Var10 string
+					templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(j.Filename)
+					if templ_7745c5c3_Err != nil {
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 26, Col: 34}
+					}
+					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "\"><button type=\"submit\">Delete</button></form>")
+					if templ_7745c5c3_Err != nil {
+						return templ_7745c5c3_Err
+					}
+				}
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</span></li>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "</ul>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</ul><script>\n\t\t\tdocument.querySelectorAll('form.delete-form').forEach(function(form) {\n\t\t\t\tform.addEventListener('submit', function(e) {\n\t\t\t\t\tif (!confirm('Delete ' + form.dataset.filename + ' ?')) {\n\t\t\t\t\t\te.preventDefault();\n\t\t\t\t\t}\n\t\t\t\t});\n\t\t\t});\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -167,12 +203,12 @@ func Documents(jobs []db.Job, watchJobIDs []string, errMsg string) templ.Compone
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var9 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var9 == nil {
-			templ_7745c5c3_Var9 = templ.NopComponent
+		templ_7745c5c3_Var11 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var11 == nil {
+			templ_7745c5c3_Var11 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var10 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var12 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -188,7 +224,7 @@ func Documents(jobs []db.Job, watchJobIDs []string, errMsg string) templ.Compone
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, " <h1>Documents</h1><form method=\"POST\" action=\"/documents\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"document\" accept=\".pdf\" required> <button type=\"submit\">Upload</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, " <h1>Documents</h1><form method=\"POST\" action=\"/documents\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"document\" accept=\".pdf\" required> <button type=\"submit\">Upload</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -196,32 +232,32 @@ func Documents(jobs []db.Job, watchJobIDs []string, errMsg string) templ.Compone
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, " ")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 18, " ")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			if len(watchJobIDs) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div id=\"watch-config\" data-job-ids=\"")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 19, "<div id=\"watch-config\" data-job-ids=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				var templ_7745c5c3_Var11 string
-				templ_7745c5c3_Var11, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(watchJobIDs, ","))
+				var templ_7745c5c3_Var13 string
+				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(watchJobIDs, ","))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 41, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 58, Col: 71}
 				}
-				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var11))
+				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "\" style=\"display:none\"></div><script>\n\t\t\t\t(function() {\n\t\t\t\t\tconst ids = document.getElementById(\"watch-config\").dataset.jobIds.split(\",\");\n\t\t\t\t\tids.forEach(function(jobID) {\n\t\t\t\t\t\tconst li = document.getElementById(\"job-\" + jobID);\n\t\t\t\t\t\tif (!li) return;\n\t\t\t\t\t\tconst es = new EventSource(\"/jobs/\" + jobID + \"/watch\");\n\t\t\t\t\t\tes.addEventListener(\"status\", function(e) {\n\t\t\t\t\t\t\tconst d = JSON.parse(e.data);\n\t\t\t\t\t\t\tif (d.Status) {\n\t\t\t\t\t\t\t\tconst status = li.querySelector(\".status\");\n\t\t\t\t\t\t\t\tstatus.textContent = d.Status;\n\t\t\t\t\t\t\t\tstatus.className = \"status status-\" + d.Status;\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\tconst detail = li.querySelector(\".detail\");\n\t\t\t\t\t\t\tif (d.Status === \"DONE\") {\n\t\t\t\t\t\t\t\tdetail.textContent = \"\";\n\t\t\t\t\t\t\t\tconst link = li.querySelector(\".read-link\");\n\t\t\t\t\t\t\t\tlink.innerHTML = '— <a href=\"/read/' + jobID + '\">Read</a>';\n\t\t\t\t\t\t\t\tes.close();\n\t\t\t\t\t\t\t} else if (d.Status === \"FAILED\") {\n\t\t\t\t\t\t\t\tdetail.textContent = d.Error || \"\";\n\t\t\t\t\t\t\t\tes.close();\n\t\t\t\t\t\t\t} else if (d.Stage) {\n\t\t\t\t\t\t\t\tlet text = d.Stage;\n\t\t\t\t\t\t\t\tif (d.Message) text += \" — \" + d.Message;\n\t\t\t\t\t\t\t\tif (d.PagesTotal) text += \" (\" + d.PagesDone + \"/\" + d.PagesTotal + \")\";\n\t\t\t\t\t\t\t\tdetail.textContent = text;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script>")
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, "\" style=\"display:none\"></div><script>\n\t\t\t\t(function() {\n\t\t\t\t\tfunction injectDeleteForm(li, jobID) {\n\t\t\t\t\t\tconst slot = li.querySelector(\".delete-action\");\n\t\t\t\t\t\tif (!slot || slot.querySelector(\"form.delete-form\")) return;\n\t\t\t\t\t\tconst filename = li.querySelector(\".filename\").textContent;\n\t\t\t\t\t\tconst form = document.createElement(\"form\");\n\t\t\t\t\t\tform.className = \"delete-form\";\n\t\t\t\t\t\tform.method = \"POST\";\n\t\t\t\t\t\tform.action = \"/documents/\" + jobID + \"/delete\";\n\t\t\t\t\t\tform.dataset.filename = filename;\n\t\t\t\t\t\tconst btn = document.createElement(\"button\");\n\t\t\t\t\t\tbtn.type = \"submit\";\n\t\t\t\t\t\tbtn.textContent = \"Delete\";\n\t\t\t\t\t\tform.appendChild(btn);\n\t\t\t\t\t\tform.addEventListener(\"submit\", function(e) {\n\t\t\t\t\t\t\tif (!confirm(\"Delete \" + filename + \" ?\")) e.preventDefault();\n\t\t\t\t\t\t});\n\t\t\t\t\t\tslot.appendChild(form);\n\t\t\t\t\t}\n\t\t\t\t\tconst ids = document.getElementById(\"watch-config\").dataset.jobIds.split(\",\");\n\t\t\t\t\tids.forEach(function(jobID) {\n\t\t\t\t\t\tconst li = document.getElementById(\"job-\" + jobID);\n\t\t\t\t\t\tif (!li) return;\n\t\t\t\t\t\tconst es = new EventSource(\"/jobs/\" + jobID + \"/watch\");\n\t\t\t\t\t\tes.addEventListener(\"status\", function(e) {\n\t\t\t\t\t\t\tconst d = JSON.parse(e.data);\n\t\t\t\t\t\t\tif (d.Status) {\n\t\t\t\t\t\t\t\tconst status = li.querySelector(\".status\");\n\t\t\t\t\t\t\t\tstatus.textContent = d.Status;\n\t\t\t\t\t\t\t\tstatus.className = \"status status-\" + d.Status;\n\t\t\t\t\t\t\t}\n\n\t\t\t\t\t\t\tconst detail = li.querySelector(\".detail\");\n\t\t\t\t\t\t\tif (d.Status === \"DONE\") {\n\t\t\t\t\t\t\t\tdetail.textContent = \"\";\n\t\t\t\t\t\t\t\tconst link = li.querySelector(\".read-link\");\n\t\t\t\t\t\t\t\tlink.innerHTML = '— <a href=\"/read/' + jobID + '\">Read</a>';\n\t\t\t\t\t\t\t\tinjectDeleteForm(li, jobID);\n\t\t\t\t\t\t\t\tes.close();\n\t\t\t\t\t\t\t} else if (d.Status === \"FAILED\") {\n\t\t\t\t\t\t\t\tdetail.textContent = d.Error || \"\";\n\t\t\t\t\t\t\t\tinjectDeleteForm(li, jobID);\n\t\t\t\t\t\t\t\tes.close();\n\t\t\t\t\t\t\t} else if (d.Stage) {\n\t\t\t\t\t\t\t\tlet text = d.Stage;\n\t\t\t\t\t\t\t\tif (d.Message) text += \" — \" + d.Message;\n\t\t\t\t\t\t\t\tif (d.PagesTotal) text += \" (\" + d.PagesDone + \"/\" + d.PagesTotal + \")\";\n\t\t\t\t\t\t\t\tdetail.textContent = text;\n\t\t\t\t\t\t\t}\n\t\t\t\t\t\t});\n\t\t\t\t\t});\n\t\t\t\t})();\n\t\t\t</script>")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout("Documents").Render(templ.WithChildren(ctx, templ_7745c5c3_Var10), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Layout("Documents").Render(templ.WithChildren(ctx, templ_7745c5c3_Var12), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
