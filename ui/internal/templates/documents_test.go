@@ -148,9 +148,10 @@ func TestDocumentsWatcherScriptMatchesExpected(t *testing.T) {
 				(function() {
 					function injectDeleteForm(li, jobID) {
 						const slot = li.querySelector(".delete-action");
-						if (!slot || slot.querySelector("form")) return;
+						if (!slot || slot.querySelector("form.delete-form")) return;
 						const filename = li.querySelector(".filename").textContent;
 						const form = document.createElement("form");
+						form.className = "delete-form";
 						form.method = "POST";
 						form.action = "/documents/" + jobID + "/delete";
 						form.dataset.filename = filename;
@@ -159,7 +160,7 @@ func TestDocumentsWatcherScriptMatchesExpected(t *testing.T) {
 						btn.textContent = "Delete";
 						form.appendChild(btn);
 						form.addEventListener("submit", function(e) {
-							if (!confirm("Delete « " + filename + " »?")) e.preventDefault();
+							if (!confirm("Delete " + filename + " ?")) e.preventDefault();
 						});
 						slot.appendChild(form);
 					}

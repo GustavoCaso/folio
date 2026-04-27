@@ -22,7 +22,7 @@ templ DocumentList(jobs []db.Job) {
 					</span>
 					<span class="delete-action">
 						if j.Status == "DONE" || j.Status == "FAILED" {
-							<form method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/delete") }
+							<form class="delete-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/delete") }
 								data-filename={ j.Filename }>
 								<button type="submit">Delete</button>
 							</form>
@@ -32,9 +32,9 @@ templ DocumentList(jobs []db.Job) {
 			}
 		</ul>
 		<script>
-			document.querySelectorAll('form[data-filename]').forEach(function(form) {
+			document.querySelectorAll('form.delete-form').forEach(function(form) {
 				form.addEventListener('submit', function(e) {
-					if (!confirm('Delete « ' + form.dataset.filename + ' »?')) {
+					if (!confirm('Delete ' + form.dataset.filename + ' ?')) {
 						e.preventDefault();
 					}
 				});
@@ -60,9 +60,10 @@ templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 				(function() {
 					function injectDeleteForm(li, jobID) {
 						const slot = li.querySelector(".delete-action");
-						if (!slot || slot.querySelector("form")) return;
+						if (!slot || slot.querySelector("form.delete-form")) return;
 						const filename = li.querySelector(".filename").textContent;
 						const form = document.createElement("form");
+						form.className = "delete-form";
 						form.method = "POST";
 						form.action = "/documents/" + jobID + "/delete";
 						form.dataset.filename = filename;
@@ -71,7 +72,7 @@ templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 						btn.textContent = "Delete";
 						form.appendChild(btn);
 						form.addEventListener("submit", function(e) {
-							if (!confirm("Delete « " + filename + " »?")) e.preventDefault();
+							if (!confirm("Delete " + filename + " ?")) e.preventDefault();
 						});
 						slot.appendChild(form);
 					}
