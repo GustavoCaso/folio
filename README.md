@@ -43,6 +43,35 @@ make test    # Go unit tests + JS (vitest) + Python tests
 | `models/` | Docling model cache (gitignored) |
 | `compose.yaml` | Docker Compose stack |
 
-## Status
+## Configuration
 
-Single-user dev project. Migrations not backwards compatible — wipe `data/folio.db` between schema changes.
+Both services are configured via environment variables. The `compose.yaml` is the canonical place to set them.
+
+### UI (`ui/`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `DB_PATH` | `/data/folio.db` | SQLite path for jobs and highlights |
+| `PARSER_GRPC_ADDR` | `localhost:50051` | Parser gRPC address |
+| `DATA_DIR` | `/data` | Where Markdown files are written and read |
+| `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+
+### Parser (`parser/`)
+
+| Variable | Default | Description |
+|---|---|---|
+| `GRPC_PORT` | `50051` | gRPC server port |
+| `NUM_WORKERS` | `2` | Parallel Docling conversions |
+| `PDF_IMAGE_MODE` | `placeholder` | Markdown image mode: `embedded`, `placeholder`, `referenced` |
+| `PDF_DO_OCR` | `true` | Run OCR on scanned pages |
+| `PDF_DO_TABLE_STRUCTURE` | `true` | Recognize table structure |
+| `PDF_GENERATE_IMAGES` | `true` | Extract picture images from PDF |
+| `PDF_POST_PROCESS_CODE_BLOCKS` | `true` | Pattern-based code language detection (fast, CPU-only) |
+| `PDF_DO_CODE_ENRICHMENT` | `false` | VLM-based code enrichment — accurate but very slow on CPU (~100s/image); requires GPU for practical use |
+| `PDF_CODE_FORMULA_PRESET` | `codeformulav2` | VLM preset when `PDF_DO_CODE_ENRICHMENT=true`: `codeformulav2` or `granite_docling` (258M, faster on CPU) |
+| `PDF_LAYOUT_BATCH_SIZE` | docling default | Docling layout batch size |
+| `PDF_OCR_BATCH_SIZE` | docling default | Docling OCR batch size |
+| `PDF_TABLE_BATCH_SIZE` | docling default | Docling table batch size |
+| `PDF_QUEUE_MAX_SIZE` | docling default | Docling pipeline queue depth |
+| `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+
