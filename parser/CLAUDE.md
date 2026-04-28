@@ -53,6 +53,13 @@ Using `uv add <dependency>` or uv add --dev <dependency>. To avoid getting unwan
 |---|---|---|
 | `GRPC_PORT` | `50051` | gRPC server port |
 | `NUM_WORKERS` | `2` | `ThreadPoolExecutor` size (parallel Docling conversions) |
+| `PDF_GENERATE_IMAGES` | `false` | Extract picture images from PDF |
+| `PDF_DO_OCR` | `true` | Run OCR on scanned pages |
+| `PDF_DO_TABLE_STRUCTURE` | `true` | Recognize table structure |
+| `PDF_DO_CODE_ENRICHMENT` | `false` | Docling VLM-based code enrichment — accurate but very slow on CPU (~100s/image); requires GPU for practical use |
+| `PDF_CODE_FORMULA_PRESET` | `codeformulav2` | VLM preset when `PDF_DO_CODE_ENRICHMENT=true`: `codeformulav2` (accurate, larger) or `granite_docling` (258M params, faster on CPU). Note: MLX variant of granite_docling requires native Apple Silicon access — not available inside Docker |
+| `PDF_POST_PROCESS_CODE_BLOCKS` | `true` | Post-process code blocks with pattern-based language detection (fast, CPU-only, no extra models); mutually exclusive with `PDF_DO_CODE_ENRICHMENT` |
+| `PDF_IMAGE_MODE` | `placeholder` | Markdown image mode: `embedded`, `placeholder`, `referenced` |
 | `PDF_LAYOUT_BATCH_SIZE` | docling default | Docling layout batch size |
 | `PDF_OCR_BATCH_SIZE` | docling default | Docling OCR batch size |
 | `PDF_TABLE_BATCH_SIZE` | docling default | Docling table batch size |

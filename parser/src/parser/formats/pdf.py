@@ -3,14 +3,45 @@ from pathlib import Path
 
 import pypdfium2
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import PdfPipelineOptions
+from docling.datamodel.pipeline_options import CodeFormulaVlmOptions, PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc.base import ImageRefMode
+
+from parser.postprocess import enrich_code_blocks
+
+
+def _bool_env(var: str, default: bool) -> bool:
+    val = os.environ.get(var)
+    if val is None:
+        return default
+    return val.lower() in ("1", "true", "yes")
+
+
+def _image_mode() -> ImageRefMode:
+    val = os.environ.get("PDF_IMAGE_MODE", "placeholder").lower()
+    return {"embedded": ImageRefMode.EMBEDDED, "referenced": ImageRefMode.REFERENCED}.get(
+        val, ImageRefMode.PLACEHOLDER
+    )
+
+
+_VALID_CODE_FORMULA_PRESETS = {"codeformulav2", "granite_docling"}
+
+
+def _code_formula_options() -> CodeFormulaVlmOptions:
+    preset = os.environ.get("PDF_CODE_FORMULA_PRESET", "codeformulav2").lower()
+    if preset not in _VALID_CODE_FORMULA_PRESETS:
+        preset = "codeformulav2"
+    result: CodeFormulaVlmOptions = CodeFormulaVlmOptions.from_preset(preset)
+    return result
 
 
 def _pipeline_options() -> PdfPipelineOptions:
     kwargs: dict[str, object] = {
-        "generate_picture_images": True,
+        "generate_picture_images": _bool_env("PDF_GENERATE_IMAGES", True),
+        "do_ocr": _bool_env("PDF_DO_OCR", True),
+        "do_table_structure": _bool_env("PDF_DO_TABLE_STRUCTURE", True),
+        "do_code_enrichment": _bool_env("PDF_DO_CODE_ENRICHMENT", False),
+        "code_formula_options": _code_formula_options(),
     }
     for env_var, field in (
         ("PDF_LAYOUT_BATCH_SIZE", "layout_batch_size"),
@@ -30,11 +61,18 @@ _converter: DocumentConverter = DocumentConverter(
     }
 )
 
+_image_mode_value: ImageRefMode = _image_mode()
+
+_post_process_code_blocks: bool = _bool_env("PDF_POST_PROCESS_CODE_BLOCKS", True)
+
 
 def convert_pdf(path: Path) -> str:
     """Convert a PDF file to Markdown using Docling. Blocking call."""
     result = _converter.convert(str(path))
-    return result.document.export_to_markdown(image_mode=ImageRefMode.EMBEDDED)
+    markdown = result.document.export_to_markdown(image_mode=_image_mode_value)
+    if _post_process_code_blocks:
+        markdown = enrich_code_blocks(markdown)
+    return markdown
 
 
 def count_pdf_pages(path: Path) -> int:
