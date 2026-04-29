@@ -81,3 +81,8 @@ def count_pdf_pages(path: Path) -> int:
         return len(pdf)
     finally:
         pdf.close()
+
+
+def warmup() -> None:
+    """Force Docling model initialization. Blocks until all models are loaded."""
+    _converter.initialize_pipeline(InputFormat.PDF)

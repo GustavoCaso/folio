@@ -224,7 +224,7 @@ func Documents(jobs []db.Job, watchJobIDs []string, errMsg string) templ.Compone
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, " <h1>Documents</h1><form method=\"POST\" action=\"/documents\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"document\" accept=\".pdf\" required> <button type=\"submit\">Upload</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, " <h1>Documents</h1><form method=\"POST\" action=\"/documents\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"document\" accept=\".pdf\" required> <button type=\"submit\" id=\"upload-btn\" disabled>Upload</button></form>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

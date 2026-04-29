@@ -49,7 +49,7 @@ templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 		<h1>Documents</h1>
 		<form method="POST" action="/documents" enctype="multipart/form-data">
 			<input type="file" name="document" accept=".pdf" required/>
-			<button type="submit">Upload</button>
+			<button type="submit" id="upload-btn" disabled>Upload</button>
 		</form>
 
 		@DocumentList(jobs)

@@ -18,12 +18,45 @@ templ Layout(title string) {
 			mark.highlight     { background: #ffe066; cursor: pointer; border-radius: 2px; }
 			mark.highlight img { outline: 3px solid #ffeb3b; outline-offset: 2px; background: transparent; }
 			.error-banner      { background: #fff0f0; border: 1px solid #cc0000; color: #cc0000; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; }
+			.parser-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
+			.parser-dot.healthy   { background:#006600; }
+			.parser-dot.unhealthy { background:#cc0000; }
+			.parser-dot.checking  { background:#999; }
+			#parser-status-text   { font-size:0.8em; color:#666; }
 		</style>
 	</head>
 	<body>
-		<nav><a href="/">Documents</a></nav>
+		<nav><a href="/">Documents</a>
+		<span id="parser-status" class="parser-dot checking"></span><span id="parser-status-text">Parser checking…</span>
+		</nav>
     <br>
 		{ children... }
+		<script>
+		(function() {
+			var dot  = document.getElementById('parser-status');
+			var text = document.getElementById('parser-status-text');
+
+			function setStatus(s) {
+				dot.className = 'parser-dot ' + s;
+				if (s === 'healthy')   { text.textContent = 'Parser ready'; }
+				if (s === 'unhealthy') { text.textContent = 'Parser unavailable'; }
+				if (s === 'checking')  { text.textContent = 'Parser checking…'; }
+
+				var btn = document.getElementById('upload-btn');
+				if (btn) { btn.disabled = (s !== 'healthy'); }
+			}
+
+			function poll() {
+				fetch('/health/parser')
+					.then(function(r) { return r.json(); })
+					.then(function(d) { setStatus(d.status === 'healthy' ? 'healthy' : 'unhealthy'); })
+					.catch(function()  { setStatus('unhealthy'); });
+			}
+
+			poll();
+			setInterval(poll, 10000);
+		})();
+		</script>
 	</body>
 	</html>
 }
