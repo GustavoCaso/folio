@@ -10,6 +10,7 @@ import (
 
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
+	"google.golang.org/grpc/health/grpc_health_v1"
 
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	pb "github.com/GustavoCaso/folio/ui/internal/parser/proto"
@@ -142,4 +143,14 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 		"md_chunks", mdChunks,
 	)
 	return ConversionResult{Markdown: mdBuf.Bytes()}, nil
+}
+
+// Health returns true if the parser reports SERVING via grpc health protocol.
+func (c *Client) Health(ctx context.Context) bool {
+	hc := grpc_health_v1.NewHealthClient(c.conn)
+	resp, err := hc.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+	if err != nil {
+		return false
+	}
+	return resp.GetStatus() == grpc_health_v1.HealthCheckResponse_SERVING
 }

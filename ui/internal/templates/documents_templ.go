@@ -224,7 +224,7 @@ func Documents(jobs []db.Job, watchJobIDs []string, errMsg string) templ.Compone
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, " <h1>Documents</h1><form method=\"POST\" action=\"/documents\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"document\" accept=\".pdf\" required> <button type=\"submit\">Upload</button></form>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 17, " <h1>Documents</h1><form method=\"POST\" action=\"/documents\" enctype=\"multipart/form-data\"><input type=\"file\" name=\"document\" accept=\".pdf\" required> <button type=\"submit\" id=\"upload-btn\">Upload</button></form><noscript><p>JavaScript is disabled, so live parser availability checks are unavailable. You can still submit an upload; if the parser is unavailable, the server will report the error.</p></noscript>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -244,7 +244,7 @@ func Documents(jobs []db.Job, watchJobIDs []string, errMsg string) templ.Compone
 				var templ_7745c5c3_Var13 string
 				templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(watchJobIDs, ","))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 58, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 61, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 				if templ_7745c5c3_Err != nil {

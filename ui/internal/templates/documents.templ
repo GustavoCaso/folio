@@ -49,8 +49,11 @@ templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 		<h1>Documents</h1>
 		<form method="POST" action="/documents" enctype="multipart/form-data">
 			<input type="file" name="document" accept=".pdf" required/>
-			<button type="submit">Upload</button>
+			<button type="submit" id="upload-btn">Upload</button>
 		</form>
+    <noscript>
+      <p>JavaScript is disabled, so live parser availability checks are unavailable. You can still submit an upload; if the parser is unavailable, the server will report the error.</p>
+		</noscript>
 
 		@DocumentList(jobs)
 

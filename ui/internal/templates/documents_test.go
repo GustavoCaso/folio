@@ -247,3 +247,13 @@ func TestDocumentsEmbedsMultipleJobIDs(t *testing.T) {
 		t.Errorf("expected joined data-job-ids attribute, got: %s", got)
 	}
 }
+
+func TestDocuments_UploadButtonStartsDisabled(t *testing.T) {
+	got := renderDocuments(t, nil)
+	if !strings.Contains(got, `id="upload-btn"`) {
+		t.Errorf("expected upload-btn id on button, got:\n%s", got)
+	}
+	if !strings.Contains(got, `disabled`) {
+		t.Errorf("expected upload button to be disabled initially, got:\n%s", got)
+	}
+}
