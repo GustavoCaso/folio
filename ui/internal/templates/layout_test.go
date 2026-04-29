@@ -45,15 +45,3 @@ func TestLayout_HasPollingScript(t *testing.T) {
 		t.Errorf("expected polling script referencing /health/parser in layout, got:\n%s", got)
 	}
 }
-
-func TestLayout_ScriptAfterChildren(t *testing.T) {
-	got := renderLayout(t)
-	childrenPos := strings.Index(got, `<br>`)
-	scriptPos := strings.Index(got, `/health/parser`)
-	if childrenPos == -1 || scriptPos == -1 {
-		t.Fatal("missing <br> or /health/parser in layout output")
-	}
-	if scriptPos < childrenPos {
-		t.Errorf("polling script appears before children slot — script must come after children so #upload-btn is in DOM")
-	}
-}

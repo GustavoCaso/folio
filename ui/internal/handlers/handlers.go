@@ -44,6 +44,7 @@ func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logg
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)
+	mux.HandleFunc("GET /health/parser", hs.ParserHealth)
 	mux.HandleFunc("POST /documents", hs.UploadDocument)
 	mux.HandleFunc("POST /documents/{id}/delete", hs.DeleteDocument)
 	mux.HandleFunc("GET /read/{jobID}", hs.ReadDocument)
@@ -52,7 +53,6 @@ func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logg
 	mux.HandleFunc("DELETE /highlights/{id}", hs.DeleteHighlight)
 
 	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
-	mux.HandleFunc("GET /health/parser", hs.ParserHealth)
 
 	return mux, nil
 }
@@ -67,6 +67,10 @@ func (h *Handlers) ParserHealth(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	w.Header().Set("Expires", "0")
+
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": status}); err != nil {
 		h.logger.Error("ParserHealth: encode response", "err", err)
 	}

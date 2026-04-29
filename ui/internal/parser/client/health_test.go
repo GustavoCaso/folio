@@ -24,7 +24,7 @@ func startHealthServer(t *testing.T, status grpc_health_v1.HealthCheckResponse_S
 	hs := grpchealth.NewServer()
 	grpc_health_v1.RegisterHealthServer(srv, hs)
 	hs.SetServingStatus("", status)
-	go srv.Serve(lis)
+	go srv.Serve(lis) //nolint:errcheck
 	t.Cleanup(srv.Stop)
 	return lis.Addr().String()
 }
