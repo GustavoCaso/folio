@@ -141,66 +141,10 @@ func TestDocumentsOmitsErrorBannerWhenNoError(t *testing.T) {
 	}
 }
 
-func TestDocumentsWatcherScriptMatchesExpected(t *testing.T) {
+func TestDocumentsLoadsScript(t *testing.T) {
 	got := renderDocuments(t, nil, "job-1")
-
-	want := `<script>
-				(function() {
-					function injectDeleteForm(li, jobID) {
-						const slot = li.querySelector(".delete-action");
-						if (!slot || slot.querySelector("form.delete-form")) return;
-						const filename = li.querySelector(".filename").textContent;
-						const form = document.createElement("form");
-						form.className = "delete-form";
-						form.method = "POST";
-						form.action = "/documents/" + jobID + "/delete";
-						form.dataset.filename = filename;
-						const btn = document.createElement("button");
-						btn.type = "submit";
-						btn.textContent = "Delete";
-						form.appendChild(btn);
-						form.addEventListener("submit", function(e) {
-							if (!confirm("Delete " + filename + " ?")) e.preventDefault();
-						});
-						slot.appendChild(form);
-					}
-					const ids = document.getElementById("watch-config").dataset.jobIds.split(",");
-					ids.forEach(function(jobID) {
-						const li = document.getElementById("job-" + jobID);
-						if (!li) return;
-						const es = new EventSource("/jobs/" + jobID + "/watch");
-						es.addEventListener("status", function(e) {
-							const d = JSON.parse(e.data);
-							if (d.Status) {
-								const status = li.querySelector(".status");
-								status.textContent = d.Status;
-								status.className = "status status-" + d.Status;
-							}
-
-							const detail = li.querySelector(".detail");
-							if (d.Status === "DONE") {
-								detail.textContent = "";
-								const link = li.querySelector(".read-link");
-								link.innerHTML = '— <a href="/read/' + jobID + '">Read</a>';
-								injectDeleteForm(li, jobID);
-								es.close();
-							} else if (d.Status === "FAILED") {
-								detail.textContent = d.Error || "";
-								injectDeleteForm(li, jobID);
-								es.close();
-							} else if (d.Stage) {
-								let text = d.Stage;
-								if (d.Message) text += " — " + d.Message;
-								if (d.PagesTotal) text += " (" + d.PagesDone + "/" + d.PagesTotal + ")";
-								detail.textContent = text;
-							}
-						});
-					});
-				})();
-			</script>`
-
-	if !strings.Contains(got, want) {
-		t.Errorf("watcher script does not match expected.\nwant:\n%s\n\ngot:\n%s", want, got)
+	if !strings.Contains(got, `<script type="module" src="/static/documents.js">`) {
+		t.Errorf("expected documents.js script tag, got:\n%s", got)
 	}
 }
 
@@ -219,6 +163,15 @@ func TestDocumentList_ShowsDeleteForFailed(t *testing.T) {
 	})
 	if !strings.Contains(body, `/documents/def456/delete`) {
 		t.Errorf("expected delete link for FAILED job, got:\n%s", body)
+	}
+}
+
+func TestDocumentList_ShowsRetryForFailed(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
+	})
+	if !strings.Contains(body, `/documents/def456/retry`) {
+		t.Errorf("expected retry link for FAILED job, got:\n%s", body)
 	}
 }
 
