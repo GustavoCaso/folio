@@ -227,6 +227,57 @@ func TestDeleteJob(t *testing.T) {
 	}
 }
 
+func TestRetryJob(t *testing.T) {
+	store, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	ctx := context.Background()
+
+	job, err := store.CreateJob(ctx, "test.pdf", content, "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if job.RetryCount != 0 {
+		t.Fatalf("job must retry count to 0 after CreateJob, got: %d", job.RetryCount)
+	}
+
+	err = store.MarkJobFailed(ctx, job.ID, "testing retry logic")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	job, err = store.GetJob(ctx, job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if job.Status != "FAILED" {
+		t.Fatalf("job must have failed status after MarkJobFailed, got: %s", job.Status)
+	}
+
+	err = store.RetryJob(ctx, job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	job, err = store.GetJob(ctx, job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if job.Status != "PENDING" {
+		t.Fatalf("job must have pending status after RetryJob, got: %s", job.Status)
+	}
+
+	if job.RetryCount != 1 {
+		t.Fatalf("job must retry count to 1 after RetryJob, got: %d", job.RetryCount)
+	}
+}
+
 func TestDeleteHighlight(t *testing.T) {
 	store, err := db.New(":memory:")
 	if err != nil {
