@@ -78,7 +78,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reqID := logging.RequestIDFrom(r.Context())
-	job, err := h.store.CreateJob(r.Context(), header.Filename, reqID)
+	job, err := h.store.CreateJob(r.Context(), header.Filename, pdfBytes, reqID)
 	if err != nil {
 		log.Error("create job failed", logging.Err(err), "filename", header.Filename)
 		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store job. %v", err))
@@ -94,6 +94,43 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	// Start conversion in background — does not block the HTTP response.
 	// Snapshot the request_id so parser logs link back to the originating upload.
 	go h.runConversion(job.ID, reqID, header.Filename, pdfBytes)
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
+	log := logging.LoggerFrom(r.Context())
+	id := r.PathValue("id")
+
+	renderErr := func(status int, msg string) {
+		w.WriteHeader(status)
+		if err := templates.ErrorPage(msg).Render(r.Context(), w); err != nil {
+			log.Error("render error page failed", logging.Err(err))
+		}
+	}
+
+	job, err := h.store.GetJob(r.Context(), id)
+	if err != nil {
+		log.Warn("retry: job not found", "id", id, logging.Err(err))
+		renderErr(http.StatusNotFound, "job not found")
+		return
+	}
+
+	if job.Status != "FAILED" {
+		log.Warn("retry: job not in terminal state", "id", id, "status", job.Status)
+		renderErr(http.StatusConflict, "retry: job not in terminal state")
+		return
+	}
+
+	if err := h.store.RetryJob(r.Context(), id); err != nil {
+		log.Warn("retry: fail to update job", "id", id, logging.Err(err))
+		renderErr(http.StatusInternalServerError, "retry: failed to update job")
+		return
+	}
+
+	// Start conversion in background — does not block the HTTP response.
+	// Snapshot the request_id so parser logs link back to the originating upload.
+	go h.runConversion(job.ID, job.RequestID, job.Filename, job.Content)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

@@ -25,7 +25,7 @@ func TestReadDocument_NotFound(t *testing.T) {
 
 func TestReadDocument_JobPending_NotReady(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "pending.pdf", "")
+	job, err := store.CreateJob(context.Background(), "pending.pdf", []byte{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -44,7 +44,7 @@ func TestReadDocument_JobPending_NotReady(t *testing.T) {
 
 func TestReadDocument_JobFailed(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "broken.pdf", "")
+	job, err := store.CreateJob(context.Background(), "broken.pdf", []byte{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -66,7 +66,7 @@ func TestReadDocument_JobFailed(t *testing.T) {
 
 func TestReadDocument_MarkdownFileMissing(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "gone.pdf", "")
+	job, err := store.CreateJob(context.Background(), "gone.pdf", []byte{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestReadDocument_HappyPath(t *testing.T) {
 	}
 
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "doc.pdf", "")
+	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
