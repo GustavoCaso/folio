@@ -1,4 +1,4 @@
-.PHONY: build test test-js test-race lint lint-check format format-check proto templ
+.PHONY: build test test-js test-race lint lint-check format format-check proto templ css
 
 build:
 	go build ./...
@@ -37,3 +37,11 @@ proto:
 
 templ:
 	templ generate
+
+css:
+	@TEMPLUI_PATH="$$(go list -mod=mod -m -f '{{.Dir}}' github.com/templui/templui)" && \
+	printf '%s\n' '@source "./**/*.templ";' "@source \"$$TEMPLUI_PATH/components/**/*.templ\";" \
+		> internal/handlers/static/css/sources.generated.css
+	@mise exec -- pnpm exec tailwindcss \
+		-i internal/handlers/static/css/input.css \
+		-o internal/handlers/static/css/output.css
