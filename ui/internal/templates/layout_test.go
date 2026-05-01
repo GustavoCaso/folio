@@ -18,24 +18,17 @@ func renderLayout(t *testing.T) string {
 	return buf.String()
 }
 
-func TestLayout_HasParserDot(t *testing.T) {
+func TestLayout_HasParserStatusBadge(t *testing.T) {
 	got := renderLayout(t)
-	if !strings.Contains(got, `id="parser-status"`) {
-		t.Errorf("expected parser-status dot in layout, got:\n%s", got)
+	if !strings.Contains(got, `id="parser-status-badge"`) {
+		t.Errorf("expected parser-status-badge in layout, got:\n%s", got)
 	}
 }
 
-func TestLayout_ParserDotStartsChecking(t *testing.T) {
+func TestLayout_ParserBadgeShowsChecking(t *testing.T) {
 	got := renderLayout(t)
-	if !strings.Contains(got, `class="parser-dot checking"`) {
+	if !strings.Contains(got, "Parser checking") {
 		t.Errorf("expected checking state on initial render, got:\n%s", got)
-	}
-}
-
-func TestLayout_HasParserStatusText(t *testing.T) {
-	got := renderLayout(t)
-	if !strings.Contains(got, `id="parser-status-text"`) {
-		t.Errorf("expected parser-status-text element in layout, got:\n%s", got)
 	}
 }
 

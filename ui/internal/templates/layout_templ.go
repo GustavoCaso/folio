@@ -8,6 +8,8 @@ package templates
 import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
+import "github.com/templui/templui/components/badge"
+
 func Layout(title string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
@@ -36,13 +38,39 @@ func Layout(title string) templ.Component {
 		var templ_7745c5c3_Var2 string
 		templ_7745c5c3_Var2, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 9, Col: 16}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 11, Col: 16}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var2))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Folio</title><style>\n\t\t\tbody { font-family: sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }\n\t\t\tnav a { margin-right: 1rem; }\n\t\t\t.status { font-size: 0.8em; color: #666; }\n\t\t\t.status-PENDING    { color: #999; }\n\t\t\t.status-PROCESSING { color: #0066cc; }\n\t\t\t.status-DONE       { color: #006600; }\n\t\t\t.status-FAILED     { color: #cc0000; }\n\t\t\tmark.highlight     { background: #ffe066; cursor: pointer; border-radius: 2px; }\n\t\t\tmark.highlight img { outline: 3px solid #ffeb3b; outline-offset: 2px; background: transparent; }\n\t\t\t.error-banner      { background: #fff0f0; border: 1px solid #cc0000; color: #cc0000; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; }\n\t\t\t.parser-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }\n\t\t\t.parser-dot.healthy   { background:#006600; }\n\t\t\t.parser-dot.unhealthy { background:#cc0000; }\n\t\t\t.parser-dot.checking  { background:#999; }\n\t\t\t#parser-status-text   { font-size:0.8em; color:#666; }\n\t\t</style></head><body><nav><a href=\"/\">Documents</a> <span id=\"parser-status\" class=\"parser-dot checking\"></span><span id=\"parser-status-text\">Parser checking…</span></nav><br>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Folio</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><style>\n\t\t\tmark.highlight     { background: #ffe066; cursor: pointer; border-radius: 2px; }\n\t\t\tmark.highlight img { outline: 3px solid #ffeb3b; outline-offset: 2px; background: transparent; }\n\t\t</style></head><body class=\"min-h-screen bg-background text-foreground\"><header class=\"border-b border-border\"><div class=\"mx-auto max-w-4xl flex items-center justify-between px-4 py-3\"><a href=\"/\" class=\"font-semibold tracking-tight text-foreground hover:opacity-80\">Folio</a><div id=\"parser-status-badge\">")
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Var3 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
+			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
+			if !templ_7745c5c3_IsBuffer {
+				defer func() {
+					templ_7745c5c3_BufErr := templruntime.ReleaseBuffer(templ_7745c5c3_Buffer)
+					if templ_7745c5c3_Err == nil {
+						templ_7745c5c3_Err = templ_7745c5c3_BufErr
+					}
+				}()
+			}
+			ctx = templ.InitializeContext(ctx)
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "Parser checking…")
+			if templ_7745c5c3_Err != nil {
+				return templ_7745c5c3_Err
+			}
+			return nil
+		})
+		templ_7745c5c3_Err = badge.Badge(badge.Props{Variant: badge.VariantSecondary}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var3), templ_7745c5c3_Buffer)
+		if templ_7745c5c3_Err != nil {
+			return templ_7745c5c3_Err
+		}
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "</div></div></header><main class=\"mx-auto max-w-4xl px-4 py-8\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -50,7 +78,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "<script>\n\t\t(function() {\n\t\t\tvar dot  = document.getElementById('parser-status');\n\t\t\tvar text = document.getElementById('parser-status-text');\n\n\t\t\tfunction setStatus(s) {\n\t\t\t\tdot.className = 'parser-dot ' + s;\n\t\t\t\tif (s === 'healthy')   { text.textContent = 'Parser ready'; }\n\t\t\t\tif (s === 'unhealthy') { text.textContent = 'Parser unavailable'; }\n\t\t\t\tif (s === 'checking')  { text.textContent = 'Parser checking…'; }\n\n\t\t\t\tvar btn = document.getElementById('upload-btn');\n\t\t\t\tif (btn) { btn.disabled = (s !== 'healthy'); }\n\t\t\t}\n\n\t\t\tfunction poll() {\n\t\t\t\tfetch('/health/parser')\n\t\t\t\t\t.then(function(r) { return r.json(); })\n\t\t\t\t\t.then(function(d) { setStatus(d.status === 'healthy' ? 'healthy' : 'unhealthy'); })\n\t\t\t\t\t.catch(function()  { setStatus('unhealthy'); });\n\t\t\t}\n\n\t\t\tpoll();\n\t\t\tsetInterval(poll, 10000);\n\t\t})();\n\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</main><script>\n\t\t(function() {\n\t\t\tvar container = document.getElementById('parser-status-badge');\n\n\t\t\tfunction setBadge(s) {\n\t\t\t\tvar variantClass = {\n\t\t\t\t\thealthy:   'bg-green-100 text-green-800 border-green-200',\n\t\t\t\t\tunhealthy: 'bg-red-100 text-red-800 border-red-200',\n\t\t\t\t\tchecking:  'bg-secondary text-secondary-foreground',\n\t\t\t\t}[s] || 'bg-secondary text-secondary-foreground';\n\n\t\t\t\tvar label = {\n\t\t\t\t\thealthy:   'Parser ready',\n\t\t\t\t\tunhealthy: 'Parser unavailable',\n\t\t\t\t\tchecking:  'Parser checking…',\n\t\t\t\t}[s] || 'Parser checking…';\n\n\t\t\t\tcontainer.innerHTML = '<span class=\"inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ' + variantClass + '\">' + label + '</span>';\n\n\t\t\t\tvar btn = document.getElementById('upload-btn');\n\t\t\t\tif (btn) { btn.disabled = (s !== 'healthy'); }\n\t\t\t}\n\n\t\t\tfunction poll() {\n\t\t\t\tfetch('/health/parser')\n\t\t\t\t\t.then(function(r) { return r.json(); })\n\t\t\t\t\t.then(function(d) { setBadge(d.status === 'healthy' ? 'healthy' : 'unhealthy'); })\n\t\t\t\t\t.catch(function()  { setBadge('unhealthy'); });\n\t\t\t}\n\n\t\t\tpoll();\n\t\t\tsetInterval(poll, 10000);\n\t\t})();\n\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -74,26 +102,26 @@ func ErrorBanner(msg string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var3 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var3 == nil {
-			templ_7745c5c3_Var3 = templ.NopComponent
+		templ_7745c5c3_Var4 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var4 == nil {
+			templ_7745c5c3_Var4 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
 		if msg != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 4, "<div class=\"error-banner\" role=\"alert\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "<div class=\"rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive mb-4\" role=\"alert\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			var templ_7745c5c3_Var4 string
-			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
+			var templ_7745c5c3_Var5 string
+			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 66, Col: 46}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 72, Col: 128}
 			}
-			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
+			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -118,12 +146,12 @@ func ErrorPage(msg string) templ.Component {
 			}()
 		}
 		ctx = templ.InitializeContext(ctx)
-		templ_7745c5c3_Var5 := templ.GetChildren(ctx)
-		if templ_7745c5c3_Var5 == nil {
-			templ_7745c5c3_Var5 = templ.NopComponent
+		templ_7745c5c3_Var6 := templ.GetChildren(ctx)
+		if templ_7745c5c3_Var6 == nil {
+			templ_7745c5c3_Var6 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		templ_7745c5c3_Var6 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
+		templ_7745c5c3_Var7 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 			templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 			templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
 			if !templ_7745c5c3_IsBuffer {
@@ -141,7 +169,7 @@ func ErrorPage(msg string) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout("Error").Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Layout("Error").Render(templ.WithChildren(ctx, templ_7745c5c3_Var7), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

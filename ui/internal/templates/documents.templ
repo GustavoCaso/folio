@@ -1,53 +1,132 @@
 package templates
 
-import "strings"
-import "github.com/GustavoCaso/folio/ui/internal/db"
+import (
+	"strings"
+
+	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/templui/templui/components/badge"
+	"github.com/templui/templui/components/button"
+	"github.com/templui/templui/components/card"
+	"github.com/templui/templui/components/skeleton"
+)
+
+templ jobCard(j db.Job) {
+	@card.Card(card.Props{ID: "job-" + j.ID}) {
+		@card.Content(card.ContentProps{Class: "flex flex-col gap-3"}) {
+			<div class="flex items-start justify-between gap-2">
+				<p class="font-medium text-sm leading-snug truncate" data-filename>{ j.Filename }</p>
+				<span data-status-badge>
+					@jobBadge(j.Status)
+				</span>
+			</div>
+			if j.Status == "PROCESSING" {
+				<div class="space-y-1.5" data-skeleton>
+					@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-full"})
+					@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-2/3"})
+				</div>
+			}
+			<p class="text-xs text-muted-foreground" data-error-text>
+				if j.Status == "FAILED" {
+					{ j.Error }
+				}
+			</p>
+			<div class="flex items-center gap-2 mt-1" data-actions>
+				if j.Status == "DONE" {
+					@button.Button(button.Props{
+						Variant: button.VariantOutline,
+						Size:    button.SizeSm,
+						Href:    "/read/" + j.ID,
+					}) {
+						Read
+					}
+				}
+				if j.Status == "FAILED" {
+					<form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") }>
+						@button.Button(button.Props{
+							Variant:    button.VariantGhost,
+							Size:       button.SizeSm,
+							Type: button.TypeSubmit,
+						}) {
+							Retry
+						}
+					</form>
+				}
+				if j.Status == "DONE" || j.Status == "FAILED" {
+					<form class="delete-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/delete") } data-filename={ j.Filename }>
+						@button.Button(button.Props{
+							Variant:    button.VariantGhost,
+							Size:       button.SizeSm,
+							Class:      "text-destructive hover:text-destructive",
+							Type: button.TypeSubmit,
+						}) {
+							Delete
+						}
+					</form>
+				}
+			</div>
+		}
+	}
+}
+
+templ jobBadge(status string) {
+	switch status {
+		case "PENDING":
+			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+				Pending
+			}
+		case "PROCESSING":
+			@badge.Badge(badge.Props{Variant: badge.VariantOutline}) {
+				Processing
+			}
+		case "FAILED":
+			@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
+				Failed
+			}
+		default:
+	}
+}
 
 templ DocumentList(jobs []db.Job) {
 	if len(jobs) > 0 {
-		<ul>
+		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			for _, j := range jobs {
-				<li id={ "job-" + j.ID }>
-					<strong class="filename">{ j.Filename }</strong>
-					<span class={ "status status-" + string(j.Status) }>{ string(j.Status) }</span>
-					<span class="detail">
-						if j.Status == "FAILED" {
-							{ j.Error } — <form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") } style="display:inline"><button type="submit">Retry</button></form>
-						}
-					</span>
-					<span class="read-link">
-						if j.Status == "DONE" {
-							— <a href={ templ.SafeURL("/read/" + j.ID) }>Read</a>
-						}
-					</span>
-					<span class="delete-action">
-						if j.Status == "DONE" || j.Status == "FAILED" {
-							<form class="delete-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/delete") }
-								data-filename={ j.Filename }>
-								<button type="submit">Delete</button>
-							</form>
-						}
-					</span>
-				</li>
+				@jobCard(j)
 			}
-		</ul>
+		</div>
 	}
 }
 
 templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 	@Layout("Documents") {
 		@ErrorBanner(errMsg)
-		<h1>Documents</h1>
-		<form method="POST" action="/documents" enctype="multipart/form-data">
-			<input type="file" name="document" accept=".pdf" required/>
-			<button type="submit" id="upload-btn">Upload</button>
-		</form>
-    <noscript>
-      <p>JavaScript is disabled, so live parser availability checks are unavailable. You can still submit an upload; if the parser is unavailable, the server will report the error.</p>
-		</noscript>
-
-		@DocumentList(jobs)
-
+		<div class="flex flex-col gap-8">
+			<div>
+				<h1 class="text-2xl font-semibold mb-4">Documents</h1>
+				@card.Card() {
+					@card.Content() {
+						<form method="POST" action="/documents" enctype="multipart/form-data" class="flex items-center gap-3">
+							<input
+								type="file"
+								name="document"
+								accept=".pdf"
+								required
+								class="flex-1 text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-transparent file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-accent cursor-pointer"
+							/>
+							@button.Button(button.Props{
+								ID:   "upload-btn",
+								Type: button.TypeSubmit,
+							}) {
+								Upload
+							}
+						</form>
+						<noscript>
+							<p class="mt-2 text-xs text-muted-foreground">JavaScript is disabled. Parser availability checks are unavailable. You can still upload; the server will report errors.</p>
+						</noscript>
+					}
+				}
+			</div>
+			@DocumentList(jobs)
+		</div>
 		if len(watchJobIDs) > 0 {
 			<div id="watch-config" data-job-ids={ strings.Join(watchJobIDs, ",") } style="display:none"></div>
 		}
