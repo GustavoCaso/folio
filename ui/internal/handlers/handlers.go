@@ -14,7 +14,7 @@ import (
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
 )
 
-//go:embed static/highlight.js
+//go:embed static/highlight.js static/documents.js
 var staticFS embed.FS
 
 // ParserClient is the interface satisfied by *parserclient.Client (and fakes in tests).
@@ -46,6 +46,7 @@ func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logg
 	mux.HandleFunc("GET /", hs.ListDocuments)
 	mux.HandleFunc("GET /health/parser", hs.ParserHealth)
 	mux.HandleFunc("POST /documents", hs.UploadDocument)
+	mux.HandleFunc("POST /documents/{id}/retry", hs.RetryDocument)
 	mux.HandleFunc("POST /documents/{id}/delete", hs.DeleteDocument)
 	mux.HandleFunc("GET /read/{jobID}", hs.ReadDocument)
 	mux.HandleFunc("GET /jobs/{jobID}/watch", hs.WatchJob)

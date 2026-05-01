@@ -2,10 +2,13 @@ package db_test
 
 import (
 	"context"
+	"reflect"
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
 )
+
+var content = []byte{'a', 'b', 'c'}
 
 func TestCreateAndGetJob(t *testing.T) {
 	store, err := db.New(":memory:")
@@ -14,7 +17,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 
-	job, err := store.CreateJob(context.Background(), "book.pdf", "req-123")
+	job, err := store.CreateJob(context.Background(), "book.pdf", content, "req-123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -27,6 +30,9 @@ func TestCreateAndGetJob(t *testing.T) {
 	if job.RequestID != "req-123" {
 		t.Fatalf("expected request_id req-123, got %q", job.RequestID)
 	}
+	if !reflect.DeepEqual(job.Content, content) {
+		t.Fatalf("expected content %s, got %q", content, job.Content)
+	}
 
 	got, err := store.GetJob(context.Background(), job.ID)
 	if err != nil {
@@ -38,6 +44,9 @@ func TestCreateAndGetJob(t *testing.T) {
 	if got.RequestID != "req-123" {
 		t.Fatalf("expected request_id req-123 after read, got %q", got.RequestID)
 	}
+	if !reflect.DeepEqual(got.Content, content) {
+		t.Fatalf("expected content %s, got %q", content, job.Content)
+	}
 }
 
 func TestUpdateJobProgress(t *testing.T) {
@@ -47,7 +56,7 @@ func TestUpdateJobProgress(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
+	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
 	if err := store.UpdateJobProgress(context.Background(), job.ID, "PROCESSING", 5, 100); err != nil {
 		t.Fatal(err)
 	}
@@ -70,11 +79,11 @@ func TestGetPendingJobs(t *testing.T) {
 
 	ctx := context.Background()
 
-	pending1, _ := store.CreateJob(ctx, "a.pdf", "")
-	pending2, _ := store.CreateJob(ctx, "b.pdf", "")
-	processing, _ := store.CreateJob(ctx, "c.pdf", "")
-	done, _ := store.CreateJob(ctx, "d.pdf", "")
-	failed, _ := store.CreateJob(ctx, "e.pdf", "")
+	pending1, _ := store.CreateJob(ctx, "a.pdf", content, "")
+	pending2, _ := store.CreateJob(ctx, "b.pdf", content, "")
+	processing, _ := store.CreateJob(ctx, "c.pdf", content, "")
+	done, _ := store.CreateJob(ctx, "d.pdf", content, "")
+	failed, _ := store.CreateJob(ctx, "e.pdf", content, "")
 
 	if err := store.UpdateJobProgress(ctx, processing.ID, "PROCESSING", 1, 10); err != nil {
 		t.Fatal(err)
@@ -98,6 +107,9 @@ func TestGetPendingJobs(t *testing.T) {
 	for _, j := range jobs {
 		if j.Status != "PENDING" {
 			t.Errorf("expected PENDING, got %s for %s", j.Status, j.ID)
+		}
+		if len(j.Content) != 0 {
+			t.Errorf("expected content to not be populated, got %v for %s", j.Content, j.ID)
 		}
 		got[j.ID] = true
 	}
@@ -129,7 +141,11 @@ func TestMarkJobDone(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
+	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
+	if len(job.Content) == 0 {
+		t.Fatalf("expected content to not be empty, got %v", job.Content)
+	}
+
 	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
@@ -141,6 +157,10 @@ func TestMarkJobDone(t *testing.T) {
 	if got.OutputPath != "/data/book.md" {
 		t.Fatalf("expected /data/book.md, got %s", got.OutputPath)
 	}
+
+	if len(got.Content) != 0 {
+		t.Fatalf("expected empty content, got %v", got.Content)
+	}
 }
 
 func TestCreateAndListHighlights(t *testing.T) {
@@ -150,7 +170,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
+	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
 
 	h := db.Highlight{
 		JobID:        job.ID,
@@ -192,7 +212,7 @@ func TestDeleteJob(t *testing.T) {
 
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "test.pdf", "req-1")
+	job, err := store.CreateJob(ctx, "test.pdf", content, "req-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -214,7 +234,7 @@ func TestDeleteHighlight(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", "")
+	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
 	h, _ := store.CreateHighlight(context.Background(), db.Highlight{
 		JobID: job.ID, StartBlockID: "intro", EndBlockID: "intro", StartPos: 0, EndPos: 10, Text: "text",
 	})

@@ -18,6 +18,7 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
+	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
 )
 
 func newTestStore(t *testing.T) *db.Store {
@@ -44,6 +45,27 @@ func newTestMux(t *testing.T, store *db.Store) http.Handler {
 	return mux
 }
 
+func newTestMuxWithParser(t *testing.T, store *db.Store, parser handlers.ParserClient) http.Handler {
+	t.Helper()
+	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
+	h, err := hub.New(logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	mux, err := handlers.Register(store, h, parser, t.TempDir(), logger)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return mux
+}
+
+type errorParser struct{}
+
+func (errorParser) Convert(_ context.Context, _, _, _ string, _ []byte, _ *hub.Hub) (parserclient.ConversionResult, error) {
+	return parserclient.ConversionResult{}, errors.New("stubbed")
+}
+func (errorParser) Health(_ context.Context) bool { return false }
+
 // emptyMultipartRequest builds a POST /documents request with a valid
 // multipart body but no "document" field.
 func emptyMultipartRequest(t *testing.T) *http.Request {
@@ -58,7 +80,7 @@ func emptyMultipartRequest(t *testing.T) *http.Request {
 
 func TestUploadDocumentError_ShowsExistingJobs(t *testing.T) {
 	store := newTestStore(t)
-	if _, err := store.CreateJob(context.Background(), "existing.pdf", "req-seed"); err != nil {
+	if _, err := store.CreateJob(context.Background(), "existing.pdf", []byte{}, "req-seed"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -85,7 +107,7 @@ func TestUploadDocumentError_ShowsBanner(t *testing.T) {
 
 func TestDeleteDocument_RejectsPending(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "pending.pdf", "req-1")
+	job, err := store.CreateJob(context.Background(), "pending.pdf", []byte{}, "req-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -101,7 +123,7 @@ func TestDeleteDocument_RejectsPending(t *testing.T) {
 
 func TestDeleteDocument_DeletesFailedJob(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "failed.pdf", "req-1")
+	job, err := store.CreateJob(context.Background(), "failed.pdf", []byte{}, "req-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +153,7 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	job, err := store.CreateJob(context.Background(), "done.pdf", "req-1")
+	job, err := store.CreateJob(context.Background(), "done.pdf", []byte{}, "req-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,14 +193,70 @@ func TestDeleteDocument_NotFound(t *testing.T) {
 	}
 }
 
-func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
+func TestRetryDocument_NotFound(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/documents/nonexistent-id/retry", nil)
+	rec := httptest.NewRecorder()
+	newTestMux(t, newTestStore(t)).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Errorf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestRetryDocument_RejectsNonFailed(t *testing.T) {
 	store := newTestStore(t)
-	job1, err := store.CreateJob(t.Context(), "report.pdf", "")
+	job, err := store.CreateJob(context.Background(), "pending.pdf", []byte{}, "req-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	job2, err := store.CreateJob(t.Context(), "pending-report.pdf", "")
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/retry", nil)
+	rec := httptest.NewRecorder()
+	newTestMux(t, store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Errorf("expected 409, got %d", rec.Code)
+	}
+}
+
+func TestRetryDocument_HappyPath(t *testing.T) {
+	store := newTestStore(t)
+	job, err := store.CreateJob(context.Background(), "broken.pdf", []byte("pdf"), "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkJobFailed(context.Background(), job.ID, "parse error"); err != nil {
+		t.Fatal(err)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/retry", nil)
+	rec := httptest.NewRecorder()
+	newTestMuxWithParser(t, store, errorParser{}).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusSeeOther {
+		t.Errorf("expected 303, got %d", rec.Code)
+	}
+
+	got, err := store.GetJob(context.Background(), job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "PENDING" {
+		t.Errorf("expected status PENDING, got %s", got.Status)
+	}
+	if got.RetryCount != 1 {
+		t.Errorf("expected retry_count 1, got %d", got.RetryCount)
+	}
+}
+
+func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
+	store := newTestStore(t)
+	job1, err := store.CreateJob(t.Context(), "report.pdf", []byte{}, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	job2, err := store.CreateJob(t.Context(), "pending-report.pdf", []byte{}, "")
 	if err != nil {
 		t.Fatal(err)
 	}
