@@ -125,8 +125,8 @@ func TestDocumentsShowsErrorBanner(t *testing.T) {
 	}
 	got := buf.String()
 
-	if !strings.Contains(got, `class="error-banner"`) {
-		t.Errorf("expected error-banner element in output, got: %s", got)
+	if !strings.Contains(got, `role="alert"`) {
+		t.Errorf("expected alert element in output, got: %s", got)
 	}
 	if !strings.Contains(got, "Something went wrong") {
 		t.Errorf("expected error message in output, got: %s", got)
@@ -136,8 +136,8 @@ func TestDocumentsShowsErrorBanner(t *testing.T) {
 func TestDocumentsOmitsErrorBannerWhenNoError(t *testing.T) {
 	got := renderDocuments(t, nil)
 
-	if strings.Contains(got, `class="error-banner"`) {
-		t.Errorf("expected no error-banner element when errMsg empty, got: %s", got)
+	if strings.Contains(got, `role="alert"`) {
+		t.Errorf("expected no alert element when errMsg empty, got: %s", got)
 	}
 }
 

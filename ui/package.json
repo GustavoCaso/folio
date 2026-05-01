@@ -14,7 +14,9 @@
   },
   "packageManager": "pnpm@10.33.0",
   "devDependencies": {
+    "@tailwindcss/cli": "^4.2.4",
     "jsdom": "^29.0.2",
+    "tailwindcss": "^4.2.4",
     "vitest": "^4.1.4"
   }
 }

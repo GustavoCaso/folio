@@ -1,5 +1,7 @@
 package templates
 
+import "github.com/templui/templui/components/badge"
+
 templ Layout(title string) {
 	<!DOCTYPE html>
 	<html lang="en">
@@ -7,40 +9,44 @@ templ Layout(title string) {
 		<meta charset="UTF-8"/>
 		<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 		<title>{ title } — Folio</title>
+		<link rel="stylesheet" href="/static/css/output.css"/>
 		<style>
-			body { font-family: sans-serif; max-width: 900px; margin: 2rem auto; padding: 0 1rem; }
-			nav a { margin-right: 1rem; }
-			.status { font-size: 0.8em; color: #666; }
-			.status-PENDING    { color: #999; }
-			.status-PROCESSING { color: #0066cc; }
-			.status-DONE       { color: #006600; }
-			.status-FAILED     { color: #cc0000; }
 			mark.highlight     { background: #ffe066; cursor: pointer; border-radius: 2px; }
 			mark.highlight img { outline: 3px solid #ffeb3b; outline-offset: 2px; background: transparent; }
-			.error-banner      { background: #fff0f0; border: 1px solid #cc0000; color: #cc0000; padding: 0.75rem 1rem; border-radius: 4px; margin-bottom: 1rem; }
-			.parser-dot { display:inline-block; width:8px; height:8px; border-radius:50%; margin-right:4px; vertical-align:middle; }
-			.parser-dot.healthy   { background:#006600; }
-			.parser-dot.unhealthy { background:#cc0000; }
-			.parser-dot.checking  { background:#999; }
-			#parser-status-text   { font-size:0.8em; color:#666; }
 		</style>
 	</head>
-	<body>
-		<nav><a href="/">Documents</a>
-		<span id="parser-status" class="parser-dot checking"></span><span id="parser-status-text">Parser checking…</span>
-		</nav>
-    <br>
-		{ children... }
+	<body class="min-h-screen bg-background text-foreground">
+		<header class="border-b border-border">
+			<div class="mx-auto max-w-4xl flex items-center justify-between px-4 py-3">
+				<a href="/" class="font-semibold tracking-tight text-foreground hover:opacity-80">Folio</a>
+				<div id="parser-status-badge">
+					@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+						Parser checking…
+					}
+				</div>
+			</div>
+		</header>
+		<main class="mx-auto max-w-4xl px-4 py-8">
+			{ children... }
+		</main>
 		<script>
 		(function() {
-			var dot  = document.getElementById('parser-status');
-			var text = document.getElementById('parser-status-text');
+			var container = document.getElementById('parser-status-badge');
 
-			function setStatus(s) {
-				dot.className = 'parser-dot ' + s;
-				if (s === 'healthy')   { text.textContent = 'Parser ready'; }
-				if (s === 'unhealthy') { text.textContent = 'Parser unavailable'; }
-				if (s === 'checking')  { text.textContent = 'Parser checking…'; }
+			function setBadge(s) {
+				var variantClass = {
+					healthy:   'bg-green-100 text-green-800 border-green-200',
+					unhealthy: 'bg-red-100 text-red-800 border-red-200',
+					checking:  'bg-secondary text-secondary-foreground',
+				}[s] || 'bg-secondary text-secondary-foreground';
+
+				var label = {
+					healthy:   'Parser ready',
+					unhealthy: 'Parser unavailable',
+					checking:  'Parser checking…',
+				}[s] || 'Parser checking…';
+
+				container.innerHTML = '<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ' + variantClass + '">' + label + '</span>';
 
 				var btn = document.getElementById('upload-btn');
 				if (btn) { btn.disabled = (s !== 'healthy'); }
@@ -49,8 +55,8 @@ templ Layout(title string) {
 			function poll() {
 				fetch('/health/parser')
 					.then(function(r) { return r.json(); })
-					.then(function(d) { setStatus(d.status === 'healthy' ? 'healthy' : 'unhealthy'); })
-					.catch(function()  { setStatus('unhealthy'); });
+					.then(function(d) { setBadge(d.status === 'healthy' ? 'healthy' : 'unhealthy'); })
+					.catch(function()  { setBadge('unhealthy'); });
 			}
 
 			poll();
@@ -63,7 +69,7 @@ templ Layout(title string) {
 
 templ ErrorBanner(msg string) {
 	if msg != "" {
-		<div class="error-banner" role="alert">{ msg }</div>
+		<div class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive mb-4" role="alert">{ msg }</div>
 	}
 }
 

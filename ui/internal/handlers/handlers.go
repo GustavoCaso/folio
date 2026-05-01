@@ -7,14 +7,16 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"os"
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
+	"github.com/templui/templui/utils"
 )
 
-//go:embed static/highlight.js static/documents.js
+//go:embed static/highlight.js static/documents.js static/css/output.css
 var staticFS embed.FS
 
 // ParserClient is the interface satisfied by *parserclient.Client (and fakes in tests).
@@ -53,7 +55,9 @@ func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logg
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)
 	mux.HandleFunc("DELETE /highlights/{id}", hs.DeleteHighlight)
 
+	isDev := os.Getenv("ENV") != "production"
 	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))
+	utils.SetupScriptRoutes(mux, isDev)
 
 	return mux, nil
 }

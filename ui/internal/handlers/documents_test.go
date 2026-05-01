@@ -100,8 +100,8 @@ func TestUploadDocumentError_ShowsBanner(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
 	}
-	if !strings.Contains(rec.Body.String(), `class="error-banner"`) {
-		t.Errorf("expected error-banner in response, got:\n%s", rec.Body.String())
+	if !strings.Contains(rec.Body.String(), `role="alert"`) {
+		t.Errorf("expected alert element in response, got:\n%s", rec.Body.String())
 	}
 }
 
