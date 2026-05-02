@@ -49,14 +49,14 @@ func Reader(job db.Job, renderedHTML string, highlights []db.Highlight) templ.Co
 				}()
 			}
 			ctx = templ.InitializeContext(ctx)
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<div id=\"reader\" data-job-id=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 1, "<article class=\"mx-auto max-w-[68ch] px-2 pb-24\"><div id=\"reader\" data-job-id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var3 string
 			templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(job.ID)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 13, Col: 39}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 14, Col: 40}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 			if templ_7745c5c3_Err != nil {
@@ -70,7 +70,7 @@ func Reader(job db.Job, renderedHTML string, highlights []db.Highlight) templ.Co
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</div></article>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -122,23 +122,23 @@ func Reader(job db.Job, renderedHTML string, highlights []db.Highlight) templ.Co
 						}()
 					}
 					ctx = templ.InitializeContext(ctx)
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"flex flex-col gap-3 p-1 w-64\"><div class=\"flex flex-col gap-1\"><label class=\"text-sm font-medium\" for=\"hl-tag\">Tag</label>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 5, "<div class=\"flex flex-col gap-4 p-4 w-72\"><p class=\"text-xs font-medium tracking-widest uppercase text-muted-foreground\">Add highlight</p><div class=\"flex flex-col gap-1.5\"><label class=\"text-xs font-medium text-foreground\" for=\"hl-tag\">Tag</label>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = input.Input(input.Props{ID: "hl-tag", Placeholder: "optional"}).Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = input.Input(input.Props{ID: "hl-tag", Placeholder: "e.g. important"}).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><div class=\"flex flex-col gap-1\"><label class=\"text-sm font-medium\" for=\"hl-note\">Note</label>")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 6, "</div><div class=\"flex flex-col gap-1.5\"><label class=\"text-xs font-medium text-foreground\" for=\"hl-note\">Note</label>")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = textarea.Textarea(textarea.Props{ID: "hl-note", Placeholder: "optional", Rows: 3}).Render(ctx, templ_7745c5c3_Buffer)
+					templ_7745c5c3_Err = textarea.Textarea(textarea.Props{ID: "hl-note", Placeholder: "Your thoughts…", Rows: 3}).Render(ctx, templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
-					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div><div class=\"flex justify-end gap-2\">")
+					templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 7, "</div><div class=\"flex justify-end gap-2 pt-1\">")
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
 					}
@@ -176,7 +176,7 @@ func Reader(job db.Job, renderedHTML string, highlights []db.Highlight) templ.Co
 							}()
 						}
 						ctx = templ.InitializeContext(ctx)
-						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "Save")
+						templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "Save highlight")
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -205,7 +205,7 @@ func Reader(job db.Job, renderedHTML string, highlights []db.Highlight) templ.Co
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " <div id=\"hl-tooltip\" class=\"hidden fixed z-50 bg-card border border-border rounded-md shadow-md p-3 max-w-xs\" role=\"status\"><p id=\"hl-tooltip-content\" class=\"text-sm text-card-foreground\"></p></div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, " <div id=\"hl-tooltip\" class=\"hidden fixed z-50 bg-card border border-border rounded-lg shadow-lg px-3 py-2.5 max-w-xs\" role=\"status\"><p id=\"hl-tooltip-content\" class=\"text-sm text-card-foreground leading-snug\"></p></div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -213,7 +213,7 @@ func Reader(job db.Job, renderedHTML string, highlights []db.Highlight) templ.Co
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " <script type=\"module\" src=\"/static/highlight.js\"></script> <script>\n\t\t\twindow.__highlights = JSON.parse(document.getElementById(\"highlights-data\").textContent);\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " <script type=\"module\" src=\"/static/js/highlight.js\"></script> <script>\n\t\t\twindow.__highlights = JSON.parse(document.getElementById(\"highlights-data\").textContent);\n\t\t</script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

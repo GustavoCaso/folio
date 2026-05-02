@@ -10,9 +10,11 @@ import (
 
 templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 	@Layout(job.Filename) {
-		<div id="reader" data-job-id={ job.ID }>
-			@templ.Raw(renderedHTML)
-		</div>
+		<article class="mx-auto max-w-[68ch] px-2 pb-24">
+			<div id="reader" data-job-id={ job.ID }>
+				@templ.Raw(renderedHTML)
+			</div>
+		</article>
 
 		@popover.Root(popover.RootProps{ID: "hl-popover"}) {
 			@popover.Trigger(popover.TriggerProps{
@@ -23,21 +25,22 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 				ID:        "hl-popover-content",
 				Placement: popover.PlacementBottomStart,
 			}) {
-				<div class="flex flex-col gap-3 p-1 w-64">
-					<div class="flex flex-col gap-1">
-						<label class="text-sm font-medium" for="hl-tag">Tag</label>
-						@input.Input(input.Props{ID: "hl-tag", Placeholder: "optional"})
+				<div class="flex flex-col gap-4 p-4 w-72">
+					<p class="text-xs font-medium tracking-widest uppercase text-muted-foreground">Add highlight</p>
+					<div class="flex flex-col gap-1.5">
+						<label class="text-xs font-medium text-foreground" for="hl-tag">Tag</label>
+						@input.Input(input.Props{ID: "hl-tag", Placeholder: "e.g. important"})
 					</div>
-					<div class="flex flex-col gap-1">
-						<label class="text-sm font-medium" for="hl-note">Note</label>
-						@textarea.Textarea(textarea.Props{ID: "hl-note", Placeholder: "optional", Rows: 3})
+					<div class="flex flex-col gap-1.5">
+						<label class="text-xs font-medium text-foreground" for="hl-note">Note</label>
+						@textarea.Textarea(textarea.Props{ID: "hl-note", Placeholder: "Your thoughts…", Rows: 3})
 					</div>
-					<div class="flex justify-end gap-2">
+					<div class="flex justify-end gap-2 pt-1">
 						@button.Button(button.Props{ID: "hl-cancel", Variant: button.VariantGhost}) {
 							Cancel
 						}
 						@button.Button(button.Props{ID: "hl-save", Variant: button.VariantDefault}) {
-							Save
+							Save highlight
 						}
 					</div>
 				</div>
@@ -46,14 +49,14 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 
 		<div
 			id="hl-tooltip"
-			class="hidden fixed z-50 bg-card border border-border rounded-md shadow-md p-3 max-w-xs"
+			class="hidden fixed z-50 bg-card border border-border rounded-lg shadow-lg px-3 py-2.5 max-w-xs"
 			role="status"
 		>
-			<p id="hl-tooltip-content" class="text-sm text-card-foreground"></p>
+			<p id="hl-tooltip-content" class="text-sm text-card-foreground leading-snug"></p>
 		</div>
 
 		@templ.JSONScript("highlights-data", highlights)
-		<script type="module" src="/static/highlight.js"></script>
+		<script type="module" src="/static/js/highlight.js"></script>
 		<script>
 			window.__highlights = JSON.parse(document.getElementById("highlights-data").textContent);
 		</script>

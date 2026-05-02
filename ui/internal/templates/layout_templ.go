@@ -44,7 +44,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Folio</title><link rel=\"stylesheet\" href=\"/static/css/output.css\"><style>\n\t\t\tmark.highlight     { background: #ffe066; cursor: pointer; border-radius: 2px; }\n\t\t\tmark.highlight img { outline: 3px solid #ffeb3b; outline-offset: 2px; background: transparent; }\n\t\t</style></head><body class=\"min-h-screen bg-background text-foreground\"><header class=\"border-b border-border\"><div class=\"mx-auto max-w-4xl flex items-center justify-between px-4 py-3\"><a href=\"/\" class=\"font-semibold tracking-tight text-foreground hover:opacity-80\">Folio</a><div id=\"parser-status-badge\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Folio</title><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/tailwind/output.css\"><link rel=\"stylesheet\" href=\"/static/css/reader.css\"></head><body class=\"min-h-screen bg-background text-foreground\"><header class=\"border-b border-border\"><div class=\"mx-auto max-w-4xl flex items-center justify-between px-4 py-3\"><a href=\"/\" class=\"font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity\" style=\"font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;\">Folio</a><div id=\"parser-status-badge\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
