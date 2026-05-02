@@ -2,26 +2,63 @@ package templates
 
 import (
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/templui/templui/components/popover"
+	"github.com/templui/templui/components/button"
+	"github.com/templui/templui/components/input"
+	"github.com/templui/templui/components/textarea"
 )
 
 templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 	@Layout(job.Filename) {
-		<div id="reader" data-job-id={ job.ID }>
-			@templ.Raw(renderedHTML)
-		</div>
+		<article class="mx-auto max-w-[68ch] px-2 pb-24">
+			<div id="reader" data-job-id={ job.ID }>
+				@templ.Raw(renderedHTML)
+			</div>
+		</article>
 
-		<div id="highlight-panel" style="display:none; position:fixed; bottom:1rem; right:1rem; background:#fff; border:1px solid #ccc; padding:1rem; border-radius:4px;">
-			<input id="hl-tag" type="text" placeholder="Tag (optional)"/>
-			<textarea id="hl-note" placeholder="Note (optional)" rows="3"></textarea>
-			<button id="hl-save">Save highlight</button>
-			<button id="hl-cancel">Cancel</button>
+		@popover.Root(popover.RootProps{ID: "hl-popover"}) {
+			@popover.Trigger(popover.TriggerProps{
+				TriggerType: popover.TriggerTypeManual,
+			}) {
+			}
+			@popover.Content(popover.ContentProps{
+				ID:        "hl-popover-content",
+				Placement: popover.PlacementBottomStart,
+			}) {
+				<div class="flex flex-col gap-4 p-4 w-72">
+					<p class="text-xs font-medium tracking-widest uppercase text-muted-foreground">Add highlight</p>
+					<div class="flex flex-col gap-1.5">
+						<label class="text-xs font-medium text-foreground" for="hl-tag">Tag</label>
+						@input.Input(input.Props{ID: "hl-tag", Placeholder: "e.g. important"})
+					</div>
+					<div class="flex flex-col gap-1.5">
+						<label class="text-xs font-medium text-foreground" for="hl-note">Note</label>
+						@textarea.Textarea(textarea.Props{ID: "hl-note", Placeholder: "Your thoughts…", Rows: 3})
+					</div>
+					<div class="flex justify-end gap-2 pt-1">
+						@button.Button(button.Props{ID: "hl-cancel", Variant: button.VariantGhost}) {
+							Cancel
+						}
+						@button.Button(button.Props{ID: "hl-save", Variant: button.VariantDefault}) {
+							Save highlight
+						}
+					</div>
+				</div>
+			}
+		}
+
+		<div
+			id="hl-tooltip"
+			class="hidden fixed z-50 bg-card border border-border rounded-lg shadow-lg px-3 py-2.5 max-w-xs"
+			role="status"
+		>
+			<p id="hl-tooltip-content" class="text-sm text-card-foreground leading-snug"></p>
 		</div>
 
 		@templ.JSONScript("highlights-data", highlights)
-		<script type="module" src="/static/highlight.js"></script>
+		<script type="module" src="/static/js/highlight.js"></script>
 		<script>
 			window.__highlights = JSON.parse(document.getElementById("highlights-data").textContent);
 		</script>
 	}
 }
-

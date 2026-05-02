@@ -41,7 +41,7 @@ templ:
 css:
 	@TEMPLUI_PATH="$$(go list -mod=mod -m -f '{{.Dir}}' github.com/templui/templui)" && \
 	printf '%s\n' '@source "./**/*.templ";' "@source \"$$TEMPLUI_PATH/components/**/*.templ\";" \
-		> internal/handlers/static/css/sources.generated.css
+		> internal/handlers/static/tailwind/sources.generated.css
 	@mise exec -- pnpm exec tailwindcss \
-		-i internal/handlers/static/css/input.css \
-		-o internal/handlers/static/css/output.css
+		-i internal/handlers/static/tailwind/input.css \
+		-o internal/handlers/static/tailwind/output.css

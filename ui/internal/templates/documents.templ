@@ -130,6 +130,6 @@ templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
 		if len(watchJobIDs) > 0 {
 			<div id="watch-config" data-job-ids={ strings.Join(watchJobIDs, ",") } style="display:none"></div>
 		}
-		<script type="module" src="/static/documents.js"></script>
+		<script type="module" src="/static/js/documents.js"></script>
 	}
 }

@@ -1,3 +1,4 @@
 parser/src/parser/grpc/** linguist-generated
 ui/internal/parser/proto/** linguist-generated
 ui/internal/templates/*_templ.go linguist-generated
+ui/internal/handlers/static/tailwind/** linguist-generated
