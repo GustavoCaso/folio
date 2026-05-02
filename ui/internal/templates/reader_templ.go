@@ -213,7 +213,7 @@ func Reader(job db.Job, renderedHTML string, highlights []db.Highlight) templ.Co
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " <script type=\"module\" src=\"/static/js/highlight.js\"></script> <script>\n\t\t\twindow.__highlights = JSON.parse(document.getElementById(\"highlights-data\").textContent);\n\t\t</script>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, " <script type=\"module\" src=\"/static/js/highlight.js\"></script>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

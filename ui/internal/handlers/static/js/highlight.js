@@ -264,6 +264,25 @@ function hideTooltip() {
 function bootstrap() {
   const reader = document.getElementById("reader");
   if (!reader) return;
+
+  const highlightsData = document.getElementById("highlights-data")
+  if (!highlightsData) return;
+
+  let highlights;
+  try {
+    highlights = JSON.parse(highlightsData.textContent)
+  } catch (error) {
+    console.error(error);
+    return;
+  }
+
+  if (highlights != null && highlights.length <= 0) {
+    console.log('[hightlight.js] No highlights')
+    return;
+  }
+
+  console.log('[hightlight.js] Highlights parsed')
+
   const popoverContent = document.getElementById("hl-popover-content");
   const saveBtn = document.getElementById("hl-save");
   const cancelBtn = document.getElementById("hl-cancel");
@@ -273,14 +292,16 @@ function bootstrap() {
   let pendingSelection = null;
   let popoverOpen = false;
 
-  applyHighlights(reader, window.__highlights || []);
+  applyHighlights(reader, highlights);
+
+  console.log('[hightlight.js] Highlights applied')
 
   const tooltip = document.getElementById("hl-tooltip");
   if (tooltip) {
     reader.addEventListener("click", (e) => {
       const mark = e.target.closest("mark.highlight");
       if (!mark) return;
-      const h = (window.__highlights || []).find(x => String(x.ID) === mark.dataset.highlightId);
+      const h = highlights.find(x => String(x.ID) === mark.dataset.highlightId);
       showTooltip(mark.getBoundingClientRect(), formatHighlight(h));
     });
 
