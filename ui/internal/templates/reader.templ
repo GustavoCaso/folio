@@ -57,8 +57,5 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 
 		@templ.JSONScript("highlights-data", highlights)
 		<script type="module" src="/static/js/highlight.js"></script>
-		<script>
-			window.__highlights = JSON.parse(document.getElementById("highlights-data").textContent);
-		</script>
 	}
 }
