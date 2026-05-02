@@ -57,3 +57,40 @@ func TestReaderRendersHTMLAndJobID(t *testing.T) {
 		t.Errorf("expected raw rendered HTML, got: %s", got)
 	}
 }
+
+func TestReaderRendersPopover(t *testing.T) {
+	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+
+	if !strings.Contains(got, `id="hl-popover"`) {
+		t.Errorf("expected popover root id, got: %s", got)
+	}
+	if !strings.Contains(got, `id="hl-popover-content"`) {
+		t.Errorf("expected popover content id, got: %s", got)
+	}
+	if !strings.Contains(got, `id="hl-save"`) {
+		t.Errorf("expected save button, got: %s", got)
+	}
+	if !strings.Contains(got, `id="hl-cancel"`) {
+		t.Errorf("expected cancel button, got: %s", got)
+	}
+	if !strings.Contains(got, `id="hl-tag"`) {
+		t.Errorf("expected tag input, got: %s", got)
+	}
+	if !strings.Contains(got, `id="hl-note"`) {
+		t.Errorf("expected note textarea, got: %s", got)
+	}
+}
+
+func TestReaderRendersTooltip(t *testing.T) {
+	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+
+	if !strings.Contains(got, `id="hl-tooltip"`) {
+		t.Errorf("expected tooltip container, got: %s", got)
+	}
+	if !strings.Contains(got, `id="hl-tooltip-content"`) {
+		t.Errorf("expected tooltip content element, got: %s", got)
+	}
+	if !strings.Contains(got, `role="status"`) {
+		t.Errorf("expected role=status on tooltip, got: %s", got)
+	}
+}

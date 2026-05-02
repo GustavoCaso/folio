@@ -71,11 +71,10 @@ export function offsetWithinBlock(block, targetNode, targetOffset) {
   return count;
 }
 
-function makeMark(className, dataset, title) {
+function makeMark(className, dataset) {
   const mark = document.createElement("mark");
   mark.className = className;
   Object.assign(mark.dataset, dataset);
-  if (title) mark.title = title;
   return mark;
 }
 
@@ -83,7 +82,7 @@ function makeMark(className, dataset, title) {
 // We can't use range.surroundContents() — it throws when the range crosses
 // element boundaries (true for any non-trivial highlight). Instead we wrap
 // each text node / img individually with its own sub-range.
-export function wrapRangeTextNodes(range, className, dataset, title) {
+export function wrapRangeTextNodes(range, className, dataset) {
   const root = range.commonAncestorContainer;
   const nodes = [];
   // TreeWalker doesn't include its root, so a single-text-node range needs special handling.
@@ -115,7 +114,7 @@ export function wrapRangeTextNodes(range, className, dataset, title) {
     // Skip if already wrapped — happens when overlapping highlights apply on load.
     if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "IMG") {
       if (node.parentElement && node.parentElement.tagName === "MARK") return;
-      const mark = makeMark(className, dataset, title);
+      const mark = makeMark(className, dataset);
       node.parentNode.insertBefore(mark, node);
       mark.appendChild(node);
       return;
@@ -129,7 +128,7 @@ export function wrapRangeTextNodes(range, className, dataset, title) {
     if (node === range.endContainer) nodeRange.setEnd(node, range.endOffset);
     if (nodeRange.collapsed) return;
 
-    const mark = makeMark(className, dataset, title);
+    const mark = makeMark(className, dataset);
     try {
       nodeRange.surroundContents(mark);
     } catch {
@@ -211,7 +210,6 @@ export function applyHighlight(reader, h) {
   if (!startBlock || !endBlock) return;
 
   const blocks = collectBlocksBetween(reader, startBlock, endBlock);
-  const title = (h.Tag || h.Note) ? [h.Tag, h.Note].filter(Boolean).join(": ") : "";
 
   blocks.forEach((block) => {
     // Start block: [StartPos … blockEnd]. End block: [0 … EndPos]. Middle: full block.
@@ -230,7 +228,7 @@ export function applyHighlight(reader, h) {
     } catch {
       return;
     }
-    wrapRangeTextNodes(range, "highlight", { highlightId: h.ID }, title);
+    wrapRangeTextNodes(range, "highlight", { highlightId: h.ID });
   });
 }
 
@@ -238,30 +236,98 @@ export function applyHighlights(reader, highlights) {
   highlights.forEach((h) => applyHighlight(reader, h));
 }
 
+// --- Tooltip helpers ---
+
+export function formatHighlight(h) {
+  if (!h) return "(no annotation)";
+  if (h.Tag && h.Note) return h.Tag + ": " + h.Note;
+  return h.Tag || h.Note || "(no annotation)";
+}
+
+function showTooltip(rect, text) {
+  const tooltip = document.getElementById("hl-tooltip");
+  const content = document.getElementById("hl-tooltip-content");
+  if (!tooltip || !content) return;
+  content.textContent = text;
+  tooltip.style.top = (rect.bottom + 6) + "px";
+  tooltip.style.left = rect.left + "px";
+  tooltip.classList.remove("hidden");
+}
+
+function hideTooltip() {
+  const tooltip = document.getElementById("hl-tooltip");
+  if (tooltip) tooltip.classList.add("hidden");
+}
+
 // --- Bootstrap (browser only) ---
 
 function bootstrap() {
   const reader = document.getElementById("reader");
   if (!reader) return;
-  const panel = document.getElementById("highlight-panel");
+  const popoverContent = document.getElementById("hl-popover-content");
   const saveBtn = document.getElementById("hl-save");
   const cancelBtn = document.getElementById("hl-cancel");
+  if (!popoverContent || !saveBtn || !cancelBtn) return;
   const jobID = reader.dataset.jobId;
 
   let pendingSelection = null;
+  let popoverOpen = false;
 
   applyHighlights(reader, window.__highlights || []);
 
-  // Listen on document (not reader) so a release outside reader still captures.
-  // setTimeout(0) yields one tick so the Selection is finalized — some browsers
-  // fire mouseup before the selection updates.
+  const tooltip = document.getElementById("hl-tooltip");
+  if (tooltip) {
+    reader.addEventListener("click", (e) => {
+      const mark = e.target.closest("mark.highlight");
+      if (!mark) return;
+      const h = (window.__highlights || []).find(x => String(x.ID) === mark.dataset.highlightId);
+      showTooltip(mark.getBoundingClientRect(), formatHighlight(h));
+    });
+
+    document.addEventListener("click", (e) => {
+      if (!tooltip.classList.contains("hidden") &&
+        !tooltip.contains(e.target) &&
+        !e.target.closest("mark.highlight")) {
+        hideTooltip();
+      }
+    });
+  }
+
+  popoverContent.addEventListener("toggle", (e) => {
+    if (e.newState === "closed") {
+      popoverContent.setAttribute("data-tui-popover-open", "false");
+      popoverOpen = false;
+      pendingSelection = null;
+      window.getSelection()?.removeAllRanges();
+    }
+  });
+
+  function openPopover(rect) {
+    if (popoverOpen) return;
+    popoverContent.style.top = (rect.bottom + 6) + "px";
+    popoverContent.style.left = rect.left + "px";
+    popoverContent.showPopover();
+    popoverContent.setAttribute("data-tui-popover-open", "true");
+    popoverOpen = true;
+  }
+
+  function closePopover() {
+    if (!popoverOpen) return;
+    popoverContent.hidePopover();
+  }
+
+  document.addEventListener("click", (e) => {
+    if (popoverOpen && !popoverContent.contains(e.target)) {
+      closePopover();
+    }
+  });
+
   document.addEventListener("mouseup", () => {
     setTimeout(() => {
       const sel = window.getSelection();
       if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
 
       const range = sel.getRangeAt(0);
-      // Constrain to selections fully inside the reader.
       if (!reader.contains(range.startContainer) || !reader.contains(range.endContainer)) return;
 
       const startBlock = findBlockAncestor(range.startContainer, reader);
@@ -280,13 +346,13 @@ function bootstrap() {
         text: sel.toString(),
       };
 
-      panel.style.display = "block";
+      openPopover(range.getBoundingClientRect());
     }, 0);
   });
 
   cancelBtn.addEventListener("click", () => {
     pendingSelection = null;
-    panel.style.display = "none";
+    closePopover();
     window.getSelection()?.removeAllRanges();
   });
 
@@ -303,7 +369,7 @@ function bootstrap() {
     });
 
     if (resp.ok) {
-      panel.style.display = "none";
+      closePopover();
       pendingSelection = null;
       window.location.reload();
     }

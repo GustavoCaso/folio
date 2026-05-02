@@ -2,6 +2,10 @@ package templates
 
 import (
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/templui/templui/components/popover"
+	"github.com/templui/templui/components/button"
+	"github.com/templui/templui/components/input"
+	"github.com/templui/templui/components/textarea"
 )
 
 templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
@@ -10,11 +14,42 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 			@templ.Raw(renderedHTML)
 		</div>
 
-		<div id="highlight-panel" style="display:none; position:fixed; bottom:1rem; right:1rem; background:#fff; border:1px solid #ccc; padding:1rem; border-radius:4px;">
-			<input id="hl-tag" type="text" placeholder="Tag (optional)"/>
-			<textarea id="hl-note" placeholder="Note (optional)" rows="3"></textarea>
-			<button id="hl-save">Save highlight</button>
-			<button id="hl-cancel">Cancel</button>
+		@popover.Root(popover.RootProps{ID: "hl-popover"}) {
+			@popover.Trigger(popover.TriggerProps{
+				TriggerType: popover.TriggerTypeManual,
+			}) {
+			}
+			@popover.Content(popover.ContentProps{
+				ID:        "hl-popover-content",
+				Placement: popover.PlacementBottomStart,
+			}) {
+				<div class="flex flex-col gap-3 p-1 w-64">
+					<div class="flex flex-col gap-1">
+						<label class="text-sm font-medium" for="hl-tag">Tag</label>
+						@input.Input(input.Props{ID: "hl-tag", Placeholder: "optional"})
+					</div>
+					<div class="flex flex-col gap-1">
+						<label class="text-sm font-medium" for="hl-note">Note</label>
+						@textarea.Textarea(textarea.Props{ID: "hl-note", Placeholder: "optional", Rows: 3})
+					</div>
+					<div class="flex justify-end gap-2">
+						@button.Button(button.Props{ID: "hl-cancel", Variant: button.VariantGhost}) {
+							Cancel
+						}
+						@button.Button(button.Props{ID: "hl-save", Variant: button.VariantDefault}) {
+							Save
+						}
+					</div>
+				</div>
+			}
+		}
+
+		<div
+			id="hl-tooltip"
+			class="hidden fixed z-50 bg-card border border-border rounded-md shadow-md p-3 max-w-xs"
+			role="status"
+		>
+			<p id="hl-tooltip-content" class="text-sm text-card-foreground"></p>
 		</div>
 
 		@templ.JSONScript("highlights-data", highlights)
@@ -24,4 +59,3 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 		</script>
 	}
 }
-

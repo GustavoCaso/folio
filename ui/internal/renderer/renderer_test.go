@@ -32,3 +32,16 @@ func TestRendererCodeBlockHasBlockID(t *testing.T) {
 		t.Errorf("expected data-block-id on code block, got: %s", html)
 	}
 }
+
+func TestRendererListAndListElementHasBlockID(t *testing.T) {
+	md := "1. First item\n2. Second item\n3. Third item\n4. Fourth item"
+	html, err := renderer.Render([]byte(md))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	t.Logf("HTML: %s", html)
+	if !strings.Contains(html, `data-block-id="list-1`) {
+		t.Errorf("expected data-block-id on code block, got: %s", html)
+	}
+}

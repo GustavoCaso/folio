@@ -26,7 +26,7 @@ func (t *blockIDTransformer) Transform(node *ast.Document, _ text.Reader, _ pars
 			return ast.WalkContinue, nil
 		}
 		switch n.Kind() {
-		case ast.KindHeading, ast.KindParagraph, ast.KindFencedCodeBlock, ast.KindCodeBlock:
+		case ast.KindHeading, ast.KindParagraph, ast.KindFencedCodeBlock, ast.KindCodeBlock, ast.KindList, ast.KindListItem:
 			counter++
 			kind := strings.ToLower(strings.TrimPrefix(n.Kind().String(), ""))
 			var buf bytes.Buffer

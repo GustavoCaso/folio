@@ -3,6 +3,7 @@ import {
   applyHighlight,
   applyHighlights,
   findBlockAncestor,
+  formatHighlight,
   offsetWithinBlock,
   wrapRangeTextNodes,
 } from "./highlight.js";
@@ -124,7 +125,7 @@ describe("applyHighlight with simple text", () => {
     expect(marks[0].textContent).toBe("hello");
   });
 
-  it("sets title from tag and note", () => {
+  it("does not set title attribute on mark (tooltip is handled via JS click)", () => {
     const reader = makeReader(`<p data-block-id="p-1">hello</p>`);
     applyHighlight(reader, {
       ID: "h1",
@@ -136,7 +137,7 @@ describe("applyHighlight with simple text", () => {
       Note: "remember this",
     });
     const mark = reader.querySelector("mark.highlight");
-    expect(mark.title).toBe("important: remember this");
+    expect(mark.title).toBe("");
   });
 
   it("does nothing when block-id is missing", () => {
@@ -213,6 +214,29 @@ describe("applyHighlights", () => {
   });
 });
 
+describe("formatHighlight", () => {
+  it("returns tag and note joined when both present", () => {
+    expect(formatHighlight({ Tag: "important", Note: "remember this" })).toBe("important: remember this");
+  });
+
+  it("returns tag alone when note is absent", () => {
+    expect(formatHighlight({ Tag: "important", Note: "" })).toBe("important");
+  });
+
+  it("returns note alone when tag is absent", () => {
+    expect(formatHighlight({ Tag: "", Note: "remember this" })).toBe("remember this");
+  });
+
+  it("returns fallback when both are absent", () => {
+    expect(formatHighlight({ Tag: "", Note: "" })).toBe("(no annotation)");
+  });
+
+  it("returns fallback for null/undefined highlight", () => {
+    expect(formatHighlight(null)).toBe("(no annotation)");
+    expect(formatHighlight(undefined)).toBe("(no annotation)");
+  });
+});
+
 describe("wrapRangeTextNodes", () => {
   it("wraps text in a single text-node range", () => {
     const reader = makeReader(`<p data-block-id="p-1">hello</p>`);
@@ -220,7 +244,7 @@ describe("wrapRangeTextNodes", () => {
     const range = document.createRange();
     range.setStart(text, 1);
     range.setEnd(text, 4);
-    wrapRangeTextNodes(range, "highlight", { highlightId: "x" }, "");
+    wrapRangeTextNodes(range, "highlight", { highlightId: "x" });
     expect(reader.querySelector("mark.highlight").textContent).toBe("ell");
   });
 
@@ -229,7 +253,7 @@ describe("wrapRangeTextNodes", () => {
     const block = reader.querySelector("p");
     const range = document.createRange();
     range.selectNodeContents(block);
-    wrapRangeTextNodes(range, "highlight", { highlightId: "x" }, "");
+    wrapRangeTextNodes(range, "highlight", { highlightId: "x" });
     expect(reader.querySelectorAll("mark.highlight img").length).toBe(1);
   });
 });
