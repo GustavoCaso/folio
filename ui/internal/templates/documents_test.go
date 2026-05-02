@@ -143,7 +143,7 @@ func TestDocumentsOmitsErrorBannerWhenNoError(t *testing.T) {
 
 func TestDocumentsLoadsScript(t *testing.T) {
 	got := renderDocuments(t, nil, "job-1")
-	if !strings.Contains(got, `<script type="module" src="/static/documents.js">`) {
+	if !strings.Contains(got, `<script type="module" src="/static/js/documents.js">`) {
 		t.Errorf("expected documents.js script tag, got:\n%s", got)
 	}
 }
