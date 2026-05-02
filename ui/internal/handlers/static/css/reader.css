@@ -1,0 +1,146 @@
+#reader {
+  font-family: 'Lora', Georgia, serif;
+  font-size: 1.0625rem;
+  line-height: 1.85;
+  color: oklch(0.18 0 0);
+}
+
+#reader h1,
+#reader h2,
+#reader h3,
+#reader h4,
+#reader h5,
+#reader h6 {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  line-height: 1.25;
+  letter-spacing: -0.02em;
+  margin-top: 2.5em;
+  margin-bottom: 0.75em;
+  color: oklch(0.12 0 0);
+}
+
+#reader h1 {
+  font-size: 1.75rem;
+  margin-top: 0;
+}
+
+#reader h2 {
+  font-size: 1.375rem;
+}
+
+#reader h3 {
+  font-size: 1.125rem;
+}
+
+#reader p {
+  margin-bottom: 1.4em;
+}
+
+#reader ul,
+#reader ol {
+  margin-bottom: 1.4em;
+  padding-left: 1.75em;
+}
+
+#reader li {
+  margin-bottom: 0.4em;
+}
+
+#reader blockquote {
+  border-left: 3px solid oklch(0.75 0 0);
+  margin: 2em 0;
+  padding: 0.5em 0 0.5em 1.5em;
+  color: oklch(0.42 0 0);
+  font-style: italic;
+}
+
+#reader code {
+  font-family: ui-monospace, 'Fira Code', monospace;
+  font-size: 0.875em;
+  background: oklch(0.96 0 0);
+  padding: 0.15em 0.35em;
+  border-radius: 3px;
+  color: oklch(0.32 0 0);
+}
+
+#reader pre {
+  background: oklch(0.96 0 0);
+  border: 1px solid oklch(0.9 0 0);
+  border-radius: 6px;
+  padding: 1.25em 1.5em;
+  overflow-x: auto;
+  margin-bottom: 1.75em;
+  font-size: 0.875em;
+  line-height: 1.65;
+}
+
+#reader pre code {
+  background: none;
+  padding: 0;
+}
+
+#reader img {
+  max-width: 100%;
+  border-radius: 4px;
+  margin: 1.5em 0;
+}
+
+#reader table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 2em 0 2.25em;
+  font-size: 0.9375em;
+  line-height: 1.55;
+}
+
+#reader thead {
+  border-bottom: 2px solid oklch(0.18 0 0);
+}
+
+#reader th {
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  font-size: 0.8125em;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: oklch(0.35 0 0);
+  padding: 0 0.75em 0.75em 0;
+  text-align: left;
+  white-space: nowrap;
+}
+
+#reader td {
+  padding: 0.7em 0.75em 0.7em 0;
+  text-align: left;
+  vertical-align: top;
+  border-bottom: 1px solid oklch(0.92 0 0);
+  color: oklch(0.22 0 0);
+}
+
+#reader tbody tr:last-child td {
+  border-bottom: none;
+}
+
+#reader tbody tr:hover td {
+  background: oklch(0.975 0 0);
+}
+
+/* Highlights */
+mark.highlight {
+  background: oklch(92% 0.12 88 / 0.55);
+  cursor: pointer;
+  border-radius: 2px;
+  padding: 0.05em 0;
+  transition: background 0.15s ease;
+}
+
+mark.highlight:hover {
+  background: oklch(88% 0.14 88 / 0.75);
+}
+
+mark.highlight img {
+  outline: 2px solid oklch(80% 0.15 88);
+  outline-offset: 2px;
+  background: transparent;
+}
