@@ -91,6 +91,8 @@ export function wrapRangeTextNodes(range, className, dataset) {
   }
 
   nodes.forEach((node) => {
+    // Skip empty nodes
+    if (node.textContent === '\n') return;
     // Image: splice a <mark> in manually (surroundContents requires text endpoints).
     // Skip if already wrapped — happens when overlapping highlights apply on load.
     if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "IMG") {
@@ -151,6 +153,37 @@ export function applyHighlight(reader, h) {
 
 export function applyHighlights(reader, highlights) {
   highlights.forEach((h) => applyHighlight(reader, h));
+}
+
+// Convert a DOM Range endpoint (node + nodeOffset) into a character position.
+// DOM endpoints come in two flavors:
+//   - text node: nodeOffset is a char index within the text
+//   - element node: nodeOffset is a child index (used when selection sits at an
+//     img boundary, so endContainer is <p> with offset = childIndex)
+export function offsetWithinBlock(block, targetNode, targetOffset) {
+  const walker = blockWalker(block);
+  let count = 0;
+
+  // Element-target case: sum lengths of preceding children of targetNode.
+  if (targetNode.nodeType === Node.ELEMENT_NODE) {
+    while (walker.nextNode()) {
+      const cur = walker.currentNode;
+      if (cur.parentNode === targetNode) {
+        const idx = Array.prototype.indexOf.call(targetNode.childNodes, cur);
+        if (idx >= targetOffset) return count;
+      }
+      count += nodeLen(cur);
+    }
+    return count;
+  }
+
+  // Text-target case: walk until we reach the target text node, then add its char offset.
+  while (walker.nextNode()) {
+    const cur = walker.currentNode;
+    if (cur === targetNode) return count + targetOffset;
+    count += nodeLen(cur);
+  }
+  return count;
 }
 
 // --- Tooltip helpers ---
@@ -274,8 +307,8 @@ function bootstrap() {
         job_id: jobID,
         start_block_id: startBlock.dataset.blockId,
         end_block_id: endBlock.dataset.blockId,
-        start_pos: range.startOffset,
-        end_pos: range.endOffset,
+        start_pos: offsetWithinBlock(startBlock, range.startContainer, range.startOffset),
+        end_pos: offsetWithinBlock(endBlock, range.endContainer, range.endOffset),
         text: sel.toString(),
       };
 
