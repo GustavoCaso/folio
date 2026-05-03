@@ -16,10 +16,7 @@ export function findBlockAncestor(node, root) {
   return null;
 }
 
-// Single source of truth for "what counts in a block offset": text nodes and <img>.
-// Used by both capture (offsetWithinBlock) and apply (locateInBlock) so positions
-// round-trip exactly.
-function blockOffsetWalker(block) {
+function blockWalker(block) {
   return document.createTreeWalker(
     block,
     NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
@@ -39,43 +36,35 @@ function nodeLen(node) {
   return node.nodeType === Node.TEXT_NODE ? node.textContent.length : 1;
 }
 
-// Convert a DOM Range endpoint (node + nodeOffset) into a character position.
-// DOM endpoints come in two flavors:
-//   - text node: nodeOffset is a char index within the text
-//   - element node: nodeOffset is a child index (used when selection sits at an
-//     img boundary, so endContainer is <p> with offset = childIndex)
-export function offsetWithinBlock(block, targetNode, targetOffset) {
-  // Element-target case: sum lengths of preceding children of targetNode.
-  if (targetNode.nodeType === Node.ELEMENT_NODE) {
-    const walker = blockOffsetWalker(block);
-    let count = 0;
-    while (walker.nextNode()) {
-      const cur = walker.currentNode;
-      if (cur.parentNode === targetNode) {
-        const idx = Array.prototype.indexOf.call(targetNode.childNodes, cur);
-        if (idx >= targetOffset) return count;
-      }
-      count += nodeLen(cur);
-    }
-    return count;
-  }
-
-  // Text-target case: walk until we reach the target text node, then add its char offset.
-  const walker = blockOffsetWalker(block);
-  let count = 0;
-  while (walker.nextNode()) {
-    const cur = walker.currentNode;
-    if (cur === targetNode) return count + targetOffset;
-    count += nodeLen(cur);
-  }
-  return count;
-}
-
 function makeMark(className, dataset) {
   const mark = document.createElement("mark");
   mark.className = className;
   Object.assign(mark.dataset, dataset);
   return mark;
+}
+
+// Resolves a block-level offset to a specific child node and a local offset
+// within that node. Walks text nodes and <img> children in document order,
+// each img counting as 1. Accumulates lengths to find which node owns pos:
+//
+//   <p>before<img/>after</p>  pos=7
+//   node      len  accumulated
+//   "before"   6    0 → 6   (7 <= 6? no)
+//   <img>      1    6 → 7   (7 <= 7? no)
+//   "after"    5    7 → 12  (7 <= 12? yes) → offset = 7-7 = 0
+function getAnchorNode(block, pos) {
+  const walker = blockWalker(block);
+  let accumulated = 0;
+  while (walker.nextNode()) {
+    const node = walker.currentNode;
+    const len = nodeLen(node);
+    if (pos <= accumulated + len) {
+      if (node.nodeType === Node.ELEMENT_NODE) return { node, offset: 0 };
+      return { node, offset: pos - accumulated };
+    }
+    accumulated += len;
+  }
+  return null;
 }
 
 // Wrap every text fragment and <img> inside the range with a <mark>.
@@ -85,23 +74,15 @@ function makeMark(className, dataset) {
 export function wrapRangeTextNodes(range, className, dataset) {
   const root = range.commonAncestorContainer;
   const nodes = [];
-  // TreeWalker doesn't include its root, so a single-text-node range needs special handling.
-  if (root.nodeType === Node.TEXT_NODE) {
+  // Single image selection creates a collpased range
+  // intersectsNode returns false. We need to handle manually
+  if (root.nodeType === Node.ELEMENT_NODE && root.tagName === "IMG") {
+    nodes.push(root);
+    // TreeWalker doesn't include its root, so a single-text-node range needs special handling.
+  } else if (root.nodeType === Node.TEXT_NODE) {
     nodes.push(root);
   } else {
-    const walker = document.createTreeWalker(
-      root,
-      NodeFilter.SHOW_TEXT | NodeFilter.SHOW_ELEMENT,
-      {
-        acceptNode(n) {
-          if (n.nodeType === Node.TEXT_NODE) return NodeFilter.FILTER_ACCEPT;
-          if (n.nodeType === Node.ELEMENT_NODE && n.tagName === "IMG") {
-            return NodeFilter.FILTER_ACCEPT;
-          }
-          return NodeFilter.FILTER_SKIP;
-        },
-      }
-    );
+    const walker = blockWalker(root);
     while (walker.nextNode()) {
       if (range.intersectsNode(walker.currentNode)) {
         nodes.push(walker.currentNode);
@@ -137,99 +118,36 @@ export function wrapRangeTextNodes(range, className, dataset) {
   });
 }
 
-// Inverse of offsetWithinBlock: turn a stored char position back into a
-// DOM Range endpoint. `which` disambiguates exact boundaries:
-//   - "start": pos at end-of-text-node belongs to the NEXT node (so we don't
-//     start a range at a zero-width tail)
-//   - "end":   pos at end-of-text-node belongs to THIS node (so we don't
-//     end a range at the zero-width head of the next)
-// Image positions resolve to {parent, childIndex} or {parent, childIndex+1}
-// — Range endpoints can't go inside an <img>, only around it.
-function locateInBlock(block, pos, which) {
-  const walker = blockOffsetWalker(block);
-  let count = 0;
-  while (walker.nextNode()) {
-    const cur = walker.currentNode;
-    const len = nodeLen(cur);
-
-    if (cur.nodeType === Node.TEXT_NODE) {
-      const cmp = which === "start" ? count + len > pos : count + len >= pos;
-      if (cmp) {
-        return { node: cur, offset: pos - count, kind: "text" };
-      }
-    } else {
-      // <img> occupies positions [count, count+1].
-      if (which === "start" && pos <= count) {
-        const parent = cur.parentNode;
-        const idx = Array.prototype.indexOf.call(parent.childNodes, cur);
-        return { node: parent, offset: idx, kind: "element" }; // before img
-      }
-      if (which === "end" && pos === count + 1) {
-        const parent = cur.parentNode;
-        const idx = Array.prototype.indexOf.call(parent.childNodes, cur);
-        return { node: parent, offset: idx + 1, kind: "element" }; // after img
-      }
-    }
-    count += len;
-  }
-  // pos beyond block content — clamp to block end.
-  return { node: block, offset: block.childNodes.length, kind: "element" };
-}
-
-// Slice of [data-block-id] elements between start and end (inclusive), in document order.
-// Used to walk every block touched by a multi-block highlight.
-function collectBlocksBetween(reader, startBlock, endBlock) {
-  if (startBlock === endBlock) return [startBlock];
-  const all = reader.querySelectorAll("[data-block-id]");
-  const out = [];
-  let inRange = false;
-  for (const el of all) {
-    if (el === startBlock) inRange = true;
-    if (inRange) out.push(el);
-    if (el === endBlock) break;
-  }
-  return out;
-}
-
-function blockTotalLen(block) {
-  const walker = blockOffsetWalker(block);
-  let n = 0;
-  while (walker.nextNode()) n += nodeLen(walker.currentNode);
-  return n;
-}
-
-// Render a stored highlight onto the DOM. Walks every block from start to end
-// and applies a per-block sub-range; never builds one giant cross-block Range
-// (those would crash in surroundContents on element boundaries).
+// Render a stored highlight onto the DOM.
 export function applyHighlight(reader, h) {
   // BlockID fallback supports legacy single-block test fixtures.
   const startBlockID = h.StartBlockID || h.BlockID;
   const endBlockID = h.EndBlockID || startBlockID;
   const startBlock = reader.querySelector(`[data-block-id="${startBlockID}"]`);
   const endBlock = reader.querySelector(`[data-block-id="${endBlockID}"]`);
-  if (!startBlock || !endBlock) return;
+  if (!startBlock || !endBlock) {
+    console.log('[highlight.js] skipping highlight. no start or end block');
+    return;
+  }
 
-  const blocks = collectBlocksBetween(reader, startBlock, endBlock);
+  const startAnchor = getAnchorNode(startBlock, h.StartPos);
+  const endAnchor = getAnchorNode(endBlock, h.EndPos);
 
-  blocks.forEach((block) => {
-    // Start block: [StartPos … blockEnd]. End block: [0 … EndPos]. Middle: full block.
-    const fromPos = block === startBlock ? h.StartPos : 0;
-    const toPos = block === endBlock ? h.EndPos : blockTotalLen(block);
-    if (fromPos >= toPos) return;
+  if (!startAnchor || !endAnchor) {
+    console.log('[highlight.js] skipping highlight. no node to anchor at');
+    return;
+  }
 
-    const start = locateInBlock(block, fromPos, "start");
-    const end = locateInBlock(block, toPos, "end");
-    if (!start || !end) return;
+  const range = document.createRange();
+  try {
+    range.setStart(startAnchor.node, startAnchor.offset);
+    range.setEnd(endAnchor.node, endAnchor.offset);
+  } catch (error) {
+    console.error(`Failed to create range. ${error}`)
+    return;
+  }
 
-    const range = document.createRange();
-    try {
-      range.setStart(start.node, start.offset);
-      range.setEnd(end.node, end.offset);
-    } catch {
-      return;
-    }
-    wrapRangeTextNodes(range, "highlight", { highlightId: h.ID });
-  });
+  wrapRangeTextNodes(range, "highlight", { highlightId: h.ID });
 }
 
 export function applyHighlights(reader, highlights) {
@@ -276,12 +194,6 @@ function bootstrap() {
     return;
   }
 
-  if (highlights != null && highlights.length <= 0) {
-    console.log('[hightlight.js] No highlights')
-    return;
-  }
-
-  console.log('[hightlight.js] Highlights parsed')
 
   const popoverContent = document.getElementById("hl-popover-content");
   const saveBtn = document.getElementById("hl-save");
@@ -291,10 +203,11 @@ function bootstrap() {
 
   let pendingSelection = null;
   let popoverOpen = false;
+  if (highlights != null && highlights.length > 0) {
+    applyHighlights(reader, highlights);
+    console.log('[hightlight.js] Highlights applied')
+  }
 
-  applyHighlights(reader, highlights);
-
-  console.log('[hightlight.js] Highlights applied')
 
   const tooltip = document.getElementById("hl-tooltip");
   if (tooltip) {
@@ -362,8 +275,8 @@ function bootstrap() {
         job_id: jobID,
         start_block_id: startBlock.dataset.blockId,
         end_block_id: endBlock.dataset.blockId,
-        start_pos: offsetWithinBlock(startBlock, range.startContainer, range.startOffset),
-        end_pos: offsetWithinBlock(endBlock, range.endContainer, range.endOffset),
+        start_pos: range.startOffset,
+        end_pos: range.endOffset,
         text: sel.toString(),
       };
 

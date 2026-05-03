@@ -4,7 +4,6 @@ import {
   applyHighlights,
   findBlockAncestor,
   formatHighlight,
-  offsetWithinBlock,
   wrapRangeTextNodes,
 } from "./highlight.js";
 
@@ -25,34 +24,6 @@ describe("findBlockAncestor", () => {
     const reader = makeReader(`<p>hi</p>`);
     const text = reader.querySelector("p").firstChild;
     expect(findBlockAncestor(text, reader)).toBe(null);
-  });
-});
-
-describe("offsetWithinBlock", () => {
-  it("counts characters across multiple text nodes", () => {
-    const reader = makeReader(`<p data-block-id="p-1">hello <em>world</em>!</p>`);
-    const block = reader.querySelector("p");
-    const emText = block.querySelector("em").firstChild;
-    expect(offsetWithinBlock(block, emText, 3)).toBe("hello ".length + 3);
-  });
-
-  it("counts each <img> as 1 character", () => {
-    const reader = makeReader(
-      `<p data-block-id="p-1">before<img src="x"/>after</p>`,
-    );
-    const block = reader.querySelector("p");
-    const afterText = block.lastChild;
-    // "before" = 6, img = 1, target = start of "after" → 7
-    expect(offsetWithinBlock(block, afterText, 0)).toBe(7);
-  });
-
-  it("returns offset when target is the block element with child index", () => {
-    const reader = makeReader(
-      `<p data-block-id="p-1">a<img src="x"/>b</p>`,
-    );
-    const block = reader.querySelector("p");
-    // child index 2 = after the img → "a"(1) + img(1) = 2
-    expect(offsetWithinBlock(block, block, 2)).toBe(2);
   });
 });
 
@@ -77,10 +48,14 @@ describe("applyHighlight with images in the block", () => {
 
     const marks = reader.querySelectorAll("mark.highlight");
     expect(marks.length).toBe(3);
-    expect(marks[0].textContent).toBe("ore");
-    expect(marks[1].querySelector("img")).toBeTruthy();
-    expect(marks[2].textContent).toBe("aft");
-    marks.forEach((m) => expect(m.dataset.highlightId).toBe("h1"));
+    expect(marks[0].outerHTML).toBe(`<mark class="highlight" data-highlight-id="h1">ore</mark>`);
+    expect(marks[1].outerHTML).toBe(`<mark class="highlight" data-highlight-id="h1"><img src="x"></mark>`);
+    expect(marks[2].outerHTML).toBe(`<mark class="highlight" data-highlight-id="h1">aft</mark>`);
+    expect(reader.querySelector("p").innerHTML).toBe(
+      `bef<mark class="highlight" data-highlight-id="h1">ore</mark>` +
+      `<mark class="highlight" data-highlight-id="h1"><img src="x"></mark>` +
+      `<mark class="highlight" data-highlight-id="h1">aft</mark>er`
+    );
   });
 
   it("highlighting just the image wraps only the image", () => {
@@ -163,8 +138,8 @@ describe("applyHighlight across multiple blocks", () => {
   it("wraps text in start, middle, and end blocks", () => {
     const reader = makeReader(
       `<p data-block-id="p-1">hello world</p>` +
-        `<p data-block-id="p-2">middle block</p>` +
-        `<p data-block-id="p-3">end here</p>`,
+      `<p data-block-id="p-2">middle block</p>` +
+      `<p data-block-id="p-3">end here</p>`,
     );
     // start at "world" (offset 6 in p-1), end at "end" (offset 3 in p-3)
     applyHighlight(reader, {
@@ -184,8 +159,8 @@ describe("applyHighlight across multiple blocks", () => {
   it("includes image in middle block of a multi-block highlight", () => {
     const reader = makeReader(
       `<p data-block-id="p-1">hello</p>` +
-        `<p data-block-id="p-2">a<img src="x"/>b</p>` +
-        `<p data-block-id="p-3">end</p>`,
+      `<p data-block-id="p-2">a<img src="x"/>b</p>` +
+      `<p data-block-id="p-3">end</p>`,
     );
     applyHighlight(reader, {
       ID: "h1",
@@ -245,7 +220,9 @@ describe("wrapRangeTextNodes", () => {
     range.setStart(text, 1);
     range.setEnd(text, 4);
     wrapRangeTextNodes(range, "highlight", { highlightId: "x" });
-    expect(reader.querySelector("mark.highlight").textContent).toBe("ell");
+    expect(reader.querySelector("p").innerHTML).toBe(
+      `h<mark class="highlight" data-highlight-id="x">ell</mark>o`
+    );
   });
 
   it("wraps an <img> element inside the range", () => {
@@ -254,6 +231,10 @@ describe("wrapRangeTextNodes", () => {
     const range = document.createRange();
     range.selectNodeContents(block);
     wrapRangeTextNodes(range, "highlight", { highlightId: "x" });
-    expect(reader.querySelectorAll("mark.highlight img").length).toBe(1);
+    expect(block.innerHTML).toBe(
+      `<mark class="highlight" data-highlight-id="x">a</mark>` +
+      `<mark class="highlight" data-highlight-id="x"><img src="x"></mark>` +
+      `<mark class="highlight" data-highlight-id="x">b</mark>`
+    );
   });
 });
