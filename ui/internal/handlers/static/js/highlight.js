@@ -74,7 +74,7 @@ function getAnchorNode(block, pos) {
 export function wrapRangeTextNodes(range, className, dataset) {
   const root = range.commonAncestorContainer;
   const nodes = [];
-  // Single image selection creates a collpased range
+  // Single image selection creates a collapsed range
   // intersectsNode returns false. We need to handle manually
   if (root.nodeType === Node.ELEMENT_NODE && root.tagName === "IMG") {
     nodes.push(root);
@@ -237,7 +237,7 @@ function bootstrap() {
   let popoverOpen = false;
   if (highlights != null && highlights.length > 0) {
     applyHighlights(reader, highlights);
-    console.log('[hightlight.js] Highlights applied')
+    console.log('[highlight.js] Highlights applied')
   }
 
 
