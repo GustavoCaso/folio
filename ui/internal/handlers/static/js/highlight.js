@@ -120,9 +120,8 @@ export function wrapRangeTextNodes(range, className, dataset) {
 
 // Render a stored highlight onto the DOM.
 export function applyHighlight(reader, h) {
-  // BlockID fallback supports legacy single-block test fixtures.
-  const startBlockID = h.StartBlockID || h.BlockID;
-  const endBlockID = h.EndBlockID || startBlockID;
+  const startBlockID = h.StartBlockID;
+  const endBlockID = h.EndBlockID;
   const startBlock = reader.querySelector(`[data-block-id="${startBlockID}"]`);
   const endBlock = reader.querySelector(`[data-block-id="${endBlockID}"]`);
   if (!startBlock || !endBlock) {

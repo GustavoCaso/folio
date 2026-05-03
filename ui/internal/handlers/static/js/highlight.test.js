@@ -126,12 +126,6 @@ describe("applyHighlight with simple text", () => {
     });
     expect(reader.querySelectorAll("mark").length).toBe(0);
   });
-
-  it("supports legacy BlockID field for backward-compat callers", () => {
-    const reader = makeReader(`<p data-block-id="p-1">hello</p>`);
-    applyHighlight(reader, { ID: "h1", BlockID: "p-1", StartPos: 0, EndPos: 5 });
-    expect(reader.querySelectorAll("mark.highlight").length).toBe(1);
-  });
 });
 
 describe("applyHighlight across multiple blocks", () => {
