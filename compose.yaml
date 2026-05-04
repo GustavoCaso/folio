@@ -15,7 +15,7 @@ services:
   parser:
     build: ./parser
     volumes:
-      - ./models:/root/.cache  # Docling model weights cache
+      - ./models:/app/models  # Docling model weights cache (HF_HOME)
       - ./models/rapidocr:/app/.venv/lib/python3.12/site-packages/rapidocr/models
     environment:
       - GRPC_PORT=50051

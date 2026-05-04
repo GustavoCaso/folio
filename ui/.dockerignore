@@ -1,0 +1,13 @@
+
+node_modules/
+.npmrc
+.mise.toml
+package.json
+pnpm-lock.yaml
+vitest.config.js
+
+*.md
+.claude/
+.vscode/
+
+**/*_test.go

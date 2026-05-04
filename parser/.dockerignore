@@ -1,0 +1,11 @@
+.venv/
+.mypy_cache/
+.pytest_cache/
+.ruff_cache/
+
+tests/
+*.md
+.claude/
+.python-version
+
+Makefile
