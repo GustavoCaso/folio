@@ -299,3 +299,16 @@ func TestDeleteHighlight(t *testing.T) {
 		t.Fatalf("expected 0 highlights, got %d", len(highlights))
 	}
 }
+
+func TestDeleteHighlight_NotFound(t *testing.T) {
+	store, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	err = store.DeleteHighlight(context.Background(), "no-such-id")
+	if err == nil {
+		t.Fatal("expected an error when deleting a non-existent highlight, got nil")
+	}
+}

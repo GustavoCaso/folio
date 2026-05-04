@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/google/uuid"
@@ -56,6 +57,16 @@ func (s *Store) ListHighlights(ctx context.Context, jobID string) ([]Highlight, 
 }
 
 func (s *Store) DeleteHighlight(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM highlights WHERE id = ?`, id)
-	return err
+	res, err := s.db.ExecContext(ctx, `DELETE FROM highlights WHERE id = ?`, id)
+	if err != nil {
+		return err
+	}
+	n, err := res.RowsAffected()
+	if err != nil {
+		return err
+	}
+	if n == 0 {
+		return fmt.Errorf("highlight %q not found", id)
+	}
+	return nil
 }

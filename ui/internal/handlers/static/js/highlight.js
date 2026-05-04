@@ -209,6 +209,19 @@ function hideTooltip() {
   if (tooltip) tooltip.classList.add("hidden");
 }
 
+// Remove all <mark> wrappers for a highlight ID, unwrapping their children in place.
+export function removeHighlightMarks(reader, id) {
+  reader.querySelectorAll(`mark[data-highlight-id="${id}"]`).forEach((mark) => {
+    mark.replaceWith(...mark.childNodes);
+  });
+}
+
+// Remove the highlight card from the panel by highlight ID.
+export function removeHighlightCard(panel, id) {
+  const card = panel.querySelector(`div[data-scroll-to-highlight="${id}"]`);
+  if (card) card.remove();
+}
+
 // --- Bootstrap (browser only) ---
 
 function bootstrap() {
@@ -230,6 +243,7 @@ function bootstrap() {
   const popoverContent = document.getElementById("hl-popover-content");
   const saveBtn = document.getElementById("hl-save");
   const cancelBtn = document.getElementById("hl-cancel");
+  const errorEl = document.getElementById("hl-error");
   if (!popoverContent || !saveBtn || !cancelBtn) return;
   const jobID = reader.dataset.jobId;
 
@@ -241,6 +255,7 @@ function bootstrap() {
   }
 
 
+  const highlightPanel = document.getElementById("highlights-panel");
   const tooltip = document.getElementById("hl-tooltip");
   if (tooltip) {
     reader.addEventListener("click", (e) => {
@@ -259,11 +274,26 @@ function bootstrap() {
     });
   }
 
+  function hideError() {
+    if (errorEl) {
+      errorEl.textContent = "";
+      errorEl.classList.add("hidden");
+    }
+  }
+
+  function showError(msg) {
+    if (errorEl) {
+      errorEl.textContent = msg;
+      errorEl.classList.remove("hidden");
+    }
+  }
+
   popoverContent.addEventListener("toggle", (e) => {
     if (e.newState === "closed") {
       popoverContent.setAttribute("data-tui-popover-open", "false");
       popoverOpen = false;
       pendingSelection = null;
+      hideError();
       window.getSelection()?.removeAllRanges();
     }
   });
@@ -318,6 +348,7 @@ function bootstrap() {
 
   cancelBtn.addEventListener("click", () => {
     pendingSelection = null;
+    hideError();
     closePopover();
     window.getSelection()?.removeAllRanges();
   });
@@ -335,9 +366,45 @@ function bootstrap() {
     });
 
     if (resp.ok) {
+      hideError();
       closePopover();
       pendingSelection = null;
       window.location.reload();
+    } else {
+      let msg = "Failed to save highlight";
+      try {
+        const body = await resp.json();
+        if (body.error) msg = body.error;
+      } catch { /* use default msg */ }
+      showError(msg);
+    }
+  });
+
+  // --- Highlights panel ---
+
+  document.addEventListener("click", async (e) => {
+    // Delete button
+    const deleteBtn = e.target.closest("[data-delete-highlight]");
+    if (deleteBtn) {
+      const id = deleteBtn.dataset.deleteHighlight;
+      if (confirm("Delete Highlight ?")) {
+        const resp = await fetch(`/highlights/${id}`, { method: "DELETE", headers: { "Accept": "text/html" } });
+        const html = await resp.text();
+        document.body.insertAdjacentHTML("beforeend", html);
+        if (resp.ok) {
+          removeHighlightMarks(reader, id);
+          removeHighlightCard(highlightPanel, id);
+        }
+        return;
+      }
+    }
+
+    // Scroll-to on card click
+    const card = e.target.closest("[data-scroll-to-highlight]");
+    if (card) {
+      const id = card.dataset.scrollToHighlight;
+      const mark = reader.querySelector(`mark[data-highlight-id="${id}"]`);
+      if (mark) mark.scrollIntoView({ behavior: "smooth", block: "center" });
     }
   });
 }

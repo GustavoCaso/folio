@@ -5,6 +5,8 @@ import {
   findBlockAncestor,
   formatHighlight,
   offsetWithinBlock,
+  removeHighlightCard,
+  removeHighlightMarks,
   wrapRangeTextNodes,
 } from "./highlight.js";
 
@@ -334,5 +336,64 @@ describe("wrapRangeTextNodes", () => {
       `<mark class="highlight" data-highlight-id="x"><img src="x"></mark>` +
       `<mark class="highlight" data-highlight-id="x">b</mark>`
     );
+  });
+});
+
+describe("removeHighlightMarks", () => {
+  it("unwraps all marks for a given highlight ID", () => {
+    const reader = makeReader(
+      `<p data-block-id="p-1">` +
+      `bef<mark class="highlight" data-highlight-id="h1">ore</mark>` +
+      `<mark class="highlight" data-highlight-id="h1">end</mark>` +
+      `</p>`
+    );
+    removeHighlightMarks(reader, "h1");
+    expect(reader.querySelectorAll("mark").length).toBe(0);
+    expect(reader.querySelector("p").textContent).toBe("beforeend");
+  });
+
+  it("does not remove marks for a different highlight ID", () => {
+    const reader = makeReader(
+      `<p data-block-id="p-1">` +
+      `<mark class="highlight" data-highlight-id="h1">keep</mark>` +
+      `<mark class="highlight" data-highlight-id="h2">remove</mark>` +
+      `</p>`
+    );
+    removeHighlightMarks(reader, "h2");
+    const remaining = reader.querySelectorAll("mark");
+    expect(remaining.length).toBe(1);
+    expect(remaining[0].dataset.highlightId).toBe("h1");
+  });
+
+  it("is a no-op when no marks match", () => {
+    const reader = makeReader(`<p data-block-id="p-1">no marks here</p>`);
+    expect(() => removeHighlightMarks(reader, "h1")).not.toThrow();
+    expect(reader.querySelectorAll("mark").length).toBe(0);
+  });
+});
+
+describe("removeHighlightCard", () => {
+  function makePanel(html) {
+    const panel = document.createElement("div");
+    panel.id = "highlights-panel";
+    panel.innerHTML = html;
+    document.body.appendChild(panel);
+    return panel;
+  }
+
+  it("removes the card matching the highlight ID", () => {
+    const panel = makePanel(
+      `<div data-scroll-to-highlight="h1"><p>card one</p></div>` +
+      `<div data-scroll-to-highlight="h2"><p>card two</p></div>`
+    );
+    removeHighlightCard(panel, "h1");
+    expect(panel.querySelector(`[data-scroll-to-highlight="h1"]`)).toBeNull();
+    expect(panel.querySelector(`[data-scroll-to-highlight="h2"]`)).not.toBeNull();
+  });
+
+  it("is a no-op when the card is not found", () => {
+    const panel = makePanel(`<div data-scroll-to-highlight="h2"><p>card</p></div>`);
+    expect(() => removeHighlightCard(panel, "h1")).not.toThrow();
+    expect(panel.children.length).toBe(1);
   });
 });

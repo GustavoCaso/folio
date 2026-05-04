@@ -2,20 +2,86 @@ package templates
 
 import (
 	"github.com/GustavoCaso/folio/ui/internal/db"
-	"github.com/templui/templui/components/popover"
 	"github.com/templui/templui/components/button"
+	"github.com/templui/templui/components/card"
 	"github.com/templui/templui/components/input"
+	"github.com/templui/templui/components/popover"
+	"github.com/templui/templui/components/sheet"
 	"github.com/templui/templui/components/textarea"
 )
 
+templ highlightCard(h db.Highlight) {
+	@card.Card(card.Props{Class: "cursor-pointer", Attributes: map[string]any{"data-scroll-to-highlight": h.ID}}) {
+		@card.Content(card.ContentProps{Class: "group flex flex-col gap-1.5"}) {
+			<p class="text-sm font-medium text-card-foreground line-clamp-3">{ h.Text }</p>
+			if h.Tag != "" {
+				<span class="inline-flex items-center self-start rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{ h.Tag }</span>
+			}
+			if h.Note != "" {
+				<p class="text-xs text-muted-foreground line-clamp-2">{ h.Note }</p>
+			}
+			<div class="flex justify-end mt-0.5">
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeSm,
+					Attributes: map[string]any{
+						"data-delete-highlight": h.ID,
+					},
+					Class: "text-destructive hover:text-destructive",
+					Type:  button.TypeSubmit,
+				}) {
+					Delete
+				}
+			</div>
+		}
+	}
+}
+
+templ highlightsPanel(highlights []db.Highlight) {
+	@sheet.Sheet(sheet.Props{
+		ID:   "highlights-panel",
+		Side: sheet.SideRight,
+	}) {
+		@sheet.Content() {
+			@sheet.Header() {
+				@sheet.Title() {
+					Highlights
+				}
+				if len(highlights) == 0 {
+					@sheet.Description() {
+						No highlights yet. Select text in the document to add one.
+					}
+				}
+			}
+			if len(highlights) > 0 {
+				<div class="flex flex-col gap-2 overflow-y-auto px-4 pb-4">
+					for _, h := range highlights {
+						@highlightCard(h)
+					}
+				</div>
+			}
+		}
+	}
+}
+
 templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 	@Layout(job.Filename) {
+		@highlightsPanel(highlights)
+		// External trigger outside of Sheet component
+		@sheet.Trigger(sheet.TriggerProps{
+			For: "highlights-panel",
+		}) {
+			@button.Button(button.Props{
+				Variant: button.VariantOutline,
+			}) {
+				Highlights
+			}
+		}
 		<article class="mx-auto max-w-[68ch] px-2 pb-24">
 			<div id="reader" data-job-id={ job.ID }>
 				@templ.Raw(renderedHTML)
 			</div>
 		</article>
-
 		@popover.Root(popover.RootProps{ID: "hl-popover"}) {
 			@popover.Trigger(popover.TriggerProps{
 				TriggerType: popover.TriggerTypeManual,
@@ -27,6 +93,7 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 			}) {
 				<div class="flex flex-col gap-4 p-4 w-72">
 					<p class="text-xs font-medium tracking-widest uppercase text-muted-foreground">Add highlight</p>
+					<p id="hl-error" class="hidden text-xs text-destructive"></p>
 					<div class="flex flex-col gap-1.5">
 						<label class="text-xs font-medium text-foreground" for="hl-tag">Tag</label>
 						@input.Input(input.Props{ID: "hl-tag", Placeholder: "e.g. important"})
@@ -46,7 +113,6 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 				</div>
 			}
 		}
-
 		<div
 			id="hl-tooltip"
 			class="hidden fixed z-50 bg-card border border-border rounded-lg shadow-lg px-3 py-2.5 max-w-xs"
@@ -54,7 +120,6 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 		>
 			<p id="hl-tooltip-content" class="text-sm text-card-foreground leading-snug"></p>
 		</div>
-
 		@templ.JSONScript("highlights-data", highlights)
 		<script type="module" src="/static/js/highlight.js"></script>
 	}
