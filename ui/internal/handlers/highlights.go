@@ -6,6 +6,7 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
+	"github.com/templui/templui/components/toast"
 )
 
 type createHighlightRequest struct {
@@ -21,11 +22,13 @@ type createHighlightRequest struct {
 
 func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 	log := logging.LoggerFrom(r.Context())
+	w.Header().Set("Content-Type", "application/json")
 
 	var req createHighlightRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Warn("invalid highlight JSON", logging.Err(err))
-		http.Error(w, "invalid JSON", http.StatusBadRequest)
+		w.WriteHeader(http.StatusBadRequest)
+		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"}) //nolint:errcheck
 		return
 	}
 
@@ -41,7 +44,8 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 	})
 	if err != nil {
 		log.Error("create highlight failed", logging.Err(err), "job_id", req.JobID)
-		http.Error(w, "failed to save highlight", http.StatusInternalServerError)
+		w.WriteHeader(http.StatusInternalServerError)
+		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save highlight"}) //nolint:errcheck
 		return
 	}
 
@@ -52,7 +56,6 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 		"end_block_id", req.EndBlockID,
 	)
 
-	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
 	if err := json.NewEncoder(w).Encode(created); err != nil {
 		log.Error("encode highlight response failed", logging.Err(err), "highlight_id", created.ID)
@@ -60,13 +63,29 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) DeleteHighlight(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
 	log := logging.LoggerFrom(r.Context())
 	id := r.PathValue("id")
+
 	if err := h.store.DeleteHighlight(r.Context(), id); err != nil {
 		log.Error("delete highlight failed", logging.Err(err), "highlight_id", id)
-		http.Error(w, "failed to delete highlight", http.StatusInternalServerError)
+
+		toast.Toast(toast.Props{
+			Description:   "Fail to delete highlight",
+			Variant:       toast.VariantError,
+			Icon:          true,
+			Position:      toast.PositionTopLeft,
+			ShowIndicator: true,
+		}).Render(r.Context(), w) //nolint:errcheck
 		return
 	}
+
 	log.Info("highlight deleted", "highlight_id", id)
-	w.WriteHeader(http.StatusNoContent)
+	toast.Toast(toast.Props{
+		Description:   "Highlight deleted",
+		Variant:       toast.VariantSuccess,
+		Icon:          true,
+		Position:      toast.PositionTopLeft,
+		ShowIndicator: true,
+	}).Render(r.Context(), w) //nolint:errcheck
 }

@@ -81,6 +81,13 @@ func TestReaderRendersPopover(t *testing.T) {
 	}
 }
 
+func TestReaderRendersPopoverErrorElement(t *testing.T) {
+	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+
+	if !strings.Contains(got, `id="hl-error" class="hidden`) {
+		t.Errorf("expected error element id, got: %s", got)
+	}
+}
 func TestReaderRendersTooltip(t *testing.T) {
 	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
 
@@ -92,5 +99,43 @@ func TestReaderRendersTooltip(t *testing.T) {
 	}
 	if !strings.Contains(got, `role="status"`) {
 		t.Errorf("expected role=status on tooltip, got: %s", got)
+	}
+}
+
+func TestReaderHighlightsPanelEmpty(t *testing.T) {
+	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+
+	if !strings.Contains(got, `id="highlights-panel"`) {
+		t.Errorf("expected highlights panel, got: %s", got)
+	}
+	if !strings.Contains(got, "No highlights yet") {
+		t.Errorf("expected empty-state message, got: %s", got)
+	}
+}
+
+func TestReaderHighlightsPanelWithHighlights(t *testing.T) {
+	hls := []db.Highlight{
+		{ID: "h1", Text: "selected text", Tag: "important", Note: "a note"},
+		{ID: "h2", Text: "another selection", Tag: "", Note: ""},
+	}
+	got := renderReader(t, db.Job{ID: "j1"}, "", hls)
+
+	if strings.Contains(got, "No highlights yet") {
+		t.Errorf("unexpected empty-state message when highlights are present")
+	}
+	// Each card must be anchored by its highlight ID for scroll-to and delete.
+	for _, id := range []string{"h1", "h2"} {
+		if !strings.Contains(got, `data-scroll-to-highlight="`+id+`"`) {
+			t.Errorf("expected data-scroll-to-highlight=%q, got: %s", id, got)
+		}
+		if !strings.Contains(got, `data-delete-highlight="`+id+`"`) {
+			t.Errorf("expected data-delete-highlight=%q, got: %s", id, got)
+		}
+	}
+	// Text, tag, and note of the first highlight must be visible.
+	for _, want := range []string{"selected text", "important", "a note"} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %q in rendered output, got: %s", want, got)
+		}
 	}
 }
