@@ -14,6 +14,7 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
+	"github.com/templui/templui/components/toast"
 )
 
 func (h *Handlers) ListDocuments(w http.ResponseWriter, r *http.Request) {
@@ -136,14 +137,19 @@ func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 func (h *Handlers) DeleteDocument(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
 	log := logging.LoggerFrom(r.Context())
 	id := r.PathValue("id")
 
 	renderErr := func(status int, msg string) {
 		w.WriteHeader(status)
-		if err := templates.ErrorPage(msg).Render(r.Context(), w); err != nil {
-			log.Error("render error page failed", logging.Err(err))
-		}
+		toast.Toast(toast.Props{
+			Description:   msg,
+			Variant:       toast.VariantError,
+			Icon:          true,
+			Position:      toast.PositionBottomRight,
+			ShowIndicator: true,
+		}).Render(r.Context(), w) //nolint:errcheck
 	}
 
 	job, err := h.store.GetJob(r.Context(), id)
@@ -171,11 +177,59 @@ func (h *Handlers) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	http.Redirect(w, r, "/", http.StatusSeeOther)
+	w.WriteHeader(http.StatusOK)
+	toast.Toast(toast.Props{
+		Description:   "Document deleted",
+		Variant:       toast.VariantSuccess,
+		Icon:          true,
+		Position:      toast.PositionBottomRight,
+		ShowIndicator: true,
+	}).Render(r.Context(), w) //nolint:errcheck
+}
+
+func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "text/html")
+	log := logging.LoggerFrom(r.Context())
+
+	renderErr := func(status int, msg string) {
+		w.WriteHeader(status)
+		toast.Toast(toast.Props{
+			Description:   msg,
+			Variant:       toast.VariantError,
+			Icon:          true,
+			Position:      toast.PositionBottomRight,
+			ShowIndicator: true,
+		}).Render(r.Context(), w) //nolint:errcheck
+	}
+
+	id := r.PathValue("id")
+
+	_, err := h.store.GetJob(r.Context(), id)
+	if err != nil {
+		log.Warn("cancel: job not found", "id", id, logging.Err(err))
+		renderErr(http.StatusNotFound, "job not found")
+		return
+	}
+
+	val, ok := h.cancels.Load(id)
+	if !ok {
+		if markErr := h.store.MarkJobFailed(context.Background(), id, "cancelled by user"); markErr != nil {
+			log.Error("mark job failed errored", logging.Err(markErr))
+		}
+		renderErr(http.StatusConflict, "could not cancel safely. Mark job as failed, reload and try again")
+		return
+	}
+	val.(context.CancelFunc)()
+	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []byte) {
-	ctx := context.Background()
+	ctx, cancel := context.WithCancel(context.Background())
+	h.cancels.Store(jobID, cancel)
+	defer func() {
+		cancel()
+		h.cancels.Delete(jobID)
+	}()
 	log := h.logger.With("job_id", jobID, "request_id", requestID, "filename", filename)
 	start := time.Now()
 
@@ -184,10 +238,14 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 	result, err := h.parser.Convert(ctx, jobID, requestID, filename, pdfBytes, h.hub)
 	if err != nil {
 		log.Error("conversion failed", logging.Err(err), "dur_ms", time.Since(start).Milliseconds())
-		if markErr := h.store.MarkJobFailed(ctx, jobID, err.Error()); markErr != nil {
+		errMsg := err.Error()
+		if errors.Is(err, context.Canceled) {
+			errMsg = "cancelled by user"
+		}
+		if markErr := h.store.MarkJobFailed(context.Background(), jobID, errMsg); markErr != nil {
 			log.Error("mark job failed errored", logging.Err(markErr))
 		}
-		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: err.Error()})
+		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: errMsg})
 		return
 	}
 

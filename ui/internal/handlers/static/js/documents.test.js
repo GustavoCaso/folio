@@ -52,7 +52,7 @@ describe("watchJob", () => {
 		expect(es.addEventListener).toHaveBeenCalledWith("status", expect.any(Function));
 	});
 
-	it("DONE: updates badge, removes skeleton, injects read link and delete form, closes", () => {
+	it("DONE: updates badge, removes skeleton, injects read link and delete button, closes", () => {
 		const card = makeJobCard("w2");
 		const es = makeEventSource();
 		watchJob("w2");
@@ -63,7 +63,7 @@ describe("watchJob", () => {
 		expect(card.querySelector("[data-skeleton]")).toBeNull();
 		expect(card.querySelector("[data-actions] a[href]")).not.toBeNull();
 		expect(card.querySelector("[data-actions] a[href]").href).toContain("/read/w2");
-		expect(card.querySelector("form.delete-form")).not.toBeNull();
+		expect(card.querySelector("[data-delete-job]")).not.toBeNull();
 		expect(es.close).toHaveBeenCalled();
 	});
 
@@ -78,7 +78,7 @@ describe("watchJob", () => {
 		expect(card.querySelectorAll("a[href]").length).toBe(1);
 	});
 
-	it("FAILED: updates badge, removes skeleton, sets error text, injects retry and delete forms, closes", () => {
+	it("FAILED: updates badge, removes skeleton, sets error text, injects retry form and delete button, closes", () => {
 		const card = makeJobCard("w3");
 		const es = makeEventSource();
 		watchJob("w3");
@@ -89,7 +89,7 @@ describe("watchJob", () => {
 		expect(card.querySelector("[data-skeleton]")).toBeNull();
 		expect(card.querySelector("[data-error-text]").textContent).toBe("timeout");
 		expect(card.querySelector("form.retry-form")).not.toBeNull();
-		expect(card.querySelector("form.delete-form")).not.toBeNull();
+		expect(card.querySelector("[data-delete-job]")).not.toBeNull();
 		expect(es.close).toHaveBeenCalled();
 	});
 
@@ -114,33 +114,35 @@ describe("watchJob", () => {
 		expect(card.querySelector("[data-error-text]").textContent).toBe("OCR — page 1 (1/10)");
 	});
 
-	it("delete confirm cancel prevents submit", () => {
+	it("delete confirm cancel: does not call fetch", async () => {
 		vi.spyOn(window, "confirm").mockReturnValue(false);
+		const fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({ ok: true, text: async () => "" });
 		const card = makeJobCard("w5");
 		const es = makeEventSource();
 		watchJob("w5");
 
 		es.fire({ Status: "DONE" });
 
-		const form = card.querySelector("form.delete-form");
-		const e = new Event("submit", { cancelable: true });
-		form.dispatchEvent(e);
+		const btn = card.querySelector("[data-delete-job]");
+		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		await Promise.resolve();
 
-		expect(e.defaultPrevented).toBe(true);
+		expect(fetchSpy).not.toHaveBeenCalled();
 	});
 
-	it("delete confirm ok allows submit", () => {
+	it("delete confirm ok: calls fetch DELETE", async () => {
 		vi.spyOn(window, "confirm").mockReturnValue(true);
+		const fetchSpy = vi.spyOn(window, "fetch").mockResolvedValue({ ok: true, text: async () => "" });
 		const card = makeJobCard("w6");
 		const es = makeEventSource();
 		watchJob("w6");
 
 		es.fire({ Status: "DONE" });
 
-		const form = card.querySelector("form.delete-form");
-		const e = new Event("submit", { cancelable: true });
-		form.dispatchEvent(e);
+		const btn = card.querySelector("[data-delete-job]");
+		btn.dispatchEvent(new MouseEvent("click", { bubbles: true }));
+		await new Promise(r => setTimeout(r, 0));
 
-		expect(e.defaultPrevented).toBe(false);
+		expect(fetchSpy).toHaveBeenCalledWith("/documents/w6", expect.objectContaining({ method: "DELETE" }));
 	});
 });

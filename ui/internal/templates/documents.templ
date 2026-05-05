@@ -31,6 +31,16 @@ templ jobCard(j db.Job) {
 				}
 			</p>
 			<div class="flex items-center gap-2 mt-1" data-actions>
+				if j.Status == "PROCESSING" || j.Status == "PENDING" {
+					@button.Button(button.Props{
+						Variant:    button.VariantGhost,
+						Attributes: map[string]any{"data-cancel-job": j.ID, "data-job-name": j.Filename},
+						Size:       button.SizeSm,
+						Class:      "text-destructive hover:text-destructive",
+					}) {
+						Cancel
+					}
+				}
 				if j.Status == "DONE" {
 					@button.Button(button.Props{
 						Variant: button.VariantOutline,
@@ -43,25 +53,24 @@ templ jobCard(j db.Job) {
 				if j.Status == "FAILED" {
 					<form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") }>
 						@button.Button(button.Props{
-							Variant:    button.VariantGhost,
-							Size:       button.SizeSm,
-							Type: button.TypeSubmit,
+							Variant: button.VariantGhost,
+							Size:    button.SizeSm,
+							Type:    button.TypeSubmit,
 						}) {
 							Retry
 						}
 					</form>
 				}
 				if j.Status == "DONE" || j.Status == "FAILED" {
-					<form class="delete-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/delete") } data-filename={ j.Filename }>
-						@button.Button(button.Props{
-							Variant:    button.VariantGhost,
-							Size:       button.SizeSm,
-							Class:      "text-destructive hover:text-destructive",
-							Type: button.TypeSubmit,
-						}) {
-							Delete
-						}
-					</form>
+					@button.Button(button.Props{
+						Variant:    button.VariantGhost,
+						Attributes: map[string]any{"data-delete-job": j.ID, "data-job-name": j.Filename},
+						Size:       button.SizeSm,
+						Class:      "text-destructive hover:text-destructive",
+						Type:       button.TypeSubmit,
+					}) {
+						Delete
+					}
 				}
 			</div>
 		}

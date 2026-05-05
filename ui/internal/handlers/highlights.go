@@ -28,7 +28,7 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 		log.Warn("invalid highlight JSON", logging.Err(err))
 		w.WriteHeader(http.StatusBadRequest)
-		json.NewEncoder(w).Encode(map[string]string{"error": "invalid JSON"}) //nolint:errcheck
+		json.NewEncoder(w).Encode(ErrorMessage{Error: "invalid JSON"}) //nolint:errcheck
 		return
 	}
 
@@ -45,7 +45,7 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 	if err != nil {
 		log.Error("create highlight failed", logging.Err(err), "job_id", req.JobID)
 		w.WriteHeader(http.StatusInternalServerError)
-		json.NewEncoder(w).Encode(map[string]string{"error": "failed to save highlight"}) //nolint:errcheck
+		json.NewEncoder(w).Encode(ErrorMessage{Error: "failed to save highlight"}) //nolint:errcheck
 		return
 	}
 

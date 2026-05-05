@@ -152,8 +152,8 @@ func TestDocumentList_ShowsDeleteForDone(t *testing.T) {
 	body := renderDocumentList(t, []db.Job{
 		{ID: "abc123", Filename: "done.pdf", Status: "DONE"},
 	})
-	if !strings.Contains(body, `/documents/abc123/delete`) {
-		t.Errorf("expected delete link for DONE job, got:\n%s", body)
+	if !strings.Contains(body, `data-delete-job="abc123"`) {
+		t.Errorf("expected delete button for DONE job, got:\n%s", body)
 	}
 }
 
@@ -161,8 +161,8 @@ func TestDocumentList_ShowsDeleteForFailed(t *testing.T) {
 	body := renderDocumentList(t, []db.Job{
 		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
 	})
-	if !strings.Contains(body, `/documents/def456/delete`) {
-		t.Errorf("expected delete link for FAILED job, got:\n%s", body)
+	if !strings.Contains(body, `data-delete-job="def456"`) {
+		t.Errorf("expected delete button for FAILED job, got:\n%s", body)
 	}
 }
 
@@ -172,6 +172,42 @@ func TestDocumentList_ShowsRetryForFailed(t *testing.T) {
 	})
 	if !strings.Contains(body, `/documents/def456/retry`) {
 		t.Errorf("expected retry link for FAILED job, got:\n%s", body)
+	}
+}
+
+func TestDocumentList_ShowsCancelForPending(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "ghi789", Filename: "pending.pdf", Status: "PENDING"},
+	})
+	if !strings.Contains(body, `data-cancel-job="ghi789"`) {
+		t.Errorf("expected cancel button for PENDING job, got:\n%s", body)
+	}
+}
+
+func TestDocumentList_ShowsCancelForProcessing(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "jkl012", Filename: "processing.pdf", Status: "PROCESSING"},
+	})
+	if !strings.Contains(body, `data-cancel-job="jkl012"`) {
+		t.Errorf("expected cancel button for PROCESSING job, got:\n%s", body)
+	}
+}
+
+func TestDocumentList_NoCancelForDone(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "abc123", Filename: "done.pdf", Status: "DONE"},
+	})
+	if strings.Contains(body, `data-cancel-job=`) {
+		t.Errorf("expected no cancel button for DONE job, got:\n%s", body)
+	}
+}
+
+func TestDocumentList_NoCancelForFailed(t *testing.T) {
+	body := renderDocumentList(t, []db.Job{
+		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
+	})
+	if strings.Contains(body, `data-cancel-job=`) {
+		t.Errorf("expected no cancel button for FAILED job, got:\n%s", body)
 	}
 }
 
