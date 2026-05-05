@@ -37,6 +37,7 @@ templ jobCard(j db.Job) {
 						Attributes: map[string]any{"data-cancel-job": j.ID, "data-job-name": j.Filename},
 						Size:       button.SizeSm,
 						Class:      "text-destructive hover:text-destructive",
+						Type:       button.TypeButton,
 					}) {
 						Cancel
 					}
@@ -53,10 +54,10 @@ templ jobCard(j db.Job) {
 				if j.Status == "FAILED" {
 					<form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") }>
 						@button.Button(button.Props{
-							ID:      "retry-btn",
-							Variant: button.VariantGhost,
-							Size:    button.SizeSm,
-							Type:    button.TypeSubmit,
+							Attributes: map[string]any{"data-retry-job": j.ID, "data-job-name": j.Filename},
+							Variant:    button.VariantGhost,
+							Size:       button.SizeSm,
+							Type:       button.TypeSubmit,
 						}) {
 							Retry
 						}
@@ -68,7 +69,7 @@ templ jobCard(j db.Job) {
 						Attributes: map[string]any{"data-delete-job": j.ID, "data-job-name": j.Filename},
 						Size:       button.SizeSm,
 						Class:      "text-destructive hover:text-destructive",
-						Type:       button.TypeSubmit,
+						Type:       button.TypeButton,
 					}) {
 						Delete
 					}

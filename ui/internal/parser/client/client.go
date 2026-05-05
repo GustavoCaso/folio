@@ -9,8 +9,10 @@ import (
 	"time"
 
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/health/grpc_health_v1"
+	"google.golang.org/grpc/status"
 
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	pb "github.com/GustavoCaso/folio/ui/internal/parser/proto"
@@ -56,7 +58,10 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 	stream, err := c.client.ConvertDocument(ctx)
 	if err != nil {
 		log.Error("open stream failed", "err", err.Error())
-		return ConversionResult{}, fmt.Errorf("open stream: %w", err)
+		if status.Code(err) == codes.Canceled {
+			return ConversionResult{}, context.Canceled
+		}
+		return ConversionResult{}, fmt.Errorf("stream: %w", err)
 	}
 	log.Info("stream opened", "bytes", len(pdfBytes))
 
@@ -80,6 +85,9 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 			if err := stream.Send(&pb.ConvertChunk{
 				Payload: &pb.ConvertChunk_Data{Data: buf[:n]},
 			}); err != nil {
+				if status.Code(err) == codes.Canceled {
+					return ConversionResult{}, context.Canceled
+				}
 				log.Error("send data failed", "err", err.Error(), "chunks_sent", chunksSent)
 				return ConversionResult{}, fmt.Errorf("send data: %w", err)
 			}
@@ -110,6 +118,9 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 			break
 		}
 		if err != nil {
+			if status.Code(err) == codes.Canceled {
+				return ConversionResult{}, fmt.Errorf("recv: %w", context.Canceled)
+			}
 			log.Error("recv failed", "err", err.Error())
 			h.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: err.Error()})
 			return ConversionResult{}, fmt.Errorf("recv: %w", err)

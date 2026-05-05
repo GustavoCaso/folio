@@ -14,16 +14,16 @@ function readButtonHTML(jobID) {
 }
 
 function deleteFormButton(jobID, filename) {
-  return `<button type="submit" data-delete-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Delete</button>`
+  return `<button type="button" data-delete-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Delete</button>`
 }
 
 function cancelButtonHTML(jobID, filename) {
-  return `<button data-cancel-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Cancel</button>`;
+  return `<button type="button" data-cancel-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Cancel</button>`;
 }
 
 function retryFormHTML(jobID) {
   return `<form class="retry-form" method="POST" action="/documents/${jobID}/retry">` +
-    `<button type="submit" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Retry</button>` +
+    `<button type="submit" data-retry-job="${jobID}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Retry</button>` +
     `</form>`;
 }
 

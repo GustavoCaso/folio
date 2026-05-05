@@ -34,8 +34,12 @@ proto:
 		--go_out=internal/parser/proto --go_opt=paths=source_relative \
 		--go-grpc_out=internal/parser/proto --go-grpc_opt=paths=source_relative \
 		../proto/parser.proto
+		
+generate:
+	make templ
+	make css
 
-templ: css
+templ:
 	templ generate
 
 css:

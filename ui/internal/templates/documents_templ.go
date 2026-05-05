@@ -149,6 +149,7 @@ func jobCard(j db.Job) templ.Component {
 						Attributes: map[string]any{"data-cancel-job": j.ID, "data-job-name": j.Filename},
 						Size:       button.SizeSm,
 						Class:      "text-destructive hover:text-destructive",
+						Type:       button.TypeButton,
 					}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var6), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -190,7 +191,7 @@ func jobCard(j db.Job) templ.Component {
 					var templ_7745c5c3_Var8 templ.SafeURL
 					templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/documents/" + j.ID + "/retry"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 54, Col: 99}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 55, Col: 99}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 					if templ_7745c5c3_Err != nil {
@@ -219,9 +220,10 @@ func jobCard(j db.Job) templ.Component {
 						return nil
 					})
 					templ_7745c5c3_Err = button.Button(button.Props{
-						Variant: button.VariantGhost,
-						Size:    button.SizeSm,
-						Type:    button.TypeSubmit,
+						Attributes: map[string]any{"data-retry-job": j.ID, "data-job-name": j.Filename},
+						Variant:    button.VariantGhost,
+						Size:       button.SizeSm,
+						Type:       button.TypeSubmit,
 					}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var9), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -255,7 +257,7 @@ func jobCard(j db.Job) templ.Component {
 						Attributes: map[string]any{"data-delete-job": j.ID, "data-job-name": j.Filename},
 						Size:       button.SizeSm,
 						Class:      "text-destructive hover:text-destructive",
-						Type:       button.TypeSubmit,
+						Type:       button.TypeButton,
 					}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var10), templ_7745c5c3_Buffer)
 					if templ_7745c5c3_Err != nil {
 						return templ_7745c5c3_Err
@@ -549,7 +551,7 @@ func Documents(jobs []db.Job, watchJobIDs []string, errMsg string) templ.Compone
 				var templ_7745c5c3_Var21 string
 				templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(watchJobIDs, ","))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 140, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 142, Col: 71}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 				if templ_7745c5c3_Err != nil {
