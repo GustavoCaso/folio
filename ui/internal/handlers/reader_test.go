@@ -13,7 +13,8 @@ import (
 func TestReadDocument_NotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodGet, "/read/no-such-id", nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, newTestStore(t)).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, newTestStore(t))
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rec.Code)
@@ -32,7 +33,8 @@ func TestReadDocument_JobPending_NotReady(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID, nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rec.Code)
@@ -54,7 +56,8 @@ func TestReadDocument_JobFailed(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID, nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rec.Code)
@@ -76,7 +79,8 @@ func TestReadDocument_MarkdownFileMissing(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID, nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusInternalServerError {
 		t.Errorf("expected 500, got %d", rec.Code)
@@ -104,7 +108,8 @@ func TestReadDocument_HappyPath(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID, nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", rec.Code)

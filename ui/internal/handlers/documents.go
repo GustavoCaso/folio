@@ -213,7 +213,7 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 
 	status := job.Status
 	if status != "PROCESSING" && status != "PENDING" {
-		log.Warn("cancel: job not in correct state", "id", id, logging.Err(err))
+		log.Warn("cancel: job not in correct state", "id", id)
 		renderErr(http.StatusBadRequest, "job in invalid state")
 		return
 	}
@@ -223,6 +223,10 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 		if markErr := h.store.MarkJobFailed(context.Background(), id, "cancelled by user"); markErr != nil {
 			log.Error("mark job failed errored", logging.Err(markErr))
 		}
+		h.hub.Publish(id, hub.StatusEvent{
+			Status: "FAILED",
+			Error:  "cancelled by user",
+		})
 		renderErr(http.StatusConflict, "could not cancel safely. Mark job as failed, reload and try again")
 		return
 	}

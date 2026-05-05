@@ -7,7 +7,6 @@ import (
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
-	"github.com/templui/templui/components/skeleton"
 )
 
 templ jobCard(j db.Job) {
@@ -19,19 +18,13 @@ templ jobCard(j db.Job) {
 					@jobBadge(j.Status)
 				</span>
 			</div>
-			if j.Status == "PROCESSING" {
-				<div class="space-y-1.5" data-skeleton>
-					@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-full"})
-					@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-2/3"})
-				</div>
-			}
 			<p class="text-xs text-muted-foreground" data-error-text>
 				if j.Status == "FAILED" {
 					{ j.Error }
 				}
 			</p>
 			<div class="flex items-center gap-2 mt-1" data-actions>
-				if j.Status == "PROCESSING" || j.Status == "PENDING" {
+				if j.Status == "PENDING" {
 					@button.Button(button.Props{
 						Variant:    button.VariantGhost,
 						Attributes: map[string]any{"data-cancel-job": j.ID, "data-job-name": j.Filename},

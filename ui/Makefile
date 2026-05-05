@@ -1,4 +1,4 @@
-.PHONY: build test test-js test-race lint lint-check format format-check proto templ css
+.PHONY: build test test-js test-race lint lint-check format format-check proto templ css generate
 
 build:
 	go build ./...

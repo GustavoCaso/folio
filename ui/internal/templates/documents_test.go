@@ -184,15 +184,6 @@ func TestDocumentList_ShowsCancelForPending(t *testing.T) {
 	}
 }
 
-func TestDocumentList_ShowsCancelForProcessing(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
-		{ID: "jkl012", Filename: "processing.pdf", Status: "PROCESSING"},
-	})
-	if !strings.Contains(body, `data-cancel-job="jkl012"`) {
-		t.Errorf("expected cancel button for PROCESSING job, got:\n%s", body)
-	}
-}
-
 func TestDocumentList_NoCancelForDone(t *testing.T) {
 	body := renderDocumentList(t, []db.Job{
 		{ID: "abc123", Filename: "done.pdf", Status: "DONE"},
