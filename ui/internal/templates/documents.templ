@@ -53,6 +53,7 @@ templ jobCard(j db.Job) {
 				if j.Status == "FAILED" {
 					<form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") }>
 						@button.Button(button.Props{
+							ID:      "retry-btn",
 							Variant: button.VariantGhost,
 							Size:    button.SizeSm,
 							Type:    button.TypeSubmit,

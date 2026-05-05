@@ -52,8 +52,10 @@ templ Layout(title string) {
 
 				container.innerHTML = '<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ' + variantClass + '">' + label + '</span>';
 
-				var btn = document.getElementById('upload-btn');
-				if (btn) { btn.disabled = (s !== 'healthy'); }
+				var uploadBtn = document.getElementById('upload-btn');
+        var retryBtn = document.getElementById('retry-btn');
+				if (uploadBtn) { uploadBtn.disabled = (s !== 'healthy'); }
+        if (retryBtn) { retryBtn.disabled = (s !== 'healthy'); }
 			}
 
 			function poll() {
