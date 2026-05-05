@@ -204,10 +204,17 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 
 	id := r.PathValue("id")
 
-	_, err := h.store.GetJob(r.Context(), id)
+	job, err := h.store.GetJob(r.Context(), id)
 	if err != nil {
 		log.Warn("cancel: job not found", "id", id, logging.Err(err))
 		renderErr(http.StatusNotFound, "job not found")
+		return
+	}
+
+	status := job.Status
+	if status != "PROCESSING" && status != "PENDING" {
+		log.Warn("cancel: job not in correct state", "id", id, logging.Err(err))
+		renderErr(http.StatusBadRequest, "job in invalid state")
 		return
 	}
 
@@ -219,23 +226,26 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 		renderErr(http.StatusConflict, "could not cancel safely. Mark job as failed, reload and try again")
 		return
 	}
-	val.(context.CancelFunc)()
+	cancel, ok := val.(context.CancelFunc)
+	if ok {
+		cancel()
+	}
+
 	w.WriteHeader(http.StatusOK)
 }
 
 func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []byte) {
-	ctx, cancel := context.WithCancel(context.Background())
-	h.cancels.Store(jobID, cancel)
-	defer func() {
-		cancel()
-		h.cancels.Delete(jobID)
-	}()
 	log := h.logger.With("job_id", jobID, "request_id", requestID, "filename", filename)
 	start := time.Now()
 
 	log.Info("conversion start", "bytes", len(pdfBytes))
 
-	result, err := h.parser.Convert(ctx, jobID, requestID, filename, pdfBytes, h.hub)
+	convertCtx, convertCancel := context.WithCancel(context.Background())
+	h.cancels.Store(jobID, convertCancel)
+	result, err := h.parser.Convert(convertCtx, jobID, requestID, filename, pdfBytes, h.hub)
+	h.cancels.Delete(jobID)
+	convertCancel()
+
 	if err != nil {
 		log.Error("conversion failed", logging.Err(err), "dur_ms", time.Since(start).Milliseconds())
 		errMsg := err.Error()
@@ -260,14 +270,14 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 
 	if err := os.WriteFile(outputPath, result.Markdown, 0644); err != nil {
 		log.Error("write markdown failed", logging.Err(err), "output_path", outputPath)
-		if markErr := h.store.MarkJobFailed(ctx, jobID, err.Error()); markErr != nil {
+		if markErr := h.store.MarkJobFailed(context.Background(), jobID, err.Error()); markErr != nil {
 			log.Error("mark job failed errored", logging.Err(markErr))
 		}
 		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: err.Error()})
 		return
 	}
 
-	if err := h.store.MarkJobDone(ctx, jobID, outputPath); err != nil {
+	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath); err != nil {
 		log.Error("mark job done failed", logging.Err(err))
 		return
 	}

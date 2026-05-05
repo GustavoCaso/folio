@@ -260,7 +260,27 @@ func TestCancelDocument_UnknownID(t *testing.T) {
 	}
 }
 
-func TestCancelDocument_NotInFlight(t *testing.T) {
+func TestCancelDocument_InvalidState(t *testing.T) {
+	store := newTestStore(t)
+	job, err := store.CreateJob(context.Background(), "stuck.pdf", []byte("%PDF"), "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = store.MarkJobDone(context.Background(), job.ID, "fake/path")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/cancel", nil)
+	rec := httptest.NewRecorder()
+	newTestMux(t, store).ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestCancelDocument_ParserNotRunnig(t *testing.T) {
 	store := newTestStore(t)
 	job, err := store.CreateJob(context.Background(), "stuck.pdf", []byte("%PDF"), "req-1")
 	if err != nil {
@@ -280,7 +300,7 @@ func TestCancelDocument_NotInFlight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if job.Status != "FAILED" && job.Error == "cancelled by user" {
+	if job.Status != "FAILED" && job.Error != "cancelled by user" {
 		t.Fatal("job must be mark as FAILED and the error message must by 'cancelled by user'")
 	}
 }
@@ -309,8 +329,8 @@ func TestCancelDocument_OK(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	fw.Write([]byte("%PDF-1.4 fake"))
-	mw.Close()
+	fw.Write([]byte("%PDF-1.4 fake")) //nolint:errcheck
+	mw.Close()                        //nolint:errcheck
 	uploadReq := httptest.NewRequest(http.MethodPost, "/documents", body)
 	uploadReq.Header.Set("Content-Type", mw.FormDataContentType())
 	uploadRec := httptest.NewRecorder()
