@@ -66,7 +66,7 @@ Both services are configured via environment variables. The `compose.yaml` is th
 | `PDF_DO_OCR` | `true` | Run OCR on scanned pages |
 | `PDF_DO_TABLE_STRUCTURE` | `true` | Recognize table structure |
 | `PDF_GENERATE_IMAGES` | `true` | Extract picture images from PDF |
-| `PDF_POST_PROCESS_CODE_BLOCKS` | `true` | Pattern-based code language detection (fast, CPU-only) |
+| `PDF_POST_PROCESS_CODE_BLOCKS` | `true` | Pattern-based language detection + Prettier formatting for code blocks (see below) |
 | `PDF_DO_CODE_ENRICHMENT` | `false` | VLM-based code enrichment — accurate but very slow on CPU (~100s/image); requires GPU for practical use |
 | `PDF_CODE_FORMULA_PRESET` | `codeformulav2` | VLM preset when `PDF_DO_CODE_ENRICHMENT=true`: `codeformulav2` or `granite_docling` (258M, faster on CPU) |
 | `PDF_LAYOUT_BATCH_SIZE` | docling default | Docling layout batch size |
@@ -75,3 +75,43 @@ Both services are configured via environment variables. The `compose.yaml` is th
 | `PDF_QUEUE_MAX_SIZE` | docling default | Docling pipeline queue depth |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
 
+## Code block processing
+
+Docling extracts code blocks from PDFs as plain text with no language tag. The parser offers three approaches to enrich them, ordered by speed vs. accuracy:
+
+### 1. Pattern-based detection + Prettier formatting (`PDF_POST_PROCESS_CODE_BLOCKS=true`)
+
+The default. Two stages:
+
+**Detection** — regex patterns score each block against known languages (Python, JavaScript, TypeScript, Go, Rust, Java, Kotlin, SQL, Shell, JSON, YAML, TOML, HTML, CSS). The language with the most pattern hits wins. 
+
+**Formatting** — Using [Prettier](https://prettier.io) the block is piped through it via `prettier --stdin-filepath file.<ext>`. Languages with community plugins use `--plugin`:
+
+| Language | Prettier support | Plugin |
+|---|---|---|
+| JS, TS, JSON, YAML, HTML, CSS | Native | — |
+| SQL | Plugin | `prettier-plugin-sql` |
+| Shell / Bash | Plugin | `prettier-plugin-sh` |
+| Java | Plugin | `prettier-plugin-java` |
+| TOML | Plugin | `prettier-plugin-toml` |
+| Python, Go, Rust, Kotlin | None | Skipped (tag only) |
+
+Prettier failures fall back silently to the original code.
+
+**Limitations:**
+- Regex patterns can misdetect ambiguous snippets (e.g. short fragments that match multiple languages).
+- Docling sometimes strips internal newlines from code blocks, which breaks both detection and formatting.
+- Languages with no prettier support (Python, Go, Rust, Kotlin) get a language tag but no formatting.
+
+### 2. VLM-based enrichment (`PDF_DO_CODE_ENRICHMENT=true`)
+
+Uses a vision-language model (Docling's `CodeFormulaVlmOptions`) to read the code visually from the PDF page. More accurate for language detection and can reconstruct formatting lost during text extraction.
+
+**Limitations:**
+- Very slow on CPU (~100s per image). Requires a GPU for practical throughput.
+- Mutually exclusive with `PDF_POST_PROCESS_CODE_BLOCKS` — enabling both is wasteful; VLM takes precedence in Docling's pipeline.
+- Two presets via `PDF_CODE_FORMULA_PRESET`: `codeformulav2` (more accurate, larger model) and `granite_docling` (258M params, faster on CPU; MLX variant requires native Apple Silicon, unavailable in Docker).
+
+### 3. No enrichment (both disabled)
+
+Code blocks are emitted as untagged fenced blocks (` ``` ``` `). Syntax highlighting in the UI falls back to auto-detection by the browser's highlight library.
