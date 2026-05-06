@@ -51,9 +51,13 @@ templ Layout(title string) {
 				}[s] || 'Parser checking…';
 
 				container.innerHTML = '<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ' + variantClass + '">' + label + '</span>';
-
-				var btn = document.getElementById('upload-btn');
-				if (btn) { btn.disabled = (s !== 'healthy'); }
+        
+				var uploadBtn = document.getElementById('upload-btn');
+				var retryBtns = document.querySelectorAll('[data-retry-job]');
+				if (uploadBtn) { uploadBtn.disabled = (s !== 'healthy'); }
+				retryBtns.forEach(function(retryBtn) {
+					retryBtn.disabled = (s !== 'healthy');
+				});
 			}
 
 			function poll() {

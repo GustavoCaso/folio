@@ -7,7 +7,6 @@ import (
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
-	"github.com/templui/templui/components/skeleton"
 )
 
 templ jobCard(j db.Job) {
@@ -19,18 +18,23 @@ templ jobCard(j db.Job) {
 					@jobBadge(j.Status)
 				</span>
 			</div>
-			if j.Status == "PROCESSING" {
-				<div class="space-y-1.5" data-skeleton>
-					@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-full"})
-					@skeleton.Skeleton(skeleton.Props{Class: "h-3 w-2/3"})
-				</div>
-			}
 			<p class="text-xs text-muted-foreground" data-error-text>
 				if j.Status == "FAILED" {
 					{ j.Error }
 				}
 			</p>
 			<div class="flex items-center gap-2 mt-1" data-actions>
+				if j.Status == "PENDING" {
+					@button.Button(button.Props{
+						Variant:    button.VariantGhost,
+						Attributes: map[string]any{"data-cancel-job": j.ID, "data-job-name": j.Filename},
+						Size:       button.SizeSm,
+						Class:      "text-destructive hover:text-destructive",
+						Type:       button.TypeButton,
+					}) {
+						Cancel
+					}
+				}
 				if j.Status == "DONE" {
 					@button.Button(button.Props{
 						Variant: button.VariantOutline,
@@ -43,25 +47,25 @@ templ jobCard(j db.Job) {
 				if j.Status == "FAILED" {
 					<form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") }>
 						@button.Button(button.Props{
+							Attributes: map[string]any{"data-retry-job": j.ID, "data-job-name": j.Filename},
 							Variant:    button.VariantGhost,
 							Size:       button.SizeSm,
-							Type: button.TypeSubmit,
+							Type:       button.TypeSubmit,
 						}) {
 							Retry
 						}
 					</form>
 				}
 				if j.Status == "DONE" || j.Status == "FAILED" {
-					<form class="delete-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/delete") } data-filename={ j.Filename }>
-						@button.Button(button.Props{
-							Variant:    button.VariantGhost,
-							Size:       button.SizeSm,
-							Class:      "text-destructive hover:text-destructive",
-							Type: button.TypeSubmit,
-						}) {
-							Delete
-						}
-					</form>
+					@button.Button(button.Props{
+						Variant:    button.VariantGhost,
+						Attributes: map[string]any{"data-delete-job": j.ID, "data-job-name": j.Filename},
+						Size:       button.SizeSm,
+						Class:      "text-destructive hover:text-destructive",
+						Type:       button.TypeButton,
+					}) {
+						Delete
+					}
 				}
 			</div>
 		}

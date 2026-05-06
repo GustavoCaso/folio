@@ -14,6 +14,7 @@ import (
 	"path/filepath"
 	"strings"
 	"testing"
+	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
@@ -31,7 +32,7 @@ func newTestStore(t *testing.T) *db.Store {
 	return store
 }
 
-func newTestMux(t *testing.T, store *db.Store) http.Handler {
+func newTestMux(t *testing.T, store *db.Store) (http.Handler, *hub.Hub) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h, err := hub.New(logger)
@@ -42,7 +43,7 @@ func newTestMux(t *testing.T, store *db.Store) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	return mux
+	return mux, h
 }
 
 func newTestMuxWithParser(t *testing.T, store *db.Store, parser handlers.ParserClient) http.Handler {
@@ -85,7 +86,8 @@ func TestUploadDocumentError_ShowsExistingJobs(t *testing.T) {
 	}
 
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, emptyMultipartRequest(t))
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, emptyMultipartRequest(t))
 
 	got := rec.Body.String()
 	if !strings.Contains(got, "existing.pdf") {
@@ -95,7 +97,8 @@ func TestUploadDocumentError_ShowsExistingJobs(t *testing.T) {
 
 func TestUploadDocumentError_ShowsBanner(t *testing.T) {
 	rec := httptest.NewRecorder()
-	newTestMux(t, newTestStore(t)).ServeHTTP(rec, emptyMultipartRequest(t))
+	mux, _ := newTestMux(t, newTestStore(t))
+	mux.ServeHTTP(rec, emptyMultipartRequest(t))
 
 	if rec.Code != http.StatusBadRequest {
 		t.Errorf("expected 400, got %d", rec.Code)
@@ -112,9 +115,10 @@ func TestDeleteDocument_RejectsPending(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/delete", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/documents/"+job.ID, nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusConflict {
 		t.Errorf("expected 409, got %d", rec.Code)
@@ -131,12 +135,13 @@ func TestDeleteDocument_DeletesFailedJob(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/delete", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/documents/"+job.ID, nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusSeeOther {
-		t.Errorf("expected 303, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
 	}
 
 	_, err = store.GetJob(context.Background(), job.ID)
@@ -161,7 +166,7 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/delete", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/documents/"+job.ID, nil)
 	rec := httptest.NewRecorder()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -169,8 +174,8 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 	mux, _ := handlers.Register(store, h, nil, dir, logger)
 	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusSeeOther {
-		t.Errorf("expected 303, got %d", rec.Code)
+	if rec.Code != http.StatusOK {
+		t.Errorf("expected 200, got %d", rec.Code)
 	}
 
 	if _, err := os.Stat(mdPath); !errors.Is(err, os.ErrNotExist) {
@@ -184,9 +189,10 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 }
 
 func TestDeleteDocument_NotFound(t *testing.T) {
-	req := httptest.NewRequest(http.MethodPost, "/documents/nonexistent-id/delete", nil)
+	req := httptest.NewRequest(http.MethodDelete, "/documents/nonexistent-id", nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, newTestStore(t)).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, newTestStore(t))
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rec.Code)
@@ -196,7 +202,8 @@ func TestDeleteDocument_NotFound(t *testing.T) {
 func TestRetryDocument_NotFound(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/documents/nonexistent-id/retry", nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, newTestStore(t)).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, newTestStore(t))
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusNotFound {
 		t.Errorf("expected 404, got %d", rec.Code)
@@ -212,7 +219,8 @@ func TestRetryDocument_RejectsNonFailed(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/retry", nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusConflict {
 		t.Errorf("expected 409, got %d", rec.Code)
@@ -249,6 +257,152 @@ func TestRetryDocument_HappyPath(t *testing.T) {
 	}
 }
 
+func TestCancelDocument_UnknownID(t *testing.T) {
+	req := httptest.NewRequest(http.MethodPost, "/documents/no-such-id/cancel", nil)
+	rec := httptest.NewRecorder()
+	mux, _ := newTestMux(t, newTestStore(t))
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
+	}
+}
+
+func TestCancelDocument_InvalidState(t *testing.T) {
+	store := newTestStore(t)
+	job, err := store.CreateJob(context.Background(), "stuck.pdf", []byte("%PDF"), "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = store.MarkJobDone(context.Background(), job.ID, "fake/path")
+	if err != nil {
+		t.Fatal(err)
+	}
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/cancel", nil)
+	rec := httptest.NewRecorder()
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusBadRequest {
+		t.Fatalf("expected 400, got %d", rec.Code)
+	}
+}
+
+func TestCancelDocument_ParserNotRunnig(t *testing.T) {
+	store := newTestStore(t)
+	job, err := store.CreateJob(context.Background(), "stuck.pdf", []byte("%PDF"), "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// Job exists in DB but no goroutine is running it (not in cancels map).
+	mux, hub := newTestMux(t, store)
+	ch := hub.Subscribe(job.ID)
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/cancel", nil)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, req)
+
+	if rec.Code != http.StatusConflict {
+		t.Fatalf("expected 409, got %d", rec.Code)
+	}
+
+	// Even when returnig a 409 we mark the jobs as failed so user can retry
+	job, err = store.GetJob(context.Background(), job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if job.Status != "FAILED" || job.Error != "cancelled by user" {
+		t.Fatal("job must be mark as FAILED and the error message must by 'cancelled by user'")
+	}
+
+	select {
+	case got := <-ch:
+		if got.Status != "FAILED" {
+			t.Fatal("hub status incorrect")
+		}
+		if got.Error != "cancelled by user" {
+			t.Fatal("hub error incorrect")
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("hub message never received")
+	}
+	hub.Unsubscribe(job.ID, ch)
+}
+
+// blockingParser blocks Convert until its context is cancelled.
+type blockingParser struct {
+	started chan struct{}
+}
+
+func (p *blockingParser) Convert(ctx context.Context, _, _, _ string, _ []byte, _ *hub.Hub) (parserclient.ConversionResult, error) {
+	close(p.started)
+	<-ctx.Done()
+	return parserclient.ConversionResult{}, ctx.Err()
+}
+func (p *blockingParser) Health(_ context.Context) bool { return true }
+
+func TestCancelDocument_OK(t *testing.T) {
+	store := newTestStore(t)
+	parser := &blockingParser{started: make(chan struct{})}
+	mux := newTestMuxWithParser(t, store, parser)
+
+	// Upload a PDF to start a conversion goroutine.
+	body := &bytes.Buffer{}
+	mw := multipart.NewWriter(body)
+	fw, err := mw.CreateFormFile("document", "test.pdf")
+	if err != nil {
+		t.Fatal(err)
+	}
+	fw.Write([]byte("%PDF-1.4 fake")) //nolint:errcheck
+	mw.Close()                        //nolint:errcheck
+	uploadReq := httptest.NewRequest(http.MethodPost, "/documents", body)
+	uploadReq.Header.Set("Content-Type", mw.FormDataContentType())
+	uploadRec := httptest.NewRecorder()
+	mux.ServeHTTP(uploadRec, uploadReq)
+	if uploadRec.Code != http.StatusSeeOther {
+		t.Fatalf("upload: expected 303, got %d", uploadRec.Code)
+	}
+
+	// Wait for the parser goroutine to start blocking.
+	select {
+	case <-parser.started:
+	case <-time.After(3 * time.Second):
+		t.Fatal("parser goroutine never started")
+	}
+
+	// Find the job ID.
+	jobs, err := store.GetPendingJobs(context.Background())
+	if err != nil || len(jobs) == 0 {
+		t.Fatalf("expected a pending job, err=%v jobs=%v", err, jobs)
+	}
+	jobID := jobs[0].ID
+
+	// Cancel it.
+	cancelReq := httptest.NewRequest(http.MethodPost, "/documents/"+jobID+"/cancel", nil)
+	cancelRec := httptest.NewRecorder()
+	mux.ServeHTTP(cancelRec, cancelReq)
+	if cancelRec.Code != http.StatusOK {
+		t.Fatalf("cancel: expected 200, got %d", cancelRec.Code)
+	}
+
+	// Wait for the goroutine to finish and mark the job FAILED.
+	deadline := time.Now().Add(3 * time.Second)
+	for time.Now().Before(deadline) {
+		job, err := store.GetJob(context.Background(), jobID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if job.Status == "FAILED" {
+			if job.Error != "cancelled by user" {
+				t.Errorf("expected error 'cancelled by user', got %q", job.Error)
+			}
+			return
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	t.Fatal("job never transitioned to FAILED after cancel")
+}
+
 func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
 	store := newTestStore(t)
 	job1, err := store.CreateJob(t.Context(), "report.pdf", []byte{}, "")
@@ -267,7 +421,8 @@ func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodGet, "/", nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Errorf("expected 200, got %d", rec.Code)

@@ -1,4 +1,4 @@
-.PHONY: build test test-js test-race lint lint-check format format-check proto templ css
+.PHONY: build test test-js test-race lint lint-check format format-check proto templ css generate
 
 build:
 	go build ./...
@@ -34,6 +34,10 @@ proto:
 		--go_out=internal/parser/proto --go_opt=paths=source_relative \
 		--go-grpc_out=internal/parser/proto --go-grpc_opt=paths=source_relative \
 		../proto/parser.proto
+		
+generate:
+	make templ
+	make css
 
 templ:
 	templ generate

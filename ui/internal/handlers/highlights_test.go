@@ -59,7 +59,8 @@ func TestCreateHighlight_HappyPath(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/highlights", bytes.NewReader(body))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusCreated {
 		t.Fatalf("expected 201, got %d; body: %s", rec.Code, rec.Body.String())
@@ -84,7 +85,8 @@ func TestCreateHighlight_InvalidJSON(t *testing.T) {
 	req := httptest.NewRequest(http.MethodPost, "/highlights", strings.NewReader("not json"))
 	req.Header.Set("Content-Type", "application/json")
 	rec := httptest.NewRecorder()
-	newTestMux(t, newTestStore(t)).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, newTestStore(t))
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("expected 400, got %d", rec.Code)
@@ -108,7 +110,8 @@ func TestDeleteHighlight_HappyPath(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/highlights/"+h.ID, nil)
 	req.Header.Set("Accept", "text/html")
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d; body: %s", rec.Code, rec.Body.String())
@@ -127,7 +130,8 @@ func TestDeleteHighlight_RemovesFromStore(t *testing.T) {
 
 	req := httptest.NewRequest(http.MethodDelete, "/highlights/"+h.ID, nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, store).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, store)
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
@@ -145,7 +149,8 @@ func TestDeleteHighlight_RemovesFromStore(t *testing.T) {
 func TestDeleteHighlight_UnknownID_ReturnsErrorToast(t *testing.T) {
 	req := httptest.NewRequest(http.MethodDelete, "/highlights/no-such-id", nil)
 	rec := httptest.NewRecorder()
-	newTestMux(t, newTestStore(t)).ServeHTTP(rec, req)
+	mux, _ := newTestMux(t, newTestStore(t))
+	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)

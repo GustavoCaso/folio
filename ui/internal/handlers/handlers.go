@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
+	"sync"
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
@@ -34,7 +35,8 @@ type Handlers struct {
 	// outlive the originating request and therefore can't use
 	// logging.LoggerFrom. Request-scoped code should pull the logger — with
 	// request_id attached by middleware — from r.Context() instead.
-	logger *slog.Logger
+	logger  *slog.Logger
+	cancels sync.Map // jobID → context.CancelFunc
 }
 
 func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logger *slog.Logger) (*http.ServeMux, error) {
@@ -48,8 +50,9 @@ func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logg
 	mux.HandleFunc("GET /", hs.ListDocuments)
 	mux.HandleFunc("GET /health/parser", hs.ParserHealth)
 	mux.HandleFunc("POST /documents", hs.UploadDocument)
+	mux.HandleFunc("POST /documents/{id}/cancel", hs.CancelDocument)
 	mux.HandleFunc("POST /documents/{id}/retry", hs.RetryDocument)
-	mux.HandleFunc("POST /documents/{id}/delete", hs.DeleteDocument)
+	mux.HandleFunc("DELETE /documents/{id}", hs.DeleteDocument)
 	mux.HandleFunc("GET /read/{jobID}", hs.ReadDocument)
 	mux.HandleFunc("GET /jobs/{jobID}/watch", hs.WatchJob)
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)

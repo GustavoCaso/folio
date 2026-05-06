@@ -13,15 +13,17 @@ function readButtonHTML(jobID) {
   return `<a href="/read/${jobID}" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground">Read</a>`;
 }
 
-function deleteFormHTML(jobID, filename) {
-  return `<form class="delete-form" method="POST" action="/documents/${jobID}/delete" data-filename="${filename}">` +
-    `<button type="submit" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Delete</button>` +
-    `</form>`;
+function deleteFormButton(jobID, filename) {
+  return `<button type="button" data-delete-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Delete</button>`
+}
+
+function cancelButtonHTML(jobID, filename) {
+  return `<button type="button" data-cancel-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Cancel</button>`;
 }
 
 function retryFormHTML(jobID) {
   return `<form class="retry-form" method="POST" action="/documents/${jobID}/retry">` +
-    `<button type="submit" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Retry</button>` +
+    `<button type="submit" data-retry-job="${jobID}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Retry</button>` +
     `</form>`;
 }
 
@@ -34,7 +36,6 @@ export function watchJob(jobID) {
     const d = JSON.parse(e.data);
 
     const statusBadge = card.querySelector("[data-status-badge]");
-    const skeleton = card.querySelector("[data-skeleton]");
     const errorText = card.querySelector("[data-error-text]");
     const actions = card.querySelector("[data-actions]");
     const filename = card.querySelector("[data-filename]")?.textContent || "";
@@ -44,19 +45,15 @@ export function watchJob(jobID) {
     }
 
     if (d.Status === "DONE") {
-      if (skeleton) skeleton.remove();
       if (errorText) errorText.textContent = "";
       if (actions && !actions.querySelector("a[href]")) {
-        actions.innerHTML = readButtonHTML(jobID) + deleteFormHTML(jobID, filename);
-        wireDeleteConfirm(actions, filename);
+        actions.innerHTML = readButtonHTML(jobID) + deleteFormButton(jobID, filename);
       }
       es.close();
     } else if (d.Status === "FAILED") {
-      if (skeleton) skeleton.remove();
       if (errorText) errorText.textContent = d.Error || "";
       if (actions && !actions.querySelector("form.retry-form")) {
-        actions.innerHTML = retryFormHTML(jobID) + deleteFormHTML(jobID, filename);
-        wireDeleteConfirm(actions, filename);
+        actions.innerHTML = retryFormHTML(jobID) + deleteFormButton(jobID, filename);
       }
       es.close();
     } else if (d.Stage && errorText) {
@@ -64,28 +61,52 @@ export function watchJob(jobID) {
       if (d.Message) text += " — " + d.Message;
       if (d.PagesTotal) text += " (" + d.PagesDone + "/" + d.PagesTotal + ")";
       errorText.textContent = text;
+      if ((actions) && !actions.querySelector("[data-cancel-job]")) {
+        actions.innerHTML = cancelButtonHTML(jobID);
+      }
     }
   });
 }
 
-function wireDeleteConfirm(container, filename) {
-  container.querySelectorAll("form.delete-form").forEach(function (form) {
-    form.addEventListener("submit", function (e) {
-      if (!confirm("Delete " + filename + " ?")) e.preventDefault();
-    });
-  });
-}
-
 function bootstrap() {
-  document.querySelectorAll("form.delete-form").forEach(function (form) {
-    form.addEventListener("submit", function (e) {
-      if (!confirm("Delete " + form.dataset.filename + " ?")) e.preventDefault();
-    });
-  });
-
   const cfg = document.getElementById("watch-config");
-  if (!cfg) return;
-  cfg.dataset.jobIds.split(",").forEach(watchJob);
+  if (cfg) cfg.dataset.jobIds.split(",").forEach(watchJob);
+
+  document.addEventListener("click", async (e) => {
+    // Cancel button
+    const cancelBtn = e.target.closest("[data-cancel-job]");
+    if (cancelBtn) {
+      if (confirm(`Cancel Job ?`)) {
+        const id = cancelBtn.dataset.cancelJob;
+        const resp = await fetch(`/documents/${id}/cancel`, { method: "POST", headers: { "Accept": "text/html" } });
+
+        if (!resp.ok) {
+          const html = await resp.text();
+          document.body.insertAdjacentHTML("beforeend", html);
+        }
+
+        // SSE FAILED event drives the card transition; no DOM change here
+        return;
+      }
+    }
+
+    // Delete button
+    const deleteBtn = e.target.closest("[data-delete-job]");
+    if (deleteBtn) {
+      const id = deleteBtn.dataset.deleteJob;
+      const jobName = deleteBtn.dataset.jobName;
+      if (confirm(`Delete ${jobName} ?`)) {
+        const resp = await fetch(`/documents/${id}`, { method: "DELETE", headers: { "Accept": "text/html" } });
+        const html = await resp.text();
+        document.body.insertAdjacentHTML("beforeend", html);
+        if (resp.ok) {
+          const jobCard = document.getElementById(`job-${id}`)
+          if (jobCard) jobCard.remove();
+        }
+        return;
+      }
+    }
+  })
 }
 
 if (typeof document !== "undefined") {
