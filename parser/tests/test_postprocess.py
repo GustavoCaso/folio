@@ -53,7 +53,10 @@ class TestPrettierArguments:
         mock_result.returncode = 0
         mock_result.stdout = 'console.log("hello");\n'
 
-        with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        with (
+            patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
+            patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
+        ):
             _prettier_format("console.log('hello')\n", "js")
 
         args = mock_run.call_args[0][0]
@@ -65,7 +68,10 @@ class TestPrettierArguments:
         mock_result.returncode = 0
         mock_result.stdout = "SELECT id\nFROM users;\n"
 
-        with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        with (
+            patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
+            patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
+        ):
             _prettier_format("SELECT id FROM users;\n", "sql")
 
         args = mock_run.call_args[0][0]
@@ -77,7 +83,10 @@ class TestPrettierArguments:
         mock_result.returncode = 0
         mock_result.stdout = "#!/bin/bash\nexport FOO=bar\n"
 
-        with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        with (
+            patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
+            patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
+        ):
             _prettier_format("#!/bin/bash\nexport FOO=bar\n", "sh")
 
         args = mock_run.call_args[0][0]
@@ -89,7 +98,10 @@ class TestPrettierArguments:
         mock_result.returncode = 0
         mock_result.stdout = "public class Foo {}\n"
 
-        with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        with (
+            patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
+            patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
+        ):
             _prettier_format("public class Foo {}\n", "java")
 
         args = mock_run.call_args[0][0]
@@ -101,7 +113,10 @@ class TestPrettierArguments:
         mock_result.returncode = 0
         mock_result.stdout = '[package]\nname = "my-app"\n'
 
-        with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        with (
+            patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
+            patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
+        ):
             _prettier_format('[package]\nname = "my-app"\n', "toml")
 
         args = mock_run.call_args[0][0]
@@ -113,7 +128,10 @@ class TestPrettierArguments:
         mock_result.returncode = 0
         mock_result.stdout = "const x = 1;\n"
 
-        with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        with (
+            patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
+            patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
+        ):
             _prettier_format("const x = 1;\n", "js")
 
         args = mock_run.call_args[0][0]
@@ -124,13 +142,19 @@ class TestPrettierArguments:
         mock_result.returncode = 1
         mock_result.stdout = ""
 
-        with patch("parser.postprocess.subprocess.run", return_value=mock_result):
+        with (
+            patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
+            patch("parser.postprocess.subprocess.run", return_value=mock_result),
+        ):
             result = _prettier_format("original code\n", "js")
 
         assert result == "original code\n"
 
     def test_prettier_not_called_for_unsupported_language(self):
-        with patch("parser.postprocess.subprocess.run") as mock_run:
+        with (
+            patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
+            patch("parser.postprocess.subprocess.run") as mock_run,
+        ):
             _prettier_format("print('hi')\n", "py")
 
         mock_run.assert_not_called()

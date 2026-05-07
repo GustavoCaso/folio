@@ -114,4 +114,4 @@ Uses a vision-language model (Docling's `CodeFormulaVlmOptions`) to read the cod
 
 ### 3. No enrichment (both disabled)
 
-Code blocks are emitted as untagged fenced blocks (` ``` ``` `). Syntax highlighting in the UI falls back to auto-detection by the browser's highlight library.
+Code blocks are emitted as untagged fenced blocks.
