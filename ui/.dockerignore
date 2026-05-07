@@ -1,4 +1,3 @@
-
 node_modules/
 .npmrc
 .mise.toml
@@ -8,6 +7,7 @@ vitest.config.js
 
 *.md
 .claude/
-.vscode/
+
+Makefile
 
 **/*_test.go
