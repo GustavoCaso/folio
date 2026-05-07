@@ -14,7 +14,7 @@ RUN --mount=type=cache,target=/root/.cache/uv \
 
 FROM python:3.12-slim-bookworm
 
-RUN apt-get update && apt-get install -y curl libgl1-mesa-dev libglib2.0-0 \
+RUN apt-get update && apt-get install -y curl libgl1-mesa-dev libglib2.0-0 gosu passwd \
     && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
     && apt-get install -y nodejs \
     && rm -rf /var/lib/apt/lists/* \
@@ -29,11 +29,9 @@ COPY --from=builder /app/src ./src
 COPY entrypoint.sh .
 RUN chmod +x entrypoint.sh && chown -R folio:folio /app && mkdir -p /app/models && chown folio:folio /app/models
 
-
 ENV PYTHONPATH=/app/src:$PYTHONPATH
 ENV PATH=/app/node_modules/.bin:$PATH
 
-VOLUME ["/app/models"]
 ENV PATH="/app/.venv/bin:$PATH" \
     HF_HOME=/app/models \
     GRPC_PORT=50051 \
@@ -46,7 +44,7 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PDF_IMAGE_MODE=placeholder \
     LOG_LEVEL=info
 
-USER folio
+VOLUME ["/app/models"]
 EXPOSE 50051
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["parser-server"]
