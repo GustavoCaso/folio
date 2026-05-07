@@ -9,13 +9,20 @@ COPY src/ src/
 
 FROM python:3.12-slim-bookworm
 
-RUN apt-get update && apt-get install -y libgl1-mesa-dev libglib2.0-0 && rm -rf /var/lib/apt/lists/*
+RUN apt-get update && apt-get install -y curl libgl1-mesa-dev libglib2.0-0 \
+    && curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs \
+    && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+
 COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app/src ./src
 
 ENV PYTHONPATH=/app/src:$PYTHONPATH
+ENV PATH=/app/node_modules/.bin:$PATH
 
 EXPOSE 50051
 CMD [".venv/bin/parser-server"]

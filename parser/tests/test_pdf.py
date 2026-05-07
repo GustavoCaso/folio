@@ -161,7 +161,7 @@ class TestConvertPdf:
         ):
             result = pdf_mod.convert_pdf(pdf)
 
-        assert result.startswith("```python")
+        assert result.startswith("```py")
 
     def test_enrich_code_blocks_skipped_when_disabled(self, tmp_path):
         pdf = tmp_path / "doc.pdf"
