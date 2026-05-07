@@ -8,11 +8,17 @@ echo "Starting with PUID=$PUID, PGID=$PGID"
 
 if [ "$(id -u folio)" != "$PUID" ] || [ "$(id -g folio)" != "$PGID" ]; then
     echo "Adjusting user and group IDs..."
-    groupmod -g "$PGID" folio
-    usermod -u "$PUID" folio
+    if ! groupmod -g "$PGID" folio 2>/dev/null; then
+        echo "Warning: Could not modify group; continuing anyway"
+    fi
+    if ! usermod -u "$PUID" folio 2>/dev/null; then
+        echo "Warning: Could not modify user; continuing anyway"
+    fi
+    
+    echo "Fixing ownership of ${DATA_DIR:-/data}..."
+    if ! chown -R "$PUID:$PGID" "${DATA_DIR:-/data}" 2>/dev/null; then
+        echo "Warning: Could not chown DATA_DIR; continuing anyway"
+    fi
 fi
-
-echo "Fixing ownership of ${DATA_DIR:-/data}..."
-chown -R "$PUID:$PGID" "${DATA_DIR:-/data}"
 
 exec su-exec folio "$@"

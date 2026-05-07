@@ -9,6 +9,7 @@ RUN --mount=type=cache,target=/root/.cache/go-build \
 FROM alpine:3.20
 RUN apk add --no-cache ca-certificates tzdata su-exec shadow && \
     addgroup -S folio && adduser -S folio -G folio
+
 WORKDIR /app
 COPY --from=builder /app/folio-ui .
 COPY entrypoint.sh .

@@ -27,7 +27,7 @@ RUN npm ci
 COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app/src ./src
 COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh && chown -R folio:folio /app && mkdir -p /app/models && chown folio:folio /app/models
+RUN chmod +x entrypoint.sh && mkdir -p /app/models && chown -R folio:folio /app
 
 ENV PYTHONPATH=/app/src:$PYTHONPATH
 ENV PATH=/app/node_modules/.bin:$PATH
