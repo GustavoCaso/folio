@@ -9,7 +9,7 @@ test:
 
 test-js:
 	@echo "running ui js tests"
-	@mise exec -- pnpm test
+	@mise exec -- npm test
 
 test-race:
 	go test ./... -race
@@ -46,6 +46,6 @@ css:
 	@TEMPLUI_PATH="$$(go list -mod=mod -m -f '{{.Dir}}' github.com/templui/templui)" && \
 	printf '%s\n' '@source "./**/*.templ";' "@source \"$$TEMPLUI_PATH/components/**/*.templ\";" \
 		> internal/handlers/static/tailwind/sources.generated.css
-	@mise exec -- pnpm exec tailwindcss \
+	@mise exec -- npm exec tailwindcss -- \
 		-i internal/handlers/static/tailwind/input.css \
 		-o internal/handlers/static/tailwind/output.css
