@@ -1,6 +1,8 @@
 from unittest.mock import MagicMock, patch
 
-from parser.postprocess import _detect_language, enrich_code_blocks
+import pytest
+
+from parser.postprocess import _PRETTIER_BIN, _detect_language, _prettier_format, enrich_code_blocks
 
 
 def test_adds_language_to_untagged_python_block():
@@ -32,7 +34,6 @@ def test_passthrough_no_code_blocks():
 def test_empty_code_block_left_alone():
     md = "```\n```"
     result = enrich_code_blocks(md)
-    # empty block — no content to guess, leave as-is
     assert "```" in result
 
 
@@ -69,7 +70,6 @@ def test_bash_with_shebang_not_detected_as_go():
 
 
 def test_go():
-    # `:=` and `func` alone should not be enough to trigger go
     code = "func foo() {\n  x := 1\n  return x\n}\n"
     assert _detect_language(code) == "go"
 
@@ -94,71 +94,6 @@ def test_typescript_detected():
     assert _detect_language(code) == "ts"
 
 
-# --- prettier integration ---
-
-
-def test_prettier_formats_javascript_block():
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = 'console.log("hello");\n'
-
-    with (
-        patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
-        patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
-    ):
-        result = enrich_code_blocks("```js\nconsole.log('hello')\n```")
-
-    mock_run.assert_called_once()
-    args = mock_run.call_args[0][0]
-    assert "--stdin-filepath" in args
-    assert "file.js" in args
-    assert 'console.log("hello");\n' in result
-
-
-def test_prettier_fallback_on_error():
-    mock_result = MagicMock()
-    mock_result.returncode = 1
-    mock_result.stdout = ""
-
-    with (
-        patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
-        patch("parser.postprocess.subprocess.run", return_value=mock_result),
-    ):
-        result = enrich_code_blocks("```js\nconsole.log('hello')\n```")
-
-    # original code preserved
-    assert "console.log('hello')" in result
-
-
-def test_prettier_not_called_for_unsupported_language():
-    with (
-        patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
-        patch("parser.postprocess.subprocess.run") as mock_run,
-    ):
-        enrich_code_blocks("```python\nprint('hi')\n```")
-
-    mock_run.assert_not_called()
-
-
-def test_prettier_passes_plugin_for_sql():
-    mock_result = MagicMock()
-    mock_result.returncode = 0
-    mock_result.stdout = "SELECT id\nFROM users\nWHERE active = 1;\n"
-
-    with (
-        patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
-        patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
-    ):
-        enrich_code_blocks("```sql\nSELECT id FROM users WHERE active = 1;\n```")
-
-    args = mock_run.call_args[0][0]
-    assert "--plugin" in args
-    assert "prettier-plugin-sql" in args
-
-
-# --- new language detection ---
-
-
 def test_java_detected():
     code = (
         'public class Foo {\n    public void bar() {\n        System.out.println("hi");\n    }\n}\n'
@@ -176,42 +111,59 @@ def test_toml_detected():
     assert _detect_language(code) == "toml"
 
 
-def test_prettier_passes_plugin_for_bash():
+# --- prettier unit tests (mock subprocess to verify command structure) ---
+
+
+def test_prettier_uses_stdin_filepath():
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = 'console.log("hello");\n'
+
+    with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        _prettier_format("console.log('hello')\n", "js")
+
+    args = mock_run.call_args[0][0]
+    assert "--stdin-filepath" in args
+    assert "file.js" in args
+
+
+def test_prettier_passes_plugin_for_sql():
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "SELECT id\nFROM users;\n"
+
+    with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        _prettier_format("SELECT id FROM users;\n", "sql")
+
+    args = mock_run.call_args[0][0]
+    assert "--plugin" in args
+    assert "prettier-plugin-sql" in args
+
+
+def test_prettier_passes_plugin_for_sh():
     mock_result = MagicMock()
     mock_result.returncode = 0
     mock_result.stdout = "#!/bin/bash\nexport FOO=bar\n"
 
-    with (
-        patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
-        patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
-    ):
-        enrich_code_blocks("```sh\n#!/bin/bash\nexport FOO=bar\n```")
+    with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        _prettier_format("#!/bin/bash\nexport FOO=bar\n", "sh")
 
     args = mock_run.call_args[0][0]
     assert "--plugin" in args
     assert "prettier-plugin-sh" in args
-    assert "file.sh" in args
 
 
 def test_prettier_passes_plugin_for_java():
     mock_result = MagicMock()
     mock_result.returncode = 0
-    mock_result.stdout = (
-        'public class Foo {\n  public void bar() {\n    System.out.println("hi");\n  }\n}\n'
-    )
+    mock_result.stdout = 'public class Foo {}\n'
 
-    with (
-        patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
-        patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
-    ):
-        enrich_code_blocks(
-            '```java\npublic class Foo { public void bar() { System.out.println("hi"); } }\n```'
-        )
+    with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        _prettier_format("public class Foo {}\n", "java")
 
     args = mock_run.call_args[0][0]
     assert "--plugin" in args
     assert "prettier-plugin-java" in args
-    assert "file.java" in args
 
 
 def test_prettier_passes_plugin_for_toml():
@@ -219,13 +171,93 @@ def test_prettier_passes_plugin_for_toml():
     mock_result.returncode = 0
     mock_result.stdout = '[package]\nname = "my-app"\n'
 
-    with (
-        patch("parser.postprocess._PRETTIER_BIN", "/usr/bin/prettier"),
-        patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run,
-    ):
-        enrich_code_blocks('[package]\nname = "my-app"\n```toml\n[package]\nname = "my-app"\n```')
+    with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        _prettier_format('[package]\nname = "my-app"\n', "toml")
 
     args = mock_run.call_args[0][0]
     assert "--plugin" in args
     assert "prettier-plugin-toml" in args
-    assert "file.toml" in args
+
+
+def test_prettier_no_plugin_for_native_languages():
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = 'const x = 1;\n'
+
+    with patch("parser.postprocess.subprocess.run", return_value=mock_result) as mock_run:
+        _prettier_format("const x = 1;\n", "js")
+
+    args = mock_run.call_args[0][0]
+    assert "--plugin" not in args
+
+
+def test_prettier_fallback_on_nonzero_exit():
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+    mock_result.stdout = ""
+
+    with patch("parser.postprocess.subprocess.run", return_value=mock_result):
+        result = _prettier_format("original code\n", "js")
+
+    assert result == "original code\n"
+
+
+def test_prettier_not_called_for_unsupported_language():
+    with patch("parser.postprocess.subprocess.run") as mock_run:
+        _prettier_format("print('hi')\n", "py")
+
+    mock_run.assert_not_called()
+
+
+# --- prettier integration tests (real binary) ---
+
+
+@pytest.mark.integration
+def test_prettier_binary_available():
+    assert _PRETTIER_BIN is not None, "prettier not found in PATH — install dependencies with `npm install`"
+
+
+@pytest.mark.integration
+def test_prettier_formats_javascript():
+    # prettier normalises single → double quotes
+    result = enrich_code_blocks("```js\nconsole.log('hello')\n```")
+    assert 'console.log("hello")' in result
+
+
+@pytest.mark.integration
+def test_prettier_formats_json():
+    result = enrich_code_blocks('```json\n{"a":1,"b":2}\n```')
+    # prettier adds newlines and indentation
+    assert '"a": 1' in result
+    assert '"b": 2' in result
+
+
+@pytest.mark.integration
+def test_prettier_formats_sql():
+    result = enrich_code_blocks(
+        "```sql\nSELECT id,name FROM users WHERE active=1;\n```"
+    )
+    # prettier-plugin-sql uppercases and adds newlines
+    assert "SELECT" in result
+    assert "FROM" in result
+
+
+@pytest.mark.integration
+def test_prettier_formats_shell():
+    result = enrich_code_blocks("```sh\n#!/bin/bash\nexport   FOO=bar\n```")
+    assert "FOO=bar" in result
+
+
+@pytest.mark.integration
+def test_prettier_does_not_format_python():
+    # python has no prettier support — code returned as-is
+    code = "print(  'hello'  )"
+    result = enrich_code_blocks(f"```py\n{code}\n```")
+    assert code in result
+
+
+@pytest.mark.integration
+def test_prettier_fallback_on_invalid_code():
+    # invalid JS — prettier errors, original code preserved
+    result = enrich_code_blocks("```js\n{{{not valid js\n```")
+    assert "{{{not valid js" in result

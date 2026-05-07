@@ -2,7 +2,7 @@
 
 test:
 	@echo "running parser tests"
-	@uv run pytest tests/
+	@PATH="$(CURDIR)/node_modules/.bin:$(PATH)" uv run pytest tests/
 
 lint:
 	uv run ruff check --fix src/ tests/

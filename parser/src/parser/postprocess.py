@@ -7,10 +7,9 @@ _FENCED_BLOCK = re.compile(r"^```(\w*)\n(.*?)^```", re.MULTILINE | re.DOTALL)
 
 _log = logging.getLogger(__name__)
 
-_SUPORTED_PRETTIER_EXTENSIONS: list[str] = [
+_SUPPORTED_PRETTIER_EXTENSIONS: list[str] = [
     "js",
     "ts",
-    "rb",
     "json",
     "yaml",
     "html",
@@ -22,6 +21,8 @@ _SUPORTED_PRETTIER_EXTENSIONS: list[str] = [
 ]
 
 _PRETTIER_BIN: str | None = shutil.which("prettier")
+if _PRETTIER_BIN is None:
+    _log.warning("prettier not found in PATH — code block formatting will be skipped")
 
 _FLAGS = re.IGNORECASE | re.MULTILINE
 _FLAGS_CS = re.MULTILINE  # case-sensitive
@@ -190,7 +191,7 @@ _PRETTIER_PLUGINS: dict[str, str] = {
 
 
 def _prettier_format(code: str, lang: str) -> str:
-    supported = lang in _SUPORTED_PRETTIER_EXTENSIONS
+    supported = lang in _SUPPORTED_PRETTIER_EXTENSIONS
     if not supported or not _PRETTIER_BIN:
         return code
     cmd = [_PRETTIER_BIN, "--stdin-filepath", f"file.{lang}"]

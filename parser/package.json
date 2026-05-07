@@ -1,0 +1,11 @@
+{
+  "name": "folio-parser",
+  "private": true,
+  "dependencies": {
+    "prettier": "3.8.3",
+    "prettier-plugin-java": "2.8.1",
+    "prettier-plugin-sh": "0.18.1",
+    "prettier-plugin-sql": "0.20.0",
+    "prettier-plugin-toml": "2.0.6"
+  }
+}
