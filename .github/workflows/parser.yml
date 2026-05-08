@@ -2,10 +2,6 @@ name: parser
 
 on:
   pull_request:
-    paths:
-      - "parser/**"
-      - "proto/**"
-      - ".github/workflows/parser.yml"
   push:
     branches: [main]
 

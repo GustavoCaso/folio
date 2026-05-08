@@ -2,10 +2,6 @@ name: ui
 
 on:
   pull_request:
-    paths:
-      - "ui/**"
-      - "proto/**"
-      - ".github/workflows/ui.yml"
   push:
     branches: [main]
 
