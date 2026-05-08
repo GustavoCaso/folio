@@ -20,14 +20,17 @@ RUN apt-get update && apt-get install -y curl libgl1-mesa-dev libglib2.0-0 gosu 
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r folio && useradd -r -g folio folio
 
+RUN mkdir -p /app/models && chown -R folio:folio /app
+
 WORKDIR /app
-COPY package.json package-lock.json ./
+
+COPY --chown=folio:folio package.json package-lock.json ./
 RUN npm ci
 
-COPY --from=builder /app/.venv ./.venv
-COPY --from=builder /app/src ./src
-COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh && mkdir -p /app/models && chown -R folio:folio /app
+COPY --chown=folio:folio --from=builder /app/.venv ./.venv
+COPY --chown=folio:folio --from=builder /app/src ./src
+COPY --chown=folio:folio entrypoint.sh .
+RUN chmod +x entrypoint.sh
 
 ENV PYTHONPATH=/app/src:$PYTHONPATH
 ENV PATH=/app/node_modules/.bin:$PATH
