@@ -1,6 +1,5 @@
 node_modules/
 .npmrc
-.mise.toml
 package.json
 pnpm-lock.yaml
 vitest.config.js
