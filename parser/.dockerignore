@@ -3,7 +3,7 @@
 .pytest_cache/
 .ruff_cache/
 node_modules/
-.claude
+.npmrc
 
 tests/
 *.md

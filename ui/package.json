@@ -5,14 +5,14 @@
   "type": "module",
   "engines": {
     "node": ">=24.15.0",
-    "pnpm": ">=10.33.0"
+    "npm": ">=11"
   },
   "engineStrict": true,
   "scripts": {
     "test": "vitest run",
     "test:watch": "vitest"
   },
-  "packageManager": "pnpm@10.33.0",
+  "packageManager": "npm@11.12.1",
   "devDependencies": {
     "@tailwindcss/cli": "^4.2.4",
     "jsdom": "^29.0.2",
