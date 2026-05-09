@@ -1,5 +1,8 @@
 [tool.uv]
 package = true
+required-environments = [
+  "sys_platform == 'linux' and platform_machine == 'aarch64'",
+]
 
 [project]
 name = "parser"
@@ -8,7 +11,7 @@ description = "Stateless document parser service: converts PDF bytes to markdown
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-  "docling==2.86.0",
+  "docling-slim[format-pdf,feat-ocr-rapidocr,format-office,format-web,format-latex,feat-chunking,extract-core,feat-ocr-rapidocr-onnx,models-local,cli]==2.93.0",
   "grpcio==1.80.0",
   "grpcio-health-checking==1.71.2",
   "grpcio-tools==1.71.2",

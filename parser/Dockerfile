@@ -11,6 +11,9 @@ COPY src/ src/
 # Install the project itself now that source is present
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
+    
+RUN --mount=type=cache,target=/root/.cache/uv \
+    uv run docling-tools models download -o /app/models
 
 FROM python:3.12-slim-bookworm
 
@@ -26,14 +29,15 @@ RUN npm ci
 
 COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app/src ./src
+COPY --from=builder /app/models ./models
 COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh && mkdir -p /app/models && chown -R folio:folio /app
+RUN chmod +x entrypoint.sh && chown -R folio:folio /app
 
 ENV PYTHONPATH=/app/src:$PYTHONPATH
 ENV PATH=/app/node_modules/.bin:$PATH
 
 ENV PATH="/app/.venv/bin:$PATH" \
-    HF_HOME=/app/models \
+    DOCLING_ARTIFACTS_PATH=/app/models \
     GRPC_PORT=50051 \
     NUM_WORKERS=2 \
     PDF_GENERATE_IMAGES=false \
@@ -44,7 +48,6 @@ ENV PATH="/app/.venv/bin:$PATH" \
     PDF_IMAGE_MODE=placeholder \
     LOG_LEVEL=info
 
-VOLUME ["/app/models"]
 EXPOSE 50051
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["parser-server"]
