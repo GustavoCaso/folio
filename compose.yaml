@@ -13,7 +13,9 @@ services:
       - parser
 
   parser:
-    build: ./parser
+    build:
+      context: ./parser
+      target: dev
     environment:
       - GRPC_PORT=50051
       - NUM_WORKERS=2

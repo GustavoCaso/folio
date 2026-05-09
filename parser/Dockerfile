@@ -11,11 +11,18 @@ COPY src/ src/
 # Install the project itself now that source is present
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv sync --no-dev
-    
+
+FROM ghcr.io/astral-sh/uv:python3.12-bookworm-slim AS builder-release
+
+WORKDIR /app
+
+COPY --from=builder /app/.venv ./.venv
+COPY --from=builder /app/src ./src
+
 RUN --mount=type=cache,target=/root/.cache/uv \
     uv run docling-tools models download -o /app/models
 
-FROM python:3.12-slim-bookworm
+FROM python:3.12-slim-bookworm AS base
 
 RUN apt-get update && apt-get install -y curl libgl1-mesa-dev libglib2.0-0 gosu passwd \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
@@ -27,11 +34,9 @@ WORKDIR /app
 COPY package.json package-lock.json ./
 RUN npm ci
 
-COPY --from=builder /app/.venv ./.venv
-COPY --from=builder /app/src ./src
-COPY --from=builder /app/models ./models
+COPY --chown=folio:folio --from=builder /app/src ./src
 COPY entrypoint.sh .
-RUN chmod +x entrypoint.sh && chown -R folio:folio /app
+RUN chmod +x entrypoint.sh
 
 ENV PYTHONPATH=/app/src:$PYTHONPATH
 ENV PATH=/app/node_modules/.bin:$PATH
@@ -51,3 +56,13 @@ ENV PATH="/app/.venv/bin:$PATH" \
 EXPOSE 50051
 ENTRYPOINT ["./entrypoint.sh"]
 CMD ["parser-server"]
+
+FROM base AS dev
+
+COPY --chown=folio:folio --from=builder /app/.venv ./.venv
+COPY --chown=folio:folio models/ ./models/
+
+FROM base AS release
+
+COPY --chown=folio:folio --from=builder-release /app/.venv ./.venv
+COPY --chown=folio:folio --from=builder-release /app/models ./models/
