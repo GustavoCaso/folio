@@ -10,7 +10,8 @@ test:
 	@cd parser && make test
 	
 up: proto
-	@cd ui && make templ && make css
+	@cd ui && make generate
+	@cd parser && make download-models
 	@docker compose -p folio up --build -d 
 	
 down:

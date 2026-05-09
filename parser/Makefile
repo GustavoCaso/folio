@@ -3,6 +3,12 @@
 test:
 	@echo "running parser tests"
 	@PATH="$(CURDIR)/node_modules/.bin:$(PATH)" uv run pytest tests/
+	
+download-models:
+	@echo "Downloading models to /models folder"
+	@mkdir -p models
+	@uv run docling-tools models download -o ./models layout tableformer code_formula picture_classifier rapidocr granitedocling > /dev/null 2>&1
+	@echo "Downloading models 🎉"
 
 lint:
 	uv run ruff check --fix src/ tests/

@@ -36,8 +36,8 @@ proto:
 		../proto/parser.proto
 		
 generate:
-	make templ
-	make css
+	@make templ
+	@make css
 
 templ:
 	templ generate

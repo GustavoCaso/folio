@@ -13,12 +13,12 @@ services:
       - parser
 
   parser:
-    build: ./parser
-    volumes:
-      - ./models:/app/models  # Docling model weights cache (HF_HOME)
-      - ./models/rapidocr:/app/.venv/lib/python3.12/site-packages/rapidocr/models
+    build:
+      context: ./parser
+      target: dev
     environment:
       - GRPC_PORT=50051
       - NUM_WORKERS=2
+      - PDF_GENERATE_IMAGES=true
       - PDF_IMAGE_MODE=embedded
       - PDF_POST_PROCESS_CODE_BLOCKS=true
