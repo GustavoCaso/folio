@@ -20,7 +20,7 @@ COPY --from=builder /app/.venv ./.venv
 COPY --from=builder /app/src ./src
 
 RUN --mount=type=cache,target=/root/.cache/uv \
-    uv run docling-tools models download -o /app/models
+    uv run docling-tools models download -q -o /app/models layout tableformer code_formula picture_classifier rapidocr granitedocling
 
 FROM python:3.12-slim-bookworm AS base
 
