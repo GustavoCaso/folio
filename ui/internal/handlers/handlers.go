@@ -27,6 +27,12 @@ type ParserClient interface {
 	Health(ctx context.Context) bool
 }
 
+// BackendInitError records a backend that failed to initialise at startup.
+type BackendInitError struct {
+	BackendName string
+	Err         string
+}
+
 type Handlers struct {
 	store    *db.Store
 	hub      *hub.Hub
@@ -36,9 +42,10 @@ type Handlers struct {
 	// outlive the originating request and therefore can't use
 	// logging.LoggerFrom. Request-scoped code should pull the logger — with
 	// request_id attached by middleware — from r.Context() instead.
-	logger   *slog.Logger
-	cancels  sync.Map // jobID → context.CancelFunc
-	backends []export.Backend
+	logger        *slog.Logger
+	cancels       sync.Map // jobID → context.CancelFunc
+	backends      []export.Backend
+	backendErrors []BackendInitError
 }
 
 func (h *Handlers) backendByName(name string) export.Backend {
@@ -50,12 +57,12 @@ func (h *Handlers) backendByName(name string) export.Backend {
 	return nil
 }
 
-func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logger *slog.Logger, backends []export.Backend) (*http.ServeMux, error) {
+func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logger *slog.Logger, backends []export.Backend, backendErrors []BackendInitError) (*http.ServeMux, error) {
 	if logger == nil {
 		return nil, errors.New("handlers.Register: logger is required")
 	}
 
-	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir, logger: logger, backends: backends}
+	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir, logger: logger, backends: backends, backendErrors: backendErrors}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)

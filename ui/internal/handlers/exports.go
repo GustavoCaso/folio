@@ -17,7 +17,11 @@ func (h *Handlers) ListExports(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	if err := templates.Exports(records).Render(r.Context(), w); err != nil {
+	var initErrs []templates.BackendInitError
+	for _, e := range h.backendErrors {
+		initErrs = append(initErrs, templates.BackendInitError{BackendName: e.BackendName, Err: e.Err})
+	}
+	if err := templates.Exports(records, initErrs).Render(r.Context(), w); err != nil {
 		log.Error("render exports page failed", logging.Err(err))
 	}
 }

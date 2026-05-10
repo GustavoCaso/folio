@@ -29,7 +29,7 @@ func newHealthMux(t *testing.T, healthy bool) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mux, err := handlers.Register(nil, h, &fakeParserClient{healthy: healthy}, t.TempDir(), logger, nil)
+	mux, err := handlers.Register(nil, h, &fakeParserClient{healthy: healthy}, t.TempDir(), logger, nil, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
