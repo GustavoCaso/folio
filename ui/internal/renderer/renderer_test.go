@@ -27,9 +27,9 @@ func TestRendererCodeBlockHasBlockID(t *testing.T) {
 	}
 
 	t.Logf("HTML: %s", html)
-	// FencedCodeBlock generates <pre><code>, but data-block-id is set on pre
-	if !strings.Contains(html, `data-block-id="pre-`) {
-		t.Errorf("expected data-block-id on code block, got: %s", html)
+	// FencedCodeBlock is wrapped in a <div data-block-id="fencedcodeblock-N">.
+	if !strings.Contains(html, `data-block-id="fencedcodeblock-`) {
+		t.Errorf("expected data-block-id on fenced code block wrapper, got: %s", html)
 	}
 }
 
