@@ -20,15 +20,11 @@ type ReadwiseBackend struct {
 	client   *http.Client
 }
 
-func newReadwise(config map[string]string) (Backend, error) {
-	token, ok := config["api_token"]
-	if !ok || token == "" {
-		return nil, fmt.Errorf("readwise: api_token is required")
-	}
+func newReadwise(config map[string]string) *ReadwiseBackend {
 	return &ReadwiseBackend{
-		apiToken: token,
+		apiToken: config["api_token"],
 		client:   &http.Client{Timeout: 30 * time.Second},
-	}, nil
+	}
 }
 
 func (r *ReadwiseBackend) Name() string { return "readwise" }

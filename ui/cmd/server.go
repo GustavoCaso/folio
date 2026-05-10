@@ -61,18 +61,10 @@ func Execute() {
 	}()
 
 	// Build export backends from environment variables.
-	// A failed backend is logged and surfaced on the /exports page — it does not prevent startup.
 	var backends []export.Backend
-	var backendErrors []handlers.BackendInitError
 	if token := os.Getenv("READWISE_API_TOKEN"); token != "" {
-		b, err := export.New("readwise", map[string]string{"api_token": token})
-		if err != nil {
-			logger.Warn("readwise backend disabled", logging.Err(err))
-			backendErrors = append(backendErrors, handlers.BackendInitError{BackendName: "readwise", Err: err.Error()})
-		} else {
-			backends = append(backends, b)
-			logger.Info("readwise export backend enabled")
-		}
+		backends = append(backends, export.New("readwise", map[string]string{"api_token": token}))
+		logger.Info("readwise export backend enabled")
 	}
 
 	// Start the export worker if any backends are configured.
@@ -90,7 +82,7 @@ func Execute() {
 		logger.Info("export worker started", "interval", exportInterval)
 	}
 
-	mux, err := handlers.Register(store, h, pc, *dataDir, logger.With("component", "handlers"), backends, backendErrors)
+	mux, err := handlers.Register(store, h, pc, *dataDir, logger.With("component", "handlers"), backends)
 	if err != nil {
 		logger.Error("handlers register failed", logging.Err(err))
 		os.Exit(1)

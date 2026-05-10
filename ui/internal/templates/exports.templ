@@ -6,12 +6,6 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/db"
 )
 
-// BackendInitError is a view-model for a backend that failed to initialise at startup.
-type BackendInitError struct {
-	BackendName string
-	Err         string
-}
-
 func truncate(s string, n int) string {
 	if utf8.RuneCountInString(s) <= n {
 		return s
@@ -31,15 +25,10 @@ templ exportStatusBadge(status string) {
 	}
 }
 
-templ Exports(records []db.ExportRecord, initErrs []BackendInitError) {
+templ Exports(records []db.ExportRecord) {
 	@Layout("Exports") {
 		<div class="flex flex-col gap-6">
 			<h1 class="text-2xl font-semibold">Export History</h1>
-			for _, e := range initErrs {
-				<div class="rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive" role="alert">
-					<span class="font-semibold capitalize">{ e.BackendName }</span> backend failed to initialise: { e.Err }
-				</div>
-			}
 			if len(records) == 0 {
 				<p class="text-sm text-muted-foreground">No exports yet. Configure a backend via environment variables to start exporting highlights.</p>
 			} else {

@@ -25,11 +25,12 @@ type Backend interface {
 }
 
 // New instantiates a backend by name using the provided config map.
-func New(name string, config map[string]string) (Backend, error) {
+// Panics for unknown names — callers in main only pass compile-time constants.
+func New(name string, config map[string]string) Backend {
 	switch name {
 	case "readwise":
 		return newReadwise(config)
 	default:
-		return nil, fmt.Errorf("unknown export backend %q", name)
+		panic(fmt.Sprintf("unknown export backend %q", name))
 	}
 }
