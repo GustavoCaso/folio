@@ -15,15 +15,30 @@ import (
 
 const readwiseBaseURL = "https://readwise.io/api/v2"
 
+// ReadwiseConfig holds configuration for the Readwise export backend.
+type ReadwiseConfig struct {
+	APIToken string
+	Timeout  time.Duration
+	// BaseURL overrides the Readwise API base URL. Leave empty for production.
+	BaseURL string
+}
+
 type ReadwiseBackend struct {
 	apiToken string
+	baseURL  string
 	client   *http.Client
 }
 
-func newReadwise(config map[string]string) *ReadwiseBackend {
+// NewReadwise creates a Readwise export backend from cfg.
+func NewReadwise(cfg ReadwiseConfig) Backend {
+	base := cfg.BaseURL
+	if base == "" {
+		base = readwiseBaseURL
+	}
 	return &ReadwiseBackend{
-		apiToken: config["api_token"],
-		client:   &http.Client{Timeout: 30 * time.Second},
+		apiToken: cfg.APIToken,
+		baseURL:  base,
+		client:   &http.Client{Timeout: cfg.Timeout},
 	}
 }
 
@@ -67,7 +82,7 @@ func (r *ReadwiseBackend) Export(ctx context.Context, highlights []db.HighlightW
 		return nil, fmt.Errorf("readwise: marshal request: %w", err)
 	}
 
-	req, err := http.NewRequestWithContext(ctx, http.MethodPost, readwiseBaseURL+"/highlights/", bytes.NewReader(body))
+	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL+"/highlights/", bytes.NewReader(body))
 	if err != nil {
 		return nil, fmt.Errorf("readwise: build request: %w", err)
 	}
@@ -117,7 +132,7 @@ func (r *ReadwiseBackend) addTag(ctx context.Context, externalID, tag string) {
 		return
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
-		readwiseBaseURL+"/highlights/"+externalID+"/tags/", bytes.NewReader(body))
+		r.baseURL+"/highlights/"+externalID+"/tags/", bytes.NewReader(body))
 	if err != nil {
 		slog.Default().Warn("readwise: build tag request", "external_id", externalID, "err", err)
 		return
@@ -139,7 +154,7 @@ func (r *ReadwiseBackend) addTag(ctx context.Context, externalID, tag string) {
 
 func (r *ReadwiseBackend) Delete(ctx context.Context, externalID string) error {
 	req, err := http.NewRequestWithContext(ctx, http.MethodDelete,
-		readwiseBaseURL+"/highlights/"+externalID+"/", nil)
+		r.baseURL+"/highlights/"+externalID+"/", nil)
 	if err != nil {
 		return fmt.Errorf("readwise: build delete request: %w", err)
 	}

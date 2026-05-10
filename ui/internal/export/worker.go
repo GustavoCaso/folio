@@ -25,20 +25,21 @@ func NewWorker(store *db.Store, backends []Backend, interval time.Duration, logg
 }
 
 func (w *Worker) Run(ctx context.Context) {
-	w.runOnce(ctx)
+	w.RunOnce(ctx)
 	ticker := time.NewTicker(w.interval)
 	defer ticker.Stop()
 	for {
 		select {
 		case <-ticker.C:
-			w.runOnce(ctx)
+			w.RunOnce(ctx)
 		case <-ctx.Done():
 			return
 		}
 	}
 }
 
-func (w *Worker) runOnce(ctx context.Context) {
+// RunOnce executes one export pass across all backends. Exported for testing.
+func (w *Worker) RunOnce(ctx context.Context) {
 	for _, backend := range w.backends {
 		highlights, err := w.store.ListUnexportedHighlightsWithJob(ctx, backend.Name())
 		if err != nil {
