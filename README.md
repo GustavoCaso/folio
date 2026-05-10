@@ -17,20 +17,6 @@ Browser ──HTTP/SSE──▶ ui (Go)  ──gRPC stream──▶ parser (Pyth
 - **`parser/`** — Python gRPC server wrapping [Docling](https://github.com/docling-project/docling). Stateless: accepts PDF bytes, streams back progress + Markdown. No file paths exchanged.
 - **`proto/parser.proto`** — wire contract.
 
-## Run
-
-```bash
-make up      # docker compose up --build -d
-make down
-```
-
-UI on `http://localhost:8080`. SQLite at `data/folio.db`. Docling model cache at `models/`.
-
-## Test
-
-```bash
-make test    # Go unit tests + JS (vitest) + Python tests
-```
 
 ## Project layout
 
@@ -39,13 +25,33 @@ make test    # Go unit tests + JS (vitest) + Python tests
 | `ui/` | Go web UI, SQLite, gRPC client |
 | `parser/` | Python gRPC server, Docling integration |
 | `proto/` | Shared protobuf definitions |
-| `data/` | SQLite + parsed Markdown output (gitignored) |
-| `models/` | Docling model cache (gitignored) |
-| `compose.yaml` | Docker Compose stack |
+
+
+## Local dedelopment
+
+To install all require languages and tools run `mise install` 
+
+### Run Locally
+Requirements: Docker and Docker compose
+
+In the root folder run `make up` this would create two containers: ui and parser. 
+
+Folio would be accessible on `http://localhost:8080`. Any documents you convert would be available locally in the `data` as well as the SQLite fiel `folio.db`. 
+
+To stop everything run `make down`
+
+### Test
+
+In the root folder run `make test`. This commands takes care of executing tests in both projects
+
+### Tasks 
+
+Each projects `ui` and `parser` define their task in their `Makefile`.
 
 ## Configuration
 
-Both services are configured via environment variables. The `compose.yaml` is the canonical place to set them.
+Both services are configured via environment variables. 
+The `compose.yaml` serves as an example way of configuring Folio.
 
 ### UI (`ui/`)
 

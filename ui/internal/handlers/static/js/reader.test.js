@@ -10,7 +10,7 @@ import {
   removeHighlightCard,
   removeHighlightMarks,
   wrapRangeTextNodes,
-} from "./highlight.js";
+} from "./reader.js";
 
 function makeReader(html) {
   document.body.innerHTML = `<div id="reader">${html}</div>`;
