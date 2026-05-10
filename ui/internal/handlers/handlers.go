@@ -12,6 +12,7 @@ import (
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
 	"github.com/templui/templui/utils"
@@ -27,24 +28,34 @@ type ParserClient interface {
 }
 
 type Handlers struct {
-	store   *db.Store
-	hub     *hub.Hub
-	parser  ParserClient
-	dataDir string
+	store    *db.Store
+	hub      *hub.Hub
+	parser   ParserClient
+	dataDir  string
 	// logger is used only by background goroutines (e.g. runConversion) that
 	// outlive the originating request and therefore can't use
 	// logging.LoggerFrom. Request-scoped code should pull the logger — with
 	// request_id attached by middleware — from r.Context() instead.
-	logger  *slog.Logger
-	cancels sync.Map // jobID → context.CancelFunc
+	logger   *slog.Logger
+	cancels  sync.Map // jobID → context.CancelFunc
+	backends []export.Backend
 }
 
-func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logger *slog.Logger) (*http.ServeMux, error) {
+func (h *Handlers) backendByName(name string) export.Backend {
+	for _, b := range h.backends {
+		if b.Name() == name {
+			return b
+		}
+	}
+	return nil
+}
+
+func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logger *slog.Logger, backends []export.Backend) (*http.ServeMux, error) {
 	if logger == nil {
 		return nil, errors.New("handlers.Register: logger is required")
 	}
 
-	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir, logger: logger}
+	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir, logger: logger, backends: backends}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)
@@ -57,6 +68,7 @@ func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logg
 	mux.HandleFunc("GET /jobs/{jobID}/watch", hs.WatchJob)
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)
 	mux.HandleFunc("DELETE /highlights/{id}", hs.DeleteHighlight)
+	mux.HandleFunc("GET /exports", hs.ListExports)
 
 	isDev := os.Getenv("ENV") != "production"
 	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))

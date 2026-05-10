@@ -1,11 +1,14 @@
 package cmd
 
 import (
+	"context"
 	"flag"
 	"net/http"
 	"os"
+	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
@@ -57,7 +60,34 @@ func Execute() {
 		}
 	}()
 
-	mux, err := handlers.Register(store, h, pc, *dataDir, logger.With("component", "handlers"))
+	// Build export backends from environment variables.
+	var backends []export.Backend
+	if token := os.Getenv("READWISE_API_TOKEN"); token != "" {
+		b, err := export.New("readwise", map[string]string{"api_token": token})
+		if err != nil {
+			logger.Error("readwise backend init failed", logging.Err(err))
+			os.Exit(1)
+		}
+		backends = append(backends, b)
+		logger.Info("readwise export backend enabled")
+	}
+
+	// Start the export worker if any backends are configured.
+	if len(backends) > 0 {
+		intervalStr := envOr("EXPORT_INTERVAL", "15m")
+		exportInterval, err := time.ParseDuration(intervalStr)
+		if err != nil {
+			logger.Warn("invalid EXPORT_INTERVAL, using default 15m", "value", intervalStr)
+			exportInterval = 15 * time.Minute
+		}
+		ctx, cancel := context.WithCancel(context.Background())
+		defer cancel()
+		worker := export.NewWorker(store, backends, exportInterval, logger.With("component", "export.worker"))
+		go worker.Run(ctx)
+		logger.Info("export worker started", "interval", exportInterval)
+	}
+
+	mux, err := handlers.Register(store, h, pc, *dataDir, logger.With("component", "handlers"), backends)
 	if err != nil {
 		logger.Error("handlers register failed", logging.Err(err))
 		os.Exit(1)

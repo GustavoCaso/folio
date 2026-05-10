@@ -67,6 +67,24 @@ func (h *Handlers) DeleteHighlight(w http.ResponseWriter, r *http.Request) {
 	log := logging.LoggerFrom(r.Context())
 	id := r.PathValue("id")
 
+	// Remove the highlight from any external backends before deleting locally.
+	exports, err := h.store.ListExportsByHighlight(r.Context(), id)
+	if err != nil {
+		log.Warn("list exports for highlight failed", logging.Err(err), "highlight_id", id)
+	}
+	for _, exp := range exports {
+		if exp.Status != "exported" || exp.ExternalID == "" {
+			continue
+		}
+		backend := h.backendByName(exp.BackendName)
+		if backend == nil {
+			continue
+		}
+		if err := backend.Delete(r.Context(), exp.ExternalID); err != nil {
+			log.Warn("delete from backend failed", logging.Err(err), "backend", exp.BackendName, "highlight_id", id)
+		}
+	}
+
 	if err := h.store.DeleteHighlight(r.Context(), id); err != nil {
 		log.Error("delete highlight failed", logging.Err(err), "highlight_id", id)
 

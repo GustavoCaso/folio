@@ -39,7 +39,7 @@ func newTestMux(t *testing.T, store *db.Store) (http.Handler, *hub.Hub) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mux, err := handlers.Register(store, h, nil, t.TempDir(), logger)
+	mux, err := handlers.Register(store, h, nil, t.TempDir(), logger, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +53,7 @@ func newTestMuxWithParser(t *testing.T, store *db.Store, parser handlers.ParserC
 	if err != nil {
 		t.Fatal(err)
 	}
-	mux, err := handlers.Register(store, h, parser, t.TempDir(), logger)
+	mux, err := handlers.Register(store, h, parser, t.TempDir(), logger, nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h, _ := hub.New(logger)
-	mux, _ := handlers.Register(store, h, nil, dir, logger)
+	mux, _ := handlers.Register(store, h, nil, dir, logger, nil)
 	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {
