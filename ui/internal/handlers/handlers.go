@@ -17,7 +17,7 @@ import (
 	"github.com/templui/templui/utils"
 )
 
-//go:embed static/js/highlight.js static/js/documents.js static/tailwind/output.css static/css/reader.css
+//go:embed static/js/reader.js static/js/documents.js static/tailwind/output.css static/css/reader.css
 var staticFS embed.FS
 
 // ParserClient is the interface satisfied by *parserclient.Client (and fakes in tests).

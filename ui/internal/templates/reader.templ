@@ -122,6 +122,6 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 			<p id="hl-tooltip-content" class="text-sm text-card-foreground leading-snug"></p>
 		</div>
 		@templ.JSONScript("highlights-data", highlights)
-		<script type="module" src="/static/js/highlight.js"></script>
+		<script type="module" src="/static/js/reader.js"></script>
 	}
 }
