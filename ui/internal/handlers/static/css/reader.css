@@ -126,6 +126,75 @@
   background: oklch(0.975 0 0);
 }
 
+/* Links */
+#reader a {
+  color: oklch(0.45 0.12 250);
+  text-decoration: underline;
+  text-decoration-color: oklch(0.70 0.10 250);
+  text-underline-offset: 2px;
+  transition: color 0.15s ease, text-decoration-color 0.15s ease;
+}
+
+#reader a:hover {
+  color: oklch(0.30 0.14 250);
+  text-decoration-color: oklch(0.45 0.12 250);
+}
+
+/* Anchor links (heading permalinks) */
+#reader .anchor {
+  font-size: 0.75em;
+  opacity: 0.3;
+  margin-left: 0.4em;
+  text-decoration: none;
+  vertical-align: middle;
+  transition: opacity 0.15s ease;
+  color: inherit;
+}
+
+#reader :is(h1, h2, h3, h4, h5, h6):hover .anchor {
+  opacity: 0.6;
+}
+
+/* Table of contents */
+#toc-wrapper {
+  margin-bottom: 2em;
+  border: 1px solid oklch(0.90 0 0);
+  border-radius: 6px;
+  padding: 0.75em 1em;
+  font-size: 0.9em;
+}
+
+#toc-wrapper > ul {
+  margin-top: 0.5em;
+  margin-bottom: 0;
+  padding-left: 1.25em;
+}
+
+#toc-toggle {
+  cursor: pointer;
+  font-family: 'DM Sans', sans-serif;
+  font-weight: 500;
+  font-size: 0.875em;
+  color: oklch(0.35 0 0);
+  list-style: none;
+}
+
+#toc-toggle::-webkit-details-marker {
+  display: none;
+}
+
+#toc-toggle::before {
+  content: '▶';
+  font-size: 0.65em;
+  margin-right: 0.4em;
+  transition: transform 0.2s ease;
+  display: inline-block;
+}
+
+#toc-wrapper[open] #toc-toggle::before {
+  transform: rotate(90deg);
+}
+
 /* Highlights */
 mark.highlight {
   background: oklch(92% 0.12 88 / 0.55);

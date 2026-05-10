@@ -15,6 +15,8 @@ import (
 	"github.com/yuin/goldmark/renderer/html"
 	"github.com/yuin/goldmark/text"
 	"github.com/yuin/goldmark/util"
+	"go.abhg.dev/goldmark/anchor"
+	"go.abhg.dev/goldmark/toc"
 )
 
 type blockIDTransformer struct{}
@@ -40,7 +42,6 @@ func (t *blockIDTransformer) Transform(node *ast.Document, _ text.Reader, _ pars
 var md = goldmark.New(
 	goldmark.WithExtensions(
 		extension.GFM,
-		extension.Table,
 		highlighting.NewHighlighting(
 			highlighting.WithStyle("github"),
 			highlighting.WithFormatOptions(
@@ -48,8 +49,10 @@ var md = goldmark.New(
 				chromahtml.WithClasses(false),
 			),
 		),
+		&anchor.Extender{},
 	),
 	goldmark.WithParserOptions(
+		parser.WithAutoHeadingID(),
 		parser.WithASTTransformers(
 			util.Prioritized(&blockIDTransformer{}, 999),
 		),
@@ -59,21 +62,39 @@ var md = goldmark.New(
 	),
 )
 
-var blockIDRegex = regexp.MustCompile(`<(h[1-6]|p|pre)([^>]*)>`)
-var blockIDCounter = 0
+var preRegex = regexp.MustCompile(`<(pre)([^>]*)>`)
+var preCounter = 0
 
 // Render converts Markdown to HTML with data-block-id attributes on block elements.
+// A collapsible table of contents is prepended when headings are present.
 func Render(src []byte) (string, error) {
-	var buf bytes.Buffer
-	if err := md.Convert(src, &buf); err != nil {
+	reader := text.NewReader(src)
+	doc := md.Parser().Parse(reader)
+
+	tree, err := toc.Inspect(doc, src, toc.MaxDepth(3))
+	if err != nil {
 		return "", err
 	}
+
+	var buf bytes.Buffer
+
+	if list := toc.RenderList(tree); list != nil {
+		buf.WriteString(`<details id="toc-wrapper"><summary id="toc-toggle">Contents</summary>`)
+		if err := md.Renderer().Render(&buf, src, list); err != nil {
+			return "", err
+		}
+		buf.WriteString(`</details>`)
+	}
+
+	if err := md.Renderer().Render(&buf, src, doc); err != nil {
+		return "", err
+	}
+
 	result := buf.String()
 
-	blockIDCounter = 0
-	result = blockIDRegex.ReplaceAllStringFunc(result, func(match string) string {
-		blockIDCounter++
-		// Extract tag name and any attributes
+	preCounter = 0
+	result = preRegex.ReplaceAllStringFunc(result, func(match string) string {
+		preCounter++
 		closeIdx := strings.Index(match, ">")
 		tagPart := match[1:closeIdx]
 		parts := strings.Fields(tagPart)
@@ -82,7 +103,7 @@ func Render(src []byte) (string, error) {
 		if len(parts) > 1 {
 			attrs = " " + strings.Join(parts[1:], " ")
 		}
-		return fmt.Sprintf(`<%s%s data-block-id="%s-%d">`, tag, attrs, tag, blockIDCounter)
+		return fmt.Sprintf(`<%s%s data-block-id="%s-%d">`, tag, attrs, tag, preCounter)
 	})
 
 	return result, nil
