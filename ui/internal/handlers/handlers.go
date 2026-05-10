@@ -57,6 +57,7 @@ func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logg
 	mux.HandleFunc("GET /jobs/{jobID}/watch", hs.WatchJob)
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)
 	mux.HandleFunc("DELETE /highlights/{id}", hs.DeleteHighlight)
+	mux.HandleFunc("POST /read/{jobID}/progress", hs.UpdateReadingProgress)
 
 	isDev := os.Getenv("ENV") != "production"
 	mux.Handle("GET /static/", http.FileServer(http.FS(staticFS)))

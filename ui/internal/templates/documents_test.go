@@ -44,7 +44,7 @@ func TestDocumentList_RendersIDAndFilename(t *testing.T) {
 
 func TestDocumentList_ProcessingOmitsPageCountWhenZero(t *testing.T) {
 	got := renderDocumentList(t, []db.Job{
-		{ID: "j1", Filename: "doc.pdf", Status: "PROCESSING", PagesDone: 0, PagesTotal: 0},
+		{ID: "j1", Filename: "doc.pdf", Status: "PROCESSING"},
 	})
 
 	if strings.Contains(got, "pages") {

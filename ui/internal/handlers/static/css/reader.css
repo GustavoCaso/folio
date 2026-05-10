@@ -1,3 +1,15 @@
+#progress-bar {
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 3px;
+  width: 0%;
+  background: linear-gradient(to right, oklch(0.65 0.12 250), oklch(0.45 0.12 250), oklch(0.30 0.14 250));
+  z-index: 9999;
+  transition: width 0.1s ease;
+  pointer-events: none;
+}
+
 #reader {
   font-family: 'Lora', Georgia, serif;
   font-size: 1.0625rem;
