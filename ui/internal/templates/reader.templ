@@ -77,7 +77,7 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 				Highlights
 			}
 		}
-		<article class="mx-auto max-w-[68ch] px-2 pb-24">
+		<article class="mx-auto max-w-[68ch] px-2 py-4 pb-24">
 			<div id="reader" data-job-id={ job.ID }>
 				@templ.Raw(renderedHTML)
 			</div>

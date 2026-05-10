@@ -5,6 +5,8 @@ import (
 	"errors"
 	"net/http"
 	"os"
+	"path/filepath"
+	"strings"
 
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/renderer"
@@ -43,8 +45,14 @@ func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
 		renderErr(http.StatusNotFound, msg)
 		return
 	}
+	jobPath := job.OutputPath
+	// We are running the server locally
+	if strings.Contains(h.dataDir, "..") {
+		localDir := filepath.Dir(h.dataDir)
+		jobPath = filepath.Join(localDir, job.OutputPath)
+	}
 
-	src, err := os.ReadFile(job.OutputPath)
+	src, err := os.ReadFile(jobPath)
 	if err != nil {
 		log.Error("read markdown failed", logging.Err(err), "output_path", job.OutputPath)
 		renderErr(http.StatusInternalServerError, "Failed to read document. Please try again.")
