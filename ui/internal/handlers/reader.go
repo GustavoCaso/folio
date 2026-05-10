@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database/sql"
+	"encoding/json"
 	"errors"
 	"net/http"
 	"os"
@@ -77,4 +78,25 @@ func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
 	if err := templates.Reader(job, rendered, highlights).Render(r.Context(), w); err != nil {
 		log.Error("render reader failed", logging.Err(err))
 	}
+}
+
+func (h *Handlers) UpdateReadingProgress(w http.ResponseWriter, r *http.Request) {
+	jobID := r.PathValue("jobID")
+	log := logging.LoggerFrom(r.Context())
+
+	var body struct {
+		BlockID string `json:"block_id"`
+	}
+	if err := json.NewDecoder(r.Body).Decode(&body); err != nil || body.BlockID == "" {
+		w.WriteHeader(http.StatusBadRequest)
+		return
+	}
+
+	if err := h.store.UpdateReadingProgress(r.Context(), jobID, body.BlockID); err != nil {
+		log.Error("update reading progress failed", logging.Err(err), "job_id", jobID)
+		w.WriteHeader(http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusNoContent)
 }

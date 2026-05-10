@@ -66,6 +66,7 @@ templ highlightsPanel(highlights []db.Highlight) {
 
 templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 	@Layout(job.Filename) {
+		<div id="progress-bar"></div>
 		@highlightsPanel(highlights)
 		// External trigger outside of Sheet component
 		@sheet.Trigger(sheet.TriggerProps{
@@ -78,7 +79,7 @@ templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
 			}
 		}
 		<article class="mx-auto max-w-[68ch] px-2 py-4 pb-24">
-			<div id="reader" data-job-id={ job.ID }>
+			<div id="reader" data-job-id={ job.ID } data-reading-progress={ job.ReadingProgress }>
 				@templ.Raw(renderedHTML)
 			</div>
 		</article>

@@ -8,18 +8,17 @@ import (
 )
 
 type Job struct {
-	ID         string
-	Filename   string
-	RequestID  string
-	Content    []byte
-	RetryCount int
-	Status     string
-	PagesDone  int
-	PagesTotal int
-	Error      string
-	OutputPath string
-	CreatedAt  time.Time
-	UpdatedAt  time.Time
+	ID              string
+	Filename        string
+	RequestID       string
+	Content         []byte
+	RetryCount      int
+	Status          string
+	ReadingProgress string
+	Error           string
+	OutputPath      string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }
 
 func (s *Store) CreateJob(ctx context.Context, filename string, content []byte, requestID string) (Job, error) {
@@ -38,14 +37,14 @@ func (s *Store) CreateJob(ctx context.Context, filename string, content []byte, 
 
 func (s *Store) GetJob(ctx context.Context, id string) (Job, error) {
 	row := s.db.QueryRowContext(ctx,
-		`SELECT id, filename, request_id, content, retry_count, status, pages_done, pages_total, error, output_path, created_at, updated_at
+		`SELECT id, filename, request_id, content, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs WHERE id = ?`, id)
 	return scanJob(row)
 }
 
 func (s *Store) GetPendingJobs(ctx context.Context) ([]Job, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, filename, request_id, NULL, retry_count, status, pages_done, pages_total, error, output_path, created_at, updated_at
+		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs WHERE status = 'PENDING'`)
 
 	if err != nil {
@@ -66,7 +65,7 @@ func (s *Store) GetPendingJobs(ctx context.Context) ([]Job, error) {
 
 func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT id, filename, request_id, NULL, retry_count, status, pages_done, pages_total, error, output_path, created_at, updated_at
+		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -84,10 +83,18 @@ func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
 	return jobs, rows.Err()
 }
 
-func (s *Store) UpdateJobProgress(ctx context.Context, id, status string, pagesDone, pagesTotal int) error {
+func (s *Store) UpdateJobStatus(ctx context.Context, id, status string) error {
 	_, err := s.db.ExecContext(ctx,
-		`UPDATE jobs SET status = ?, pages_done = ?, pages_total = ?, updated_at = ? WHERE id = ?`,
-		status, pagesDone, pagesTotal, time.Now().UTC().Format(time.RFC3339), id,
+		`UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?`,
+		status, time.Now().UTC().Format(time.RFC3339), id,
+	)
+	return err
+}
+
+func (s *Store) UpdateReadingProgress(ctx context.Context, id, blockID string) error {
+	_, err := s.db.ExecContext(ctx,
+		`UPDATE jobs SET reading_progress = ?, updated_at = ? WHERE id = ?`,
+		blockID, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
 }
@@ -130,7 +137,7 @@ func scanJob(s scanner) (Job, error) {
 	var createdAt, updatedAt string
 	err := s.Scan(
 		&j.ID, &j.Filename, &j.RequestID, &j.Content, &j.RetryCount, &j.Status,
-		&j.PagesDone, &j.PagesTotal,
+		&j.ReadingProgress,
 		&j.Error, &j.OutputPath,
 		&createdAt, &updatedAt,
 	)

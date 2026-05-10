@@ -2,7 +2,9 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   applyHighlight,
   applyHighlights,
+  computeProgress,
   findBlockAncestor,
+  firstVisibleBlockID,
   formatHighlight,
   offsetWithinBlock,
   removeHighlightCard,
@@ -369,6 +371,81 @@ describe("removeHighlightMarks", () => {
     const reader = makeReader(`<p data-block-id="p-1">no marks here</p>`);
     expect(() => removeHighlightMarks(reader, "h1")).not.toThrow();
     expect(reader.querySelectorAll("mark").length).toBe(0);
+  });
+});
+
+describe("computeProgress", () => {
+  it("returns 0 when no blocks", () => {
+    expect(computeProgress([])).toBe(0);
+  });
+
+  it("returns 0 when first block visible (jsdom top=0 default)", () => {
+    const reader = makeReader(
+      `<p data-block-id="p-1">a</p><p data-block-id="p-2">b</p><p data-block-id="p-3">c</p>`
+    );
+    const blocks = Array.from(reader.querySelectorAll("[data-block-id]"));
+    expect(computeProgress(blocks)).toBe(0);
+  });
+
+  it("returns 0 for single block", () => {
+    const reader = makeReader(`<p data-block-id="p-1">only</p>`);
+    const blocks = Array.from(reader.querySelectorAll("[data-block-id]"));
+    expect(computeProgress(blocks)).toBe(0);
+  });
+
+  it("returns 100 when all blocks above viewport (top < 0)", () => {
+    const reader = makeReader(
+      `<p data-block-id="p-1">a</p><p data-block-id="p-2">b</p><p data-block-id="p-3">c</p>`
+    );
+    const blocks = Array.from(reader.querySelectorAll("[data-block-id]"));
+    blocks.forEach(b => {
+      b.getBoundingClientRect = () => ({ top: -100, bottom: -90, left: 0, right: 0, width: 0, height: 10 });
+    });
+    expect(computeProgress(blocks)).toBe(100);
+  });
+
+  it("returns 50 when middle block is first visible", () => {
+    const reader = makeReader(
+      `<p data-block-id="p-1">a</p><p data-block-id="p-2">b</p><p data-block-id="p-3">c</p>`
+    );
+    const blocks = Array.from(reader.querySelectorAll("[data-block-id]"));
+    blocks[0].getBoundingClientRect = () => ({ top: -100, bottom: -90, left: 0, right: 0, width: 0, height: 10 });
+    blocks[1].getBoundingClientRect = () => ({ top: 10, bottom: 20, left: 0, right: 0, width: 0, height: 10 });
+    blocks[2].getBoundingClientRect = () => ({ top: 30, bottom: 40, left: 0, right: 0, width: 0, height: 10 });
+    expect(computeProgress(blocks)).toBe(50);
+  });
+
+  it("returns 100 for two blocks when last is first visible after first is above viewport", () => {
+    const reader = makeReader(
+      `<p data-block-id="p-1">a</p><p data-block-id="p-2">b</p>`
+    );
+    const blocks = Array.from(reader.querySelectorAll("[data-block-id]"));
+    blocks[0].getBoundingClientRect = () => ({ top: -50, bottom: -40, left: 0, right: 0, width: 0, height: 10 });
+    blocks[1].getBoundingClientRect = () => ({ top: 5, bottom: 15, left: 0, right: 0, width: 0, height: 10 });
+    expect(computeProgress(blocks)).toBe(100);
+  });
+});
+
+describe("firstVisibleBlockID", () => {
+  it("returns empty string when no blocks", () => {
+    expect(firstVisibleBlockID([])).toBe("");
+  });
+
+  it("returns first block id when all have top=0 (jsdom default)", () => {
+    const reader = makeReader(
+      `<p data-block-id="p-1">a</p><p data-block-id="p-2">b</p>`
+    );
+    const blocks = Array.from(reader.querySelectorAll("[data-block-id]"));
+    expect(firstVisibleBlockID(blocks)).toBe("p-1");
+  });
+
+  it("returns last block id when no block has top >= 0", () => {
+    const reader = makeReader(`<p data-block-id="p-1">a</p><p data-block-id="p-2">b</p>`);
+    const blocks = Array.from(reader.querySelectorAll("[data-block-id]"));
+    blocks.forEach(b => {
+      b.getBoundingClientRect = () => ({ top: -100, bottom: -90, left: 0, right: 0, width: 0, height: 10 });
+    });
+    expect(firstVisibleBlockID(blocks)).toBe("p-2");
   });
 });
 

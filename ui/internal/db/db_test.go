@@ -49,7 +49,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 }
 
-func TestUpdateJobProgress(t *testing.T) {
+func TestUpdateJobStatus(t *testing.T) {
 	store, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
@@ -57,7 +57,7 @@ func TestUpdateJobProgress(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
-	if err := store.UpdateJobProgress(context.Background(), job.ID, "PROCESSING", 5, 100); err != nil {
+	if err := store.UpdateJobStatus(context.Background(), job.ID, "PROCESSING"); err != nil {
 		t.Fatal(err)
 	}
 
@@ -65,8 +65,23 @@ func TestUpdateJobProgress(t *testing.T) {
 	if got.Status != "PROCESSING" {
 		t.Fatalf("expected PROCESSING, got %s", got.Status)
 	}
-	if got.PagesDone != 5 || got.PagesTotal != 100 {
-		t.Fatalf("unexpected progress: %d/%d", got.PagesDone, got.PagesTotal)
+}
+
+func TestUpdateReadingProgress(t *testing.T) {
+	store, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = store.Close() }()
+
+	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
+	if err := store.UpdateReadingProgress(context.Background(), job.ID, "paragraph-42"); err != nil {
+		t.Fatal(err)
+	}
+
+	got, _ := store.GetJob(context.Background(), job.ID)
+	if got.ReadingProgress != "paragraph-42" {
+		t.Fatalf("expected paragraph-42, got %q", got.ReadingProgress)
 	}
 }
 
@@ -85,7 +100,7 @@ func TestGetPendingJobs(t *testing.T) {
 	done, _ := store.CreateJob(ctx, "d.pdf", content, "")
 	failed, _ := store.CreateJob(ctx, "e.pdf", content, "")
 
-	if err := store.UpdateJobProgress(ctx, processing.ID, "PROCESSING", 1, 10); err != nil {
+	if err := store.UpdateJobStatus(ctx, processing.ID, "PROCESSING"); err != nil {
 		t.Fatal(err)
 	}
 	if err := store.MarkJobDone(ctx, done.ID, "/data/d.md"); err != nil {

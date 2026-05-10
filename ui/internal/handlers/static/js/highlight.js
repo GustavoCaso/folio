@@ -222,11 +222,37 @@ export function removeHighlightCard(panel, id) {
   if (card) card.remove();
 }
 
+// Returns 0-100 based on which block is first visible in the viewport.
+export function computeProgress(blocks) {
+  if (!blocks.length) return 0;
+  let firstVisible = 0;
+  for (let i = 0; i < blocks.length; i++) {
+    if (blocks[i].getBoundingClientRect().top >= 0) {
+      firstVisible = i;
+      break;
+    }
+    firstVisible = i;
+  }
+  return Math.round((firstVisible / Math.max(blocks.length - 1, 1)) * 100);
+}
+
+// Returns the data-block-id of the first block whose top >= 0.
+export function firstVisibleBlockID(blocks) {
+  for (const block of blocks) {
+    if (block.getBoundingClientRect().top >= 0) return block.dataset.blockId;
+  }
+  return blocks.length ? blocks[blocks.length - 1].dataset.blockId : "";
+}
+
 // --- Bootstrap (browser only) ---
 
 function bootstrap() {
   const reader = document.getElementById("reader");
   if (!reader) return;
+
+  const progressBar = document.getElementById("progress-bar");
+
+  const allBlocks = Array.from(reader.querySelectorAll("[data-block-id]"));
 
   const highlightsData = document.getElementById("highlights-data")
   if (!highlightsData) return;
@@ -254,6 +280,42 @@ function bootstrap() {
     console.log('[highlight.js] Highlights applied')
   }
 
+  // Restore reading position
+  const savedBlockID = reader.dataset.readingProgress;
+  if (savedBlockID) {
+    const target = reader.querySelector(`[data-block-id="${savedBlockID}"]`);
+    if (target) target.scrollIntoView({ behavior: "instant", block: "start" });
+  }
+
+  // Save reading progress
+  let saveTimer = null;
+
+  function updateProgressBar() {
+    if (progressBar) progressBar.style.width = computeProgress(allBlocks) + "%";
+  }
+
+  function saveProgress() {
+    const blockID = firstVisibleBlockID(allBlocks);
+    if (!blockID) return;
+    navigator.sendBeacon(
+      `/read/${jobID}/progress`,
+      new Blob([JSON.stringify({ block_id: blockID })], { type: "application/json" })
+    );
+  }
+
+  function scheduleSave() {
+    clearTimeout(saveTimer);
+    saveTimer = setTimeout(saveProgress, 2000);
+  }
+
+  window.addEventListener("scroll", () => {
+    updateProgressBar();
+    scheduleSave();
+  }, { passive: true });
+
+  window.addEventListener("pagehide", saveProgress);
+
+  updateProgressBar();
 
   const highlightPanel = document.getElementById("highlights-panel");
   const tooltip = document.getElementById("hl-tooltip");
