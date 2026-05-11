@@ -58,7 +58,7 @@ type readwiseCreateRequest struct {
 
 // Readwise POST /api/v2/highlights/ returns a plain JSON array, not a wrapped object.
 type readwiseHighlightResponse struct {
-	ID int64 `json:"id"`
+	ModifiedHighlights []int64 `json:"modified_highlights"`
 }
 
 type readwiseTagRequest struct {
@@ -104,11 +104,13 @@ func (r *ReadwiseBackend) Export(ctx context.Context, records []db.ExportRecord)
 		return nil, fmt.Errorf("readwise: decode response: %w", err)
 	}
 
+	modifiedHighlights := created[0].ModifiedHighlights
+
 	results := make([]ExportResult, len(records))
 	for i, rec := range records {
 		results[i].ExportID = rec.ID
-		if i < len(created) {
-			results[i].ExternalID = strconv.FormatInt(created[i].ID, 10)
+		if i < len(modifiedHighlights) {
+			results[i].ExternalID = strconv.FormatInt(modifiedHighlights[i], 10)
 		} else {
 			results[i].Err = fmt.Errorf("readwise: no ID returned for highlight %s", rec.HighlightID)
 		}

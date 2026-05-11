@@ -165,8 +165,8 @@ func TestListExports_ShowsFailedRecord(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 	body := rec.Body.String()
-	if !strings.Contains(body, "FAILED") {
-		t.Errorf("expected FAILED status badge in response, got:\n%s", body)
+	if !strings.Contains(body, "Failed") {
+		t.Errorf("expected Failed status badge in response, got:\n%s", body)
 	}
 	if !strings.Contains(body, "connection refused") {
 		t.Errorf("expected error message in response, got:\n%s", body)

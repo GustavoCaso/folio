@@ -9,6 +9,8 @@ services:
       - PARSER_GRPC_ADDR=parser:50051
       - DB_PATH=/data/folio.db
       - DATA_DIR=/data
+    env_file:
+      - .env
     depends_on:
       - parser
 
@@ -22,3 +24,5 @@ services:
       - PDF_GENERATE_IMAGES=true
       - PDF_IMAGE_MODE=embedded
       - PDF_POST_PROCESS_CODE_BLOCKS=true
+    env_file:
+      - .env

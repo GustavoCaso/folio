@@ -24,6 +24,10 @@ func newTestReadwise(t *testing.T, handler http.Handler) (export.Backend, *httpt
 	return b, srv
 }
 
+type readwiseHighlightResponse struct {
+	ModifiedHighlights []int64 `json:"modified_highlights"`
+}
+
 func TestReadwiseExport_HappyPath(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v2/highlights/" || r.Method != http.MethodPost {
@@ -64,7 +68,10 @@ func TestReadwiseExport_HappyPath(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]any{{"id": 42}}) //nolint:errcheck
+
+		result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{42}}}
+
+		json.NewEncoder(w).Encode(result)
 	})
 
 	b, _ := newTestReadwise(t, handler)
@@ -96,7 +103,8 @@ func TestReadwiseExport_SendsTagAfterCreation(t *testing.T) {
 		switch {
 		case r.URL.Path == "/api/v2/highlights/" && r.Method == http.MethodPost:
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]map[string]any{{"id": 7}}) //nolint:errcheck
+			result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{7}}}
+			json.NewEncoder(w).Encode(result) //nolint:errcheck
 
 		case r.URL.Path == "/api/v2/highlights/7/tags/" && r.Method == http.MethodPost:
 			tagRequests++
@@ -135,7 +143,8 @@ func TestReadwiseExport_NoTagRequestWhenTagEmpty(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v2/highlights/" {
 			w.Header().Set("Content-Type", "application/json")
-			json.NewEncoder(w).Encode([]map[string]any{{"id": 1}}) //nolint:errcheck
+			result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{1}}}
+			json.NewEncoder(w).Encode(result) //nolint:errcheck
 			return
 		}
 		tagRequests++
@@ -172,10 +181,8 @@ func TestReadwiseExport_NonOKStatusReturnsError(t *testing.T) {
 func TestReadwiseExport_BatchPreservesOrder(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode([]map[string]any{ //nolint:errcheck
-			{"id": 10},
-			{"id": 20},
-		})
+		result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{10, 20}}}
+		json.NewEncoder(w).Encode(result)
 	})
 
 	b, _ := newTestReadwise(t, handler)
