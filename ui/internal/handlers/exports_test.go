@@ -23,8 +23,8 @@ type recordingBackend struct {
 
 func (r *recordingBackend) Name() string { return r.name }
 
-func (r *recordingBackend) Export(_ context.Context, _ []db.ExportRecord) ([]export.ExportResult, error) {
-	return nil, nil
+func (r *recordingBackend) Export(_ context.Context, _ []*export.ExportRecord) error {
+	return nil
 }
 
 func (r *recordingBackend) Delete(_ context.Context, externalID string) error {

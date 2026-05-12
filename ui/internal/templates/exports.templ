@@ -4,6 +4,8 @@ import (
 	"unicode/utf8"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/templui/templui/components/badge"
+	"github.com/templui/templui/components/table"
 )
 
 func truncate(s string, n int) string {
@@ -17,11 +19,17 @@ func truncate(s string, n int) string {
 templ exportStatusBadge(status string) {
 	switch status {
 		case "EXPORTED":
-			<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-green-100 text-green-800 border-green-200">Exported</span>
+			@badge.Badge(badge.Props{Variant: badge.VariantDefault}) {
+				Exported
+			}
 		case "FAILED":
-			<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-red-100 text-red-800 border-red-200">Failed</span>
+			@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
+				Failed
+			}
 		default:
-			<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground">{ status }</span>
+			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+				{ status }
+			}
 	}
 }
 
@@ -32,38 +40,44 @@ templ Exports(records []db.ExportRecord) {
 			if len(records) == 0 {
 				<p class="text-sm text-muted-foreground">No exports yet. Configure a backend via environment variables to start exporting highlights.</p>
 			} else {
-				<div class="overflow-x-auto rounded-lg border border-border">
-					<table class="w-full text-sm">
-						<thead class="bg-muted/50">
-							<tr>
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Highlight</th>
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Document</th>
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Backend</th>
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Status</th>
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Exported At</th>
-								<th class="px-4 py-3 text-left font-medium text-muted-foreground">Error</th>
-							</tr>
-						</thead>
-						<tbody class="divide-y divide-border">
-							for _, rec := range records {
-								<tr class="hover:bg-muted/30 transition-colors">
-									<td class="px-4 py-3 max-w-xs">
-										<p class="text-foreground line-clamp-2 font-medium">{ truncate(rec.HighlightText, 80) }</p>
-									</td>
-									<td class="px-4 py-3 text-muted-foreground max-w-xs truncate">{ rec.JobFilename }</td>
-									<td class="px-4 py-3">
-										<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold bg-secondary text-secondary-foreground capitalize">{ rec.BackendName }</span>
-									</td>
-									<td class="px-4 py-3">
-										@exportStatusBadge(rec.Status)
-									</td>
-									<td class="px-4 py-3 text-muted-foreground whitespace-nowrap">{ rec.ExportedAt.Format("2006-01-02 15:04") }</td>
-									<td class="px-4 py-3 text-destructive text-xs max-w-xs truncate">{ rec.Error }</td>
-								</tr>
+				@table.Table() {
+					@table.Header() {
+						@table.Row() {
+							@table.Head() { Highlight }
+							@table.Head() { Document }
+							@table.Head() { Backend }
+							@table.Head() { Status }
+							@table.Head() { Exported At }
+							@table.Head() { Error }
+						}
+					}
+					@table.Body() {
+						for _, rec := range records {
+							@table.Row() {
+								@table.Cell() {
+									<p class="line-clamp-2 font-medium">{ truncate(rec.HighlightText, 80) }</p>
+								}
+								@table.Cell() {
+									<span class="text-muted-foreground truncate max-w-xs block">{ rec.JobFilename }</span>
+								}
+								@table.Cell() {
+									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+										{ rec.BackendName }
+									}
+								}
+								@table.Cell() {
+									@exportStatusBadge(rec.Status)
+								}
+								@table.Cell() {
+									<span class="text-muted-foreground whitespace-nowrap">{ rec.ExportedAt.Format("2006-01-02 15:04") }</span>
+								}
+								@table.Cell() {
+									<span class="text-destructive text-xs truncate max-w-xs block">{ rec.Error }</span>
+								}
 							}
-						</tbody>
-					</table>
-				</div>
+						}
+					}
+				}
 			}
 		</div>
 	}

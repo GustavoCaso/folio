@@ -13,6 +13,7 @@ func (h *Handlers) ListExports(w http.ResponseWriter, r *http.Request) {
 	records, err := h.store.ListAllExports(r.Context())
 	if err != nil {
 		log.Error("list exports failed", logging.Err(err))
+		w.WriteHeader(http.StatusInternalServerError)
 		templates.ErrorPage("Failed to load export history").Render(r.Context(), w) //nolint:errcheck
 		return
 	}

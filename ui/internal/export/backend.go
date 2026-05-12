@@ -2,23 +2,33 @@ package export
 
 import (
 	"context"
-
-	"github.com/GustavoCaso/folio/ui/internal/db"
 )
 
-// ExportResult holds the outcome of exporting a single highlight.
-type ExportResult struct {
-	ExportID   string // ID of the highlight_exports row
-	ExternalID string // ID assigned by the external service; "" on failure
-	Err        error
+// ExportRecord holds the information for exporting
+// When export is successful the Export function must update the ExternalID
+// otherwise must populate the Err
+type ExportRecord struct {
+	ExportID     string // ID of the highlight_exports row
+	HighlighText string
+	Title        string
+	Note         string
+	Tag          string
+	ExternalID   string // ID assigned by the external service; "" on failure
+	Err          error
 }
 
 // Backend is an external service that can receive and delete highlights.
 type Backend interface {
 	Name() string
 	// Export sends highlights to the external service.
-	// Returns one ExportResult per input record in the same order.
-	Export(ctx context.Context, records []db.ExportRecord) ([]ExportResult, error)
+	//
+	// Implementations must mutate each record in place:
+	//   - On success: set ExternalID to the ID assigned by the service.
+	//   - On per-item failure: set Err; leave ExternalID empty.
+	// Every record must have ExternalID or Err set before returning nil.
+	// Return a non-nil error only when the entire batch fails (e.g. auth error,
+	// network failure); in that case individual records need not be updated.
+	Export(ctx context.Context, records []*ExportRecord) error
 	// Delete removes a highlight from the external service by its external ID.
 	Delete(ctx context.Context, externalID string) error
 }

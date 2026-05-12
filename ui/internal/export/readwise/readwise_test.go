@@ -3,25 +3,33 @@ package readwise_test
 import (
 	"context"
 	"encoding/json"
+	"io"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"testing"
 	"time"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/export/readwise"
 )
+
+func silentLogger() *slog.Logger {
+	return slog.New(slog.NewTextHandler(io.Discard, nil))
+}
 
 func newTestReadwise(t *testing.T, handler http.Handler) (export.Backend, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	b := readwise.New(readwise.Config{
+	b, err := readwise.New(readwise.Config{
 		APIToken: "test-token",
 		Timeout:  5 * time.Second,
 		BaseURL:  srv.URL + "/api/v2",
-	})
+	}, silentLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
 	return b, srv
 }
 
@@ -58,31 +66,24 @@ func TestReadwiseExport_HappyPath(t *testing.T) {
 		}
 
 		w.Header().Set("Content-Type", "application/json")
-
 		result := []readwise.ReadwiseHighlightResponse{{ModifiedHighlights: []int64{42}}}
-
 		json.NewEncoder(w).Encode(result) //nolint:errcheck
 	})
 
 	b, _ := newTestReadwise(t, handler)
 
-	results, err := b.Export(context.Background(), []db.ExportRecord{
-		{ID: "exp-1", HighlightID: "h1", HighlightText: "some text", HighlightNote: "my note", JobFilename: "book.pdf"},
-	})
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlighText: "some text", Note: "my note", Title: "book.pdf"},
+	}
+	err := b.Export(context.Background(), records)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 1 {
-		t.Fatalf("expected 1 result, got %d", len(results))
+	if records[0].ExternalID != "42" {
+		t.Errorf("expected external_id 42, got %s", records[0].ExternalID)
 	}
-	if results[0].ExportID != "exp-1" {
-		t.Errorf("expected export_id exp-1, got %s", results[0].ExportID)
-	}
-	if results[0].ExternalID != "42" {
-		t.Errorf("expected external_id 42, got %s", results[0].ExternalID)
-	}
-	if results[0].Err != nil {
-		t.Errorf("expected no error, got %v", results[0].Err)
+	if records[0].Err != nil {
+		t.Errorf("expected no error, got %v", records[0].Err)
 	}
 }
 
@@ -116,10 +117,10 @@ func TestReadwiseExport_SendsTagAfterCreation(t *testing.T) {
 
 	b, _ := newTestReadwise(t, handler)
 
-	_, err := b.Export(context.Background(), []db.ExportRecord{
-		{ID: "exp-1", HighlightID: "h1", HighlightText: "text", HighlightTag: "science", JobFilename: "book.pdf"},
-	})
-	if err != nil {
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlighText: "text", Tag: "science", Title: "book.pdf"},
+	}
+	if err := b.Export(context.Background(), records); err != nil {
 		t.Fatal(err)
 	}
 	if tagRequests != 1 {
@@ -142,10 +143,10 @@ func TestReadwiseExport_NoTagRequestWhenTagEmpty(t *testing.T) {
 
 	b, _ := newTestReadwise(t, handler)
 
-	_, err := b.Export(context.Background(), []db.ExportRecord{
-		{ID: "exp-1", HighlightID: "h1", HighlightText: "text", HighlightTag: "", JobFilename: "book.pdf"},
-	})
-	if err != nil {
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlighText: "text", Title: "book.pdf"},
+	}
+	if err := b.Export(context.Background(), records); err != nil {
 		t.Fatal(err)
 	}
 	if tagRequests != 0 {
@@ -160,10 +161,10 @@ func TestReadwiseExport_NonOKStatusReturnsError(t *testing.T) {
 
 	b, _ := newTestReadwise(t, handler)
 
-	_, err := b.Export(context.Background(), []db.ExportRecord{
-		{ID: "exp-1", HighlightID: "h1", HighlightText: "text", JobFilename: "book.pdf"},
-	})
-	if err == nil {
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlighText: "text", Title: "book.pdf"},
+	}
+	if err := b.Export(context.Background(), records); err == nil {
 		t.Fatal("expected error for non-2xx status, got nil")
 	}
 }
@@ -177,18 +178,18 @@ func TestReadwiseExport_BatchPreservesOrder(t *testing.T) {
 
 	b, _ := newTestReadwise(t, handler)
 
-	results, err := b.Export(context.Background(), []db.ExportRecord{
-		{ID: "exp-1", HighlightID: "h1", HighlightText: "first", JobFilename: "a.pdf"},
-		{ID: "exp-2", HighlightID: "h2", HighlightText: "second", JobFilename: "a.pdf"},
-	})
-	if err != nil {
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlighText: "first", Title: "a.pdf"},
+		{ExportID: "exp-2", HighlighText: "second", Title: "a.pdf"},
+	}
+	if err := b.Export(context.Background(), records); err != nil {
 		t.Fatal(err)
 	}
-	if len(results) != 2 {
-		t.Fatalf("expected 2 results, got %d", len(results))
+	if len(records) != 2 {
+		t.Fatalf("expected 2 records, got %d", len(records))
 	}
-	if results[0].ExternalID != "10" || results[1].ExternalID != "20" {
-		t.Errorf("unexpected external IDs: %s, %s", results[0].ExternalID, results[1].ExternalID)
+	if records[0].ExternalID != "10" || records[1].ExternalID != "20" {
+		t.Errorf("unexpected external IDs: %s, %s", records[0].ExternalID, records[1].ExternalID)
 	}
 }
 
@@ -219,5 +220,12 @@ func TestReadwiseDelete_NonOKStatusReturnsError(t *testing.T) {
 
 	if err := b.Delete(context.Background(), "99"); err == nil {
 		t.Fatal("expected error for non-2xx status, got nil")
+	}
+}
+
+func TestReadwiseNew_RequiresLogger(t *testing.T) {
+	_, err := readwise.New(readwise.Config{APIToken: "tok"}, nil)
+	if err == nil {
+		t.Fatal("expected error when logger is nil")
 	}
 }

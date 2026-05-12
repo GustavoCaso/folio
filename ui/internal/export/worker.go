@@ -2,6 +2,7 @@ package export
 
 import (
 	"context"
+	"errors"
 	"log/slog"
 	"time"
 
@@ -15,13 +16,21 @@ type Worker struct {
 	logger   *slog.Logger
 }
 
-func NewWorker(store *db.Store, backends []Backend, interval time.Duration, logger *slog.Logger) *Worker {
+func NewWorker(store *db.Store, backends []Backend, interval time.Duration, logger *slog.Logger) (*Worker, error) {
+	if logger == nil {
+		return nil, errors.New("export.NewWork: logger is required")
+	}
+
+	if store == nil {
+		return nil, errors.New("export.NewWork: store is required")
+	}
+
 	return &Worker{
 		store:    store,
 		backends: backends,
 		interval: interval,
 		logger:   logger,
-	}
+	}, nil
 }
 
 func (w *Worker) Run(ctx context.Context) {
@@ -50,9 +59,21 @@ func (w *Worker) RunOnce(ctx context.Context) {
 			continue
 		}
 
+		exports := make([]*ExportRecord, 0, len(records))
+
+		for _, record := range records {
+			exports = append(exports, &ExportRecord{
+				ExportID:     record.ID,
+				Title:        record.JobFilename,
+				HighlighText: record.HighlightText,
+				Note:         record.HighlightNote,
+				Tag:          record.HighlightTag,
+			})
+		}
+
 		w.logger.Info("exporting highlights", "backend", backend.Name(), "count", len(records))
 
-		results, err := backend.Export(ctx, records)
+		err = backend.Export(ctx, exports)
 		if err != nil {
 			w.logger.Error("export failed", "backend", backend.Name(), "err", err)
 			for _, rec := range records {
@@ -63,10 +84,17 @@ func (w *Worker) RunOnce(ctx context.Context) {
 			continue
 		}
 
-		for _, res := range results {
-			if res.Err != nil {
+		for _, res := range exports {
+			if res.Err != nil || res.ExternalID == "" {
+				var errorMessage string
+				if res.Err != nil {
+					errorMessage = res.Err.Error()
+				} else {
+					errorMessage = "export function not populate external ID"
+				}
+
 				w.logger.Warn("highlight export failed", "backend", backend.Name(), "export_id", res.ExportID, "err", res.Err)
-				if dbErr := w.store.MarkHighlightExportFailed(ctx, res.ExportID, res.Err.Error()); dbErr != nil {
+				if dbErr := w.store.MarkHighlightExportFailed(ctx, res.ExportID, errorMessage); dbErr != nil {
 					w.logger.Error("mark export failed", "export_id", res.ExportID, "err", dbErr)
 				}
 			} else {

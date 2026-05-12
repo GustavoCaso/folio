@@ -15,27 +15,27 @@ import (
 // fakeBackend is a controllable Backend for testing the Worker.
 type fakeBackend struct {
 	name      string
-	results   []export.ExportResult
 	exportErr error
+	// perRecord maps ExportID -> ExternalID or Err to return.
+	perRecord map[string]export.ExportRecord
 	deleted   []string
 }
 
 func (f *fakeBackend) Name() string { return f.name }
 
-func (f *fakeBackend) Export(_ context.Context, records []db.ExportRecord) ([]export.ExportResult, error) {
+func (f *fakeBackend) Export(_ context.Context, records []*export.ExportRecord) error {
 	if f.exportErr != nil {
-		return nil, f.exportErr
+		return f.exportErr
 	}
-	// Return preset results matched by position; fall back to a generated ID.
-	out := make([]export.ExportResult, len(records))
-	for i, rec := range records {
-		if i < len(f.results) {
-			out[i] = f.results[i]
+	for _, rec := range records {
+		if override, ok := f.perRecord[rec.ExportID]; ok {
+			rec.ExternalID = override.ExternalID
+			rec.Err = override.Err
 		} else {
-			out[i] = export.ExportResult{ExportID: rec.ID, ExternalID: "ext-" + rec.HighlightID}
+			rec.ExternalID = "ext-" + rec.ExportID
 		}
 	}
-	return out, nil
+	return nil
 }
 
 func (f *fakeBackend) Delete(_ context.Context, externalID string) error {
@@ -76,6 +76,15 @@ func silentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
+func newWorker(t *testing.T, store *db.Store, backends []export.Backend) *export.Worker {
+	t.Helper()
+	w, err := export.NewWorker(store, backends, time.Hour, silentLogger())
+	if err != nil {
+		t.Fatal(err)
+	}
+	return w
+}
+
 func runWorkerOnce(w *export.Worker) {
 	w.RunOnce(context.Background())
 }
@@ -89,11 +98,11 @@ func TestWorker_SuccessfulExportMarksHighlight(t *testing.T) {
 	}
 
 	fake := &fakeBackend{
-		name:    "readwise",
-		results: []export.ExportResult{{ExportID: records[0].ID, ExternalID: "ext-42"}},
+		name:      "readwise",
+		perRecord: map[string]export.ExportRecord{records[0].ID: {ExternalID: "ext-42"}},
 	}
 
-	w := export.NewWorker(store, []export.Backend{fake}, time.Hour, silentLogger())
+	w := newWorker(t, store, []export.Backend{fake})
 	runWorkerOnce(w)
 
 	got, err := store.ListExportsByHighlight(context.Background(), h.ID)
@@ -118,7 +127,7 @@ func TestWorker_BackendErrorMarksAllAsFailed(t *testing.T) {
 		exportErr: errors.New("network timeout"),
 	}
 
-	w := export.NewWorker(store, []export.Backend{fake}, time.Hour, silentLogger())
+	w := newWorker(t, store, []export.Backend{fake})
 	runWorkerOnce(w)
 
 	got, err := store.ListExportsByHighlight(context.Background(), h.ID)
@@ -145,13 +154,11 @@ func TestWorker_PerResultErrorMarksAsFailed(t *testing.T) {
 	}
 
 	fake := &fakeBackend{
-		name: "readwise",
-		results: []export.ExportResult{
-			{ExportID: records[0].ID, Err: errors.New("bad highlight")},
-		},
+		name:      "readwise",
+		perRecord: map[string]export.ExportRecord{records[0].ID: {Err: errors.New("bad highlight")}},
 	}
 
-	w := export.NewWorker(store, []export.Backend{fake}, time.Hour, silentLogger())
+	w := newWorker(t, store, []export.Backend{fake})
 	runWorkerOnce(w)
 
 	got, err := store.ListExportsByHighlight(context.Background(), h.ID)
@@ -179,7 +186,7 @@ func TestWorker_AlreadyExportedIsSkipped(t *testing.T) {
 	}
 
 	fake := &fakeBackend{name: "readwise"}
-	w := export.NewWorker(store, []export.Backend{fake}, time.Hour, silentLogger())
+	w := newWorker(t, store, []export.Backend{fake})
 	runWorkerOnce(w)
 
 	// Worker should not have called Export (no PENDING rows), so still exactly 1 record.
@@ -223,7 +230,7 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	a := &fakeBackend{name: "backend-a"}
 	b := &fakeBackend{name: "backend-b"}
 
-	w := export.NewWorker(store, []export.Backend{a, b}, time.Hour, silentLogger())
+	w := newWorker(t, store, []export.Backend{a, b})
 	runWorkerOnce(w)
 
 	got, err := store.ListExportsByHighlight(context.Background(), h.ID)
@@ -232,5 +239,25 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	}
 	if len(got) != 2 {
 		t.Fatalf("expected 2 records (one per backend), got %d", len(got))
+	}
+}
+
+func TestNewWorker_RequiresLogger(t *testing.T) {
+	store, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	_, err = export.NewWorker(store, nil, time.Hour, nil)
+	if err == nil {
+		t.Fatal("expected error when logger is nil")
+	}
+}
+
+func TestNewWorker_RequiresStore(t *testing.T) {
+	_, err := export.NewWorker(nil, nil, time.Hour, silentLogger())
+	if err == nil {
+		t.Fatal("expected error when store is nil")
 	}
 }

@@ -4,13 +4,13 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"strconv"
 	"time"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 )
 
@@ -28,10 +28,15 @@ type ReadwiseBackend struct {
 	apiToken string
 	baseURL  string
 	client   *http.Client
+	logger   *slog.Logger
 }
 
 // New creates a Readwise export backend from cfg.
-func New(cfg Config) export.Backend {
+func New(cfg Config, logger *slog.Logger) (export.Backend, error) {
+	if logger == nil {
+		return nil, errors.New("readwise.New: logger is required")
+	}
+
 	base := cfg.BaseURL
 	if base == "" {
 		base = readwiseBaseURL
@@ -40,82 +45,81 @@ func New(cfg Config) export.Backend {
 		apiToken: cfg.APIToken,
 		baseURL:  base,
 		client:   &http.Client{Timeout: cfg.Timeout},
-	}
+		logger:   logger,
+	}, nil
 }
 
 func (r *ReadwiseBackend) Name() string { return "readwise" }
 
-func (r *ReadwiseBackend) Export(ctx context.Context, records []db.ExportRecord) ([]export.ExportResult, error) {
-	inputs := make([]ReadwiseHighlightInput, len(records))
-	for i, rec := range records {
+func (r *ReadwiseBackend) Export(ctx context.Context, exports []*export.ExportRecord) error {
+	inputs := make([]ReadwiseHighlightInput, len(exports))
+	for i, rec := range exports {
 		inputs[i] = ReadwiseHighlightInput{
-			Text:     rec.HighlightText,
-			Title:    rec.JobFilename,
+			Text:     rec.HighlighText,
+			Title:    rec.Title,
 			Category: "books",
-			Note:     rec.HighlightNote,
+			Note:     rec.Note,
 		}
 	}
 
 	body, err := json.Marshal(ReadwiseCreateRequest{Highlights: inputs})
 	if err != nil {
-		return nil, fmt.Errorf("readwise: marshal request: %w", err)
+		return fmt.Errorf("readwise: marshal request: %w", err)
 	}
 
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost, r.baseURL+"/highlights/", bytes.NewReader(body))
 	if err != nil {
-		return nil, fmt.Errorf("readwise: build request: %w", err)
+		return fmt.Errorf("readwise: build request: %w", err)
 	}
 	req.Header.Set("Authorization", "Token "+r.apiToken)
 	req.Header.Set("Content-Type", "application/json")
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		return nil, fmt.Errorf("readwise: http request: %w", err)
+		return fmt.Errorf("readwise: http request: %w", err)
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return nil, fmt.Errorf("readwise: unexpected status %d", resp.StatusCode)
+		return fmt.Errorf("readwise: unexpected status %d", resp.StatusCode)
 	}
 
 	// Response is a plain JSON array of created highlight objects.
 	var created []ReadwiseHighlightResponse
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
-		return nil, fmt.Errorf("readwise: decode response: %w", err)
+		return fmt.Errorf("readwise: decode response: %w", err)
+	}
+
+	if len(created) == 0 {
+		return fmt.Errorf("readwise: empty response when creating highlights")
 	}
 
 	modifiedHighlights := created[0].ModifiedHighlights
 
-	results := make([]export.ExportResult, len(records))
-	for i, rec := range records {
-		results[i].ExportID = rec.ID
-		if i < len(modifiedHighlights) {
-			results[i].ExternalID = strconv.FormatInt(modifiedHighlights[i], 10)
-		} else {
-			results[i].Err = fmt.Errorf("readwise: no ID returned for highlight %s", rec.HighlightID)
-		}
+	for i, id := range modifiedHighlights {
+		exports[i].ExternalID = strconv.FormatInt(id, 10)
 	}
 
 	// Add tags via a separate per-highlight endpoint (Readwise has no tag field on creation).
-	for i, rec := range records {
-		if rec.HighlightTag != "" && results[i].ExternalID != "" {
-			r.addTag(ctx, results[i].ExternalID, rec.HighlightTag)
+	for i, rec := range exports {
+		if rec.Tag != "" && exports[i].ExternalID != "" {
+			r.addTag(ctx, exports[i].ExternalID, rec.Tag)
 		}
 	}
 
-	return results, nil
+	return nil
 }
 
 func (r *ReadwiseBackend) addTag(ctx context.Context, externalID, tag string) {
 	body, err := json.Marshal(ReadwiseTagRequest{Name: tag})
 	if err != nil {
-		slog.Default().Warn("readwise: marshal tag request", "external_id", externalID, "err", err)
+		r.logger.Warn("readwise: marshal tag request", "external_id", externalID, "err", err)
 		return
 	}
 	req, err := http.NewRequestWithContext(ctx, http.MethodPost,
 		r.baseURL+"/highlights/"+externalID+"/tags/", bytes.NewReader(body))
 	if err != nil {
-		slog.Default().Warn("readwise: build tag request", "external_id", externalID, "err", err)
+		r.logger.Warn("readwise: build tag request", "external_id", externalID, "err", err)
 		return
 	}
 	req.Header.Set("Authorization", "Token "+r.apiToken)
@@ -123,13 +127,13 @@ func (r *ReadwiseBackend) addTag(ctx context.Context, externalID, tag string) {
 
 	resp, err := r.client.Do(req)
 	if err != nil {
-		slog.Default().Warn("readwise: add tag failed", "external_id", externalID, "tag", tag, "err", err)
+		r.logger.Warn("readwise: add tag failed", "external_id", externalID, "tag", tag, "err", err)
 		return
 	}
 	defer func() { _ = resp.Body.Close() }()
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		slog.Default().Warn("readwise: add tag unexpected status", "external_id", externalID, "tag", tag, "status", resp.StatusCode)
+		r.logger.Warn("readwise: add tag unexpected status", "external_id", externalID, "tag", tag, "status", resp.StatusCode)
 	}
 }
 

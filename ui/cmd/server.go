@@ -70,10 +70,16 @@ func Execute() {
 			logger.Warn("invalid READWISE_TIMEOUT, using default 30s", "value", timeoutStr)
 			readwiseTimeout = 30 * time.Second
 		}
-		backends = append(backends, readwise.New(readwise.Config{
+		backend, err := readwise.New(readwise.Config{
 			APIToken: token,
 			Timeout:  readwiseTimeout,
-		}))
+		}, logger.With("component", "export.readwise"))
+
+		if err != nil {
+			logger.Error("readwise backend init failed", logging.Err(err))
+			os.Exit(1)
+		}
+		backends = append(backends, backend)
 		logger.Info("readwise export backend enabled", "timeout", readwiseTimeout)
 	}
 
@@ -87,7 +93,11 @@ func Execute() {
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		worker := export.NewWorker(store, backends, exportInterval, logger.With("component", "export.worker"))
+		worker, err := export.NewWorker(store, backends, exportInterval, logger.With("component", "export.worker"))
+		if err != nil {
+			logger.Error("export init failed", logging.Err(err))
+			os.Exit(1)
+		}
 		go worker.Run(ctx)
 		logger.Info("export worker started", "interval", exportInterval)
 	}
