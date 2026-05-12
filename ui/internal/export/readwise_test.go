@@ -71,7 +71,7 @@ func TestReadwiseExport_HappyPath(t *testing.T) {
 
 		result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{42}}}
 
-		json.NewEncoder(w).Encode(result)
+		json.NewEncoder(w).Encode(result) //nolint:errcheck
 	})
 
 	b, _ := newTestReadwise(t, handler)
@@ -182,7 +182,7 @@ func TestReadwiseExport_BatchPreservesOrder(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{10, 20}}}
-		json.NewEncoder(w).Encode(result)
+		json.NewEncoder(w).Encode(result) //nolint:errcheck
 	})
 
 	b, _ := newTestReadwise(t, handler)
