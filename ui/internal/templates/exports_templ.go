@@ -65,7 +65,9 @@ func exportStatusBadge(status string) templ.Component {
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = badge.Badge(badge.Props{Variant: badge.VariantDefault}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = badge.Badge(badge.Props{
+				Class:   "bg-green-100 text-green-800 border-green-200",
+				Variant: badge.VariantDefault}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -108,7 +110,7 @@ func exportStatusBadge(status string) templ.Component {
 				var templ_7745c5c3_Var5 string
 				templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(status)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 31, Col: 12}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 33, Col: 12}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 				if templ_7745c5c3_Err != nil {
@@ -416,7 +418,7 @@ func Exports(records []db.ExportRecord) templ.Component {
 									var templ_7745c5c3_Var20 string
 									templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinStringErrs(truncate(rec.HighlightText, 80))
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 58, Col: 78}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 72, Col: 78}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 									if templ_7745c5c3_Err != nil {
@@ -455,7 +457,7 @@ func Exports(records []db.ExportRecord) templ.Component {
 									var templ_7745c5c3_Var22 string
 									templ_7745c5c3_Var22, templ_7745c5c3_Err = templ.JoinStringErrs(rec.JobFilename)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 61, Col: 86}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 75, Col: 86}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var22))
 									if templ_7745c5c3_Err != nil {
@@ -502,7 +504,7 @@ func Exports(records []db.ExportRecord) templ.Component {
 										var templ_7745c5c3_Var25 string
 										templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(rec.BackendName)
 										if templ_7745c5c3_Err != nil {
-											return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 65, Col: 27}
+											return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 79, Col: 27}
 										}
 										_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 										if templ_7745c5c3_Err != nil {
@@ -569,7 +571,7 @@ func Exports(records []db.ExportRecord) templ.Component {
 									var templ_7745c5c3_Var28 string
 									templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinStringErrs(rec.ExportedAt.Format("2006-01-02 15:04"))
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 72, Col: 106}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 86, Col: 106}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 									if templ_7745c5c3_Err != nil {
@@ -608,7 +610,7 @@ func Exports(records []db.ExportRecord) templ.Component {
 									var templ_7745c5c3_Var30 string
 									templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(rec.Error)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 75, Col: 83}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 89, Col: 83}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 									if templ_7745c5c3_Err != nil {

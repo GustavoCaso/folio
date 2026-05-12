@@ -19,7 +19,9 @@ func truncate(s string, n int) string {
 templ exportStatusBadge(status string) {
 	switch status {
 		case "EXPORTED":
-			@badge.Badge(badge.Props{Variant: badge.VariantDefault}) {
+			@badge.Badge(badge.Props{
+				Class:   "bg-green-100 text-green-800 border-green-200",
+				Variant: badge.VariantDefault}) {
 				Exported
 			}
 		case "FAILED":
@@ -43,12 +45,24 @@ templ Exports(records []db.ExportRecord) {
 				@table.Table() {
 					@table.Header() {
 						@table.Row() {
-							@table.Head() { Highlight }
-							@table.Head() { Document }
-							@table.Head() { Backend }
-							@table.Head() { Status }
-							@table.Head() { Exported At }
-							@table.Head() { Error }
+							@table.Head() {
+								Highlight 
+							}
+							@table.Head() {
+								Document 
+							}
+							@table.Head() {
+								Backend 
+							}
+							@table.Head() {
+								Status 
+							}
+							@table.Head() {
+								Exported At 
+							}
+							@table.Head() {
+								Error 
+							}
 						}
 					}
 					@table.Body() {
