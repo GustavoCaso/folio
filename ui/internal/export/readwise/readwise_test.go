@@ -1,4 +1,4 @@
-package export_test
+package readwise_test
 
 import (
 	"context"
@@ -10,22 +10,19 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/export"
+	"github.com/GustavoCaso/folio/ui/internal/export/readwise"
 )
 
 func newTestReadwise(t *testing.T, handler http.Handler) (export.Backend, *httptest.Server) {
 	t.Helper()
 	srv := httptest.NewServer(handler)
 	t.Cleanup(srv.Close)
-	b := export.NewReadwise(export.ReadwiseConfig{
+	b := readwise.New(readwise.Config{
 		APIToken: "test-token",
 		Timeout:  5 * time.Second,
 		BaseURL:  srv.URL + "/api/v2",
 	})
 	return b, srv
-}
-
-type readwiseHighlightResponse struct {
-	ModifiedHighlights []int64 `json:"modified_highlights"`
 }
 
 func TestReadwiseExport_HappyPath(t *testing.T) {
@@ -40,14 +37,7 @@ func TestReadwiseExport_HappyPath(t *testing.T) {
 			t.Errorf("expected Content-Type application/json, got %q", got)
 		}
 
-		var req struct {
-			Highlights []struct {
-				Text     string `json:"text"`
-				Title    string `json:"title"`
-				Category string `json:"category"`
-				Note     string `json:"note"`
-			} `json:"highlights"`
-		}
+		var req readwise.ReadwiseCreateRequest
 		if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
 			t.Fatalf("decode request: %v", err)
 		}
@@ -69,7 +59,7 @@ func TestReadwiseExport_HappyPath(t *testing.T) {
 
 		w.Header().Set("Content-Type", "application/json")
 
-		result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{42}}}
+		result := []readwise.ReadwiseHighlightResponse{{ModifiedHighlights: []int64{42}}}
 
 		json.NewEncoder(w).Encode(result) //nolint:errcheck
 	})
@@ -103,7 +93,7 @@ func TestReadwiseExport_SendsTagAfterCreation(t *testing.T) {
 		switch {
 		case r.URL.Path == "/api/v2/highlights/" && r.Method == http.MethodPost:
 			w.Header().Set("Content-Type", "application/json")
-			result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{7}}}
+			result := []readwise.ReadwiseHighlightResponse{{ModifiedHighlights: []int64{7}}}
 			json.NewEncoder(w).Encode(result) //nolint:errcheck
 
 		case r.URL.Path == "/api/v2/highlights/7/tags/" && r.Method == http.MethodPost:
@@ -143,7 +133,7 @@ func TestReadwiseExport_NoTagRequestWhenTagEmpty(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path == "/api/v2/highlights/" {
 			w.Header().Set("Content-Type", "application/json")
-			result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{1}}}
+			result := []readwise.ReadwiseHighlightResponse{{ModifiedHighlights: []int64{1}}}
 			json.NewEncoder(w).Encode(result) //nolint:errcheck
 			return
 		}
@@ -181,7 +171,7 @@ func TestReadwiseExport_NonOKStatusReturnsError(t *testing.T) {
 func TestReadwiseExport_BatchPreservesOrder(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
-		result := []readwiseHighlightResponse{{ModifiedHighlights: []int64{10, 20}}}
+		result := []readwise.ReadwiseHighlightResponse{{ModifiedHighlights: []int64{10, 20}}}
 		json.NewEncoder(w).Encode(result) //nolint:errcheck
 	})
 

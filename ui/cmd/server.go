@@ -9,6 +9,7 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/export"
+	"github.com/GustavoCaso/folio/ui/internal/export/readwise"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
@@ -69,7 +70,7 @@ func Execute() {
 			logger.Warn("invalid READWISE_TIMEOUT, using default 30s", "value", timeoutStr)
 			readwiseTimeout = 30 * time.Second
 		}
-		backends = append(backends, export.NewReadwise(export.ReadwiseConfig{
+		backends = append(backends, readwise.New(readwise.Config{
 			APIToken: token,
 			Timeout:  readwiseTimeout,
 		}))

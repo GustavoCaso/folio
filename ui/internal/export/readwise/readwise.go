@@ -1,4 +1,4 @@
-package export
+package readwise
 
 import (
 	"bytes"
@@ -11,12 +11,13 @@ import (
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/export"
 )
 
 const readwiseBaseURL = "https://readwise.io/api/v2"
 
-// ReadwiseConfig holds configuration for the Readwise export backend.
-type ReadwiseConfig struct {
+// Config holds configuration for the Readwise export backend.
+type Config struct {
 	APIToken string
 	Timeout  time.Duration
 	// BaseURL overrides the Readwise API base URL. Leave empty for production.
@@ -29,8 +30,8 @@ type ReadwiseBackend struct {
 	client   *http.Client
 }
 
-// NewReadwise creates a Readwise export backend from cfg.
-func NewReadwise(cfg ReadwiseConfig) Backend {
+// New creates a Readwise export backend from cfg.
+func New(cfg Config) export.Backend {
 	base := cfg.BaseURL
 	if base == "" {
 		base = readwiseBaseURL
@@ -44,31 +45,10 @@ func NewReadwise(cfg ReadwiseConfig) Backend {
 
 func (r *ReadwiseBackend) Name() string { return "readwise" }
 
-type readwiseHighlightInput struct {
-	Text          string `json:"text"`
-	Title         string `json:"title"`
-	Category      string `json:"category"`
-	Note          string `json:"note,omitempty"`
-	HighlightedAt string `json:"highlighted_at,omitempty"`
-}
-
-type readwiseCreateRequest struct {
-	Highlights []readwiseHighlightInput `json:"highlights"`
-}
-
-// Readwise POST /api/v2/highlights/ returns a plain JSON array, not a wrapped object.
-type readwiseHighlightResponse struct {
-	ModifiedHighlights []int64 `json:"modified_highlights"`
-}
-
-type readwiseTagRequest struct {
-	Name string `json:"name"`
-}
-
-func (r *ReadwiseBackend) Export(ctx context.Context, records []db.ExportRecord) ([]ExportResult, error) {
-	inputs := make([]readwiseHighlightInput, len(records))
+func (r *ReadwiseBackend) Export(ctx context.Context, records []db.ExportRecord) ([]export.ExportResult, error) {
+	inputs := make([]ReadwiseHighlightInput, len(records))
 	for i, rec := range records {
-		inputs[i] = readwiseHighlightInput{
+		inputs[i] = ReadwiseHighlightInput{
 			Text:     rec.HighlightText,
 			Title:    rec.JobFilename,
 			Category: "books",
@@ -76,7 +56,7 @@ func (r *ReadwiseBackend) Export(ctx context.Context, records []db.ExportRecord)
 		}
 	}
 
-	body, err := json.Marshal(readwiseCreateRequest{Highlights: inputs})
+	body, err := json.Marshal(ReadwiseCreateRequest{Highlights: inputs})
 	if err != nil {
 		return nil, fmt.Errorf("readwise: marshal request: %w", err)
 	}
@@ -99,14 +79,14 @@ func (r *ReadwiseBackend) Export(ctx context.Context, records []db.ExportRecord)
 	}
 
 	// Response is a plain JSON array of created highlight objects.
-	var created []readwiseHighlightResponse
+	var created []ReadwiseHighlightResponse
 	if err := json.NewDecoder(resp.Body).Decode(&created); err != nil {
 		return nil, fmt.Errorf("readwise: decode response: %w", err)
 	}
 
 	modifiedHighlights := created[0].ModifiedHighlights
 
-	results := make([]ExportResult, len(records))
+	results := make([]export.ExportResult, len(records))
 	for i, rec := range records {
 		results[i].ExportID = rec.ID
 		if i < len(modifiedHighlights) {
@@ -127,7 +107,7 @@ func (r *ReadwiseBackend) Export(ctx context.Context, records []db.ExportRecord)
 }
 
 func (r *ReadwiseBackend) addTag(ctx context.Context, externalID, tag string) {
-	body, err := json.Marshal(readwiseTagRequest{Name: tag})
+	body, err := json.Marshal(ReadwiseTagRequest{Name: tag})
 	if err != nil {
 		slog.Default().Warn("readwise: marshal tag request", "external_id", externalID, "err", err)
 		return
