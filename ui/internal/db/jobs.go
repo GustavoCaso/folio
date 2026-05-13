@@ -4,55 +4,41 @@ import (
 	"context"
 	"time"
 
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/google/uuid"
 )
 
-type Job struct {
-	ID              string
-	Filename        string
-	RequestID       string
-	Content         []byte
-	RetryCount      int
-	Status          string
-	ReadingProgress string
-	Error           string
-	OutputPath      string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-}
-
-func (s *Store) CreateJob(ctx context.Context, filename string, content []byte, requestID string) (Job, error) {
+func (d *db) CreateJob(ctx context.Context, filename string, content []byte, requestID string) (domain.Job, error) {
 	now := time.Now().UTC()
 	id := uuid.NewString()
-	_, err := s.db.ExecContext(ctx,
+	_, err := d.conn.ExecContext(ctx,
 		`INSERT INTO jobs (id, filename, request_id, content, status, created_at, updated_at)
 		 VALUES (?, ?, ?, ?, 'PENDING', ?, ?)`,
 		id, filename, requestID, content, now.Format(time.RFC3339), now.Format(time.RFC3339),
 	)
 	if err != nil {
-		return Job{}, err
+		return domain.Job{}, err
 	}
-	return Job{ID: id, Filename: filename, RequestID: requestID, Content: content, Status: "PENDING", CreatedAt: now, UpdatedAt: now}, nil
+	return domain.Job{ID: id, Filename: filename, RequestID: requestID, Content: content, Status: "PENDING", CreatedAt: now, UpdatedAt: now}, nil
 }
 
-func (s *Store) GetJob(ctx context.Context, id string) (Job, error) {
-	row := s.db.QueryRowContext(ctx,
+func (d *db) GetJob(ctx context.Context, id string) (domain.Job, error) {
+	row := d.conn.QueryRowContext(ctx,
 		`SELECT id, filename, request_id, content, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs WHERE id = ?`, id)
 	return scanJob(row)
 }
 
-func (s *Store) GetPendingJobs(ctx context.Context) ([]Job, error) {
-	rows, err := s.db.QueryContext(ctx,
+func (d *db) GetPendingJobs(ctx context.Context) ([]domain.Job, error) {
+	rows, err := d.conn.QueryContext(ctx,
 		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs WHERE status = 'PENDING'`)
-
 	if err != nil {
 		return nil, err
 	}
 	defer func() { _ = rows.Close() }()
 
-	var jobs []Job
+	var jobs []domain.Job
 	for rows.Next() {
 		j, err := scanJob(rows)
 		if err != nil {
@@ -63,8 +49,8 @@ func (s *Store) GetPendingJobs(ctx context.Context) ([]Job, error) {
 	return jobs, rows.Err()
 }
 
-func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
-	rows, err := s.db.QueryContext(ctx,
+func (d *db) ListJobs(ctx context.Context) ([]domain.Job, error) {
+	rows, err := d.conn.QueryContext(ctx,
 		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs ORDER BY created_at DESC`)
 	if err != nil {
@@ -72,7 +58,7 @@ func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var jobs []Job
+	var jobs []domain.Job
 	for rows.Next() {
 		j, err := scanJob(rows)
 		if err != nil {
@@ -83,45 +69,45 @@ func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
 	return jobs, rows.Err()
 }
 
-func (s *Store) UpdateJobStatus(ctx context.Context, id, status string) error {
-	_, err := s.db.ExecContext(ctx,
+func (d *db) UpdateJobStatus(ctx context.Context, id, status string) error {
+	_, err := d.conn.ExecContext(ctx,
 		`UPDATE jobs SET status = ?, updated_at = ? WHERE id = ?`,
 		status, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
 }
 
-func (s *Store) UpdateReadingProgress(ctx context.Context, id, blockID string) error {
-	_, err := s.db.ExecContext(ctx,
+func (d *db) UpdateReadingProgress(ctx context.Context, id, blockID string) error {
+	_, err := d.conn.ExecContext(ctx,
 		`UPDATE jobs SET reading_progress = ?, updated_at = ? WHERE id = ?`,
 		blockID, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
 }
 
-func (s *Store) RetryJob(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx,
+func (d *db) RetryJob(ctx context.Context, id string) error {
+	_, err := d.conn.ExecContext(ctx,
 		`UPDATE jobs SET status = 'PENDING', retry_count = retry_count + 1, updated_at = ? WHERE id = ?`,
 		time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
 }
 
-func (s *Store) MarkJobDone(ctx context.Context, id, outputPath string) error {
-	_, err := s.db.ExecContext(ctx,
+func (d *db) MarkJobDone(ctx context.Context, id, outputPath string) error {
+	_, err := d.conn.ExecContext(ctx,
 		`UPDATE jobs SET status = 'DONE', content = NULL, output_path = ?, updated_at = ? WHERE id = ?`,
 		outputPath, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
 }
 
-func (s *Store) DeleteJob(ctx context.Context, id string) error {
-	_, err := s.db.ExecContext(ctx, `DELETE FROM jobs WHERE id = ?`, id)
+func (d *db) DeleteJob(ctx context.Context, id string) error {
+	_, err := d.conn.ExecContext(ctx, `DELETE FROM jobs WHERE id = ?`, id)
 	return err
 }
 
-func (s *Store) MarkJobFailed(ctx context.Context, id, errMsg string) error {
-	_, err := s.db.ExecContext(ctx,
+func (d *db) MarkJobFailed(ctx context.Context, id, errMsg string) error {
+	_, err := d.conn.ExecContext(ctx,
 		`UPDATE jobs SET status = 'FAILED', error = ?, updated_at = ? WHERE id = ?`,
 		errMsg, time.Now().UTC().Format(time.RFC3339), id,
 	)
@@ -132,17 +118,16 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
-func scanJob(s scanner) (Job, error) {
-	var j Job
+func scanJob(s scanner) (domain.Job, error) {
+	var j domain.Job
 	var createdAt, updatedAt string
 	err := s.Scan(
 		&j.ID, &j.Filename, &j.RequestID, &j.Content, &j.RetryCount, &j.Status,
-		&j.ReadingProgress,
-		&j.Error, &j.OutputPath,
+		&j.ReadingProgress, &j.Error, &j.OutputPath,
 		&createdAt, &updatedAt,
 	)
 	if err != nil {
-		return Job{}, err
+		return domain.Job{}, err
 	}
 	j.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	j.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)

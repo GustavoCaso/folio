@@ -5,10 +5,12 @@ import (
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 // seedJobAndHighlightForExport creates a DONE job, one highlight, and a PENDING export row for backendName.
-func seedJobAndHighlightForExport(t *testing.T, store *db.Store, backendName string) (db.Job, db.Highlight) {
+func seedJobAndHighlightForExport(t *testing.T, store repository.Store, backendName string) (domain.Job, domain.Highlight) {
 	t.Helper()
 	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req")
 	if err != nil {
@@ -17,7 +19,7 @@ func seedJobAndHighlightForExport(t *testing.T, store *db.Store, backendName str
 	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h, err := store.CreateHighlight(context.Background(), domain.Highlight{
 		JobID:        job.ID,
 		StartBlockID: "p-1",
 		EndBlockID:   "p-1",
@@ -36,7 +38,7 @@ func seedJobAndHighlightForExport(t *testing.T, store *db.Store, backendName str
 }
 
 // pendingExportID fetches the single PENDING export row ID for a highlight+backend.
-func pendingExportID(t *testing.T, store *db.Store, backendName string) string {
+func pendingExportID(t *testing.T, store repository.Store, backendName string) string {
 	t.Helper()
 	records, err := store.ListUnexportedHighlights(context.Background(), backendName)
 	if err != nil {
@@ -49,15 +51,15 @@ func pendingExportID(t *testing.T, store *db.Store, backendName string) string {
 }
 
 func TestListUnexportedHighlights_AllUnexported(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, store, "readwise")
+	_, h := seedJobAndHighlightForExport(t, database, "readwise")
 
-	records, err := store.ListUnexportedHighlights(context.Background(), "readwise")
+	records, err := database.ListUnexportedHighlights(context.Background(), "readwise")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -79,20 +81,20 @@ func TestListUnexportedHighlights_AllUnexported(t *testing.T) {
 }
 
 func TestListUnexportedHighlights_MarkedExportedIsExcluded(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	seedJobAndHighlightForExport(t, store, "readwise")
-	exportID := pendingExportID(t, store, "readwise")
+	seedJobAndHighlightForExport(t, database, "readwise")
+	exportID := pendingExportID(t, database, "readwise")
 
-	if err := store.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
+	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
 		t.Fatal(err)
 	}
 
-	records, err := store.ListUnexportedHighlights(context.Background(), "readwise")
+	records, err := database.ListUnexportedHighlights(context.Background(), "readwise")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,21 +104,21 @@ func TestListUnexportedHighlights_MarkedExportedIsExcluded(t *testing.T) {
 }
 
 func TestListUnexportedHighlights_FailedIsNotRetried(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	seedJobAndHighlightForExport(t, store, "readwise")
-	exportID := pendingExportID(t, store, "readwise")
+	seedJobAndHighlightForExport(t, database, "readwise")
+	exportID := pendingExportID(t, database, "readwise")
 
-	if err := store.MarkHighlightExportFailed(context.Background(), exportID, "timeout"); err != nil {
+	if err := database.MarkHighlightExportFailed(context.Background(), exportID, "timeout"); err != nil {
 		t.Fatal(err)
 	}
 
 	// FAILED rows are not PENDING, so they don't appear in ListUnexportedHighlights.
-	records, err := store.ListUnexportedHighlights(context.Background(), "readwise")
+	records, err := database.ListUnexportedHighlights(context.Background(), "readwise")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,26 +128,26 @@ func TestListUnexportedHighlights_FailedIsNotRetried(t *testing.T) {
 }
 
 func TestListUnexportedHighlights_IsolatedByBackend(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, store, "readwise")
+	_, h := seedJobAndHighlightForExport(t, database, "readwise")
 
 	// Also create a PENDING row for other-backend.
-	if err := store.CreateHighlightExport(context.Background(), h.ID, "other-backend"); err != nil {
+	if err := database.CreateHighlightExport(context.Background(), h.ID, "other-backend"); err != nil {
 		t.Fatal(err)
 	}
 
-	exportID := pendingExportID(t, store, "readwise")
-	if err := store.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
+	exportID := pendingExportID(t, database, "readwise")
+	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
 		t.Fatal(err)
 	}
 
 	// other-backend still has a PENDING row.
-	records, err := store.ListUnexportedHighlights(context.Background(), "other-backend")
+	records, err := database.ListUnexportedHighlights(context.Background(), "other-backend")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,20 +157,20 @@ func TestListUnexportedHighlights_IsolatedByBackend(t *testing.T) {
 }
 
 func TestMarkHighlightExported(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, store, "readwise")
-	exportID := pendingExportID(t, store, "readwise")
+	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	exportID := pendingExportID(t, database, "readwise")
 
-	if err := store.MarkHighlightExported(context.Background(), exportID, "ext-999"); err != nil {
+	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-999"); err != nil {
 		t.Fatal(err)
 	}
 
-	records, err := store.ListExportsByHighlight(context.Background(), h.ID)
+	records, err := database.ListExportsByHighlight(context.Background(), h.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -194,20 +196,20 @@ func TestMarkHighlightExported(t *testing.T) {
 }
 
 func TestMarkHighlightExportFailed(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, store, "readwise")
-	exportID := pendingExportID(t, store, "readwise")
+	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	exportID := pendingExportID(t, database, "readwise")
 
-	if err := store.MarkHighlightExportFailed(context.Background(), exportID, "connection refused"); err != nil {
+	if err := database.MarkHighlightExportFailed(context.Background(), exportID, "connection refused"); err != nil {
 		t.Fatal(err)
 	}
 
-	records, err := store.ListExportsByHighlight(context.Background(), h.ID)
+	records, err := database.ListExportsByHighlight(context.Background(), h.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -227,20 +229,20 @@ func TestMarkHighlightExportFailed(t *testing.T) {
 }
 
 func TestListAllExports_JoinsHighlightAndJob(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, store, "readwise")
-	exportID := pendingExportID(t, store, "readwise")
+	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	exportID := pendingExportID(t, database, "readwise")
 
-	if err := store.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
+	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
 		t.Fatal(err)
 	}
 
-	records, err := store.ListAllExports(context.Background())
+	records, err := database.ListAllExports(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -261,28 +263,28 @@ func TestListAllExports_JoinsHighlightAndJob(t *testing.T) {
 }
 
 func TestListAllExports_ReturnsAllRecords(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	_, h1 := seedJobAndHighlightForExport(t, store, "readwise")
-	exportID1 := pendingExportID(t, store, "readwise")
+	_, h1 := seedJobAndHighlightForExport(t, database, "readwise")
+	exportID1 := pendingExportID(t, database, "readwise")
 
 	// Second highlight on the same job.
-	h2, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h2, err := database.CreateHighlight(context.Background(), domain.Highlight{
 		JobID: h1.JobID, StartBlockID: "p-2", EndBlockID: "p-2",
 		StartPos: 0, EndPos: 3, Text: "bye",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CreateHighlightExport(context.Background(), h2.ID, "readwise"); err != nil {
+	if err := database.CreateHighlightExport(context.Background(), h2.ID, "readwise"); err != nil {
 		t.Fatal(err)
 	}
 
-	records, err := store.ListUnexportedHighlights(context.Background(), "readwise")
+	records, err := database.ListUnexportedHighlights(context.Background(), "readwise")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -296,14 +298,14 @@ func TestListAllExports_ReturnsAllRecords(t *testing.T) {
 		t.Fatal("could not find export row for h2")
 	}
 
-	if err := store.MarkHighlightExported(context.Background(), exportID1, "ext-1"); err != nil {
+	if err := database.MarkHighlightExported(context.Background(), exportID1, "ext-1"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkHighlightExported(context.Background(), exportID2, "ext-2"); err != nil {
+	if err := database.MarkHighlightExported(context.Background(), exportID2, "ext-2"); err != nil {
 		t.Fatal(err)
 	}
 
-	all, err := store.ListAllExports(context.Background())
+	all, err := database.ListAllExports(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -320,24 +322,24 @@ func TestListAllExports_ReturnsAllRecords(t *testing.T) {
 }
 
 func TestExportRecord_CascadesOnHighlightDelete(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, store, "readwise")
-	exportID := pendingExportID(t, store, "readwise")
+	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	exportID := pendingExportID(t, database, "readwise")
 
-	if err := store.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
+	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
 		t.Fatal(err)
 	}
 
-	if err := store.DeleteHighlight(context.Background(), h.ID); err != nil {
+	if err := database.DeleteHighlight(context.Background(), h.ID); err != nil {
 		t.Fatal(err)
 	}
 
-	records, err := store.ListAllExports(context.Background())
+	records, err := database.ListAllExports(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}

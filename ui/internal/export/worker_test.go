@@ -9,7 +9,9 @@ import (
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/export"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 // fakeBackend is a controllable Backend for testing the Worker.
@@ -44,39 +46,39 @@ func (f *fakeBackend) Delete(_ context.Context, externalID string) error {
 }
 
 // newWorkerStore creates an in-memory store seeded with a DONE job and one highlight with a PENDING export row.
-func newWorkerStore(t *testing.T, backendName string) (*db.Store, db.Highlight) {
+func newWorkerStore(t *testing.T, backendName string) (repository.Store, domain.Highlight) {
 	t.Helper()
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = database.Close() })
 
-	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req")
+	job, err := database.CreateJob(context.Background(), "book.pdf", []byte{1}, "req")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
+	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h, err := database.CreateHighlight(context.Background(), domain.Highlight{
 		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 5, Text: "hello",
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.CreateHighlightExport(context.Background(), h.ID, backendName); err != nil {
+	if err := database.CreateHighlightExport(context.Background(), h.ID, backendName); err != nil {
 		t.Fatal(err)
 	}
-	return store, h
+	return database, h
 }
 
 func silentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-func newWorker(t *testing.T, store *db.Store, backends []export.Backend) *export.Worker {
+func newWorker(t *testing.T, store repository.ExportRepository, backends []export.Backend) *export.Worker {
 	t.Helper()
 	w, err := export.NewWorker(store, backends, time.Hour, silentLogger())
 	if err != nil {
@@ -229,20 +231,20 @@ func TestWorker_AlreadyExportedIsSkipped(t *testing.T) {
 }
 
 func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = database.Close() })
 
-	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req")
+	job, err := database.CreateJob(context.Background(), "book.pdf", []byte{1}, "req")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
+	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h, err := database.CreateHighlight(context.Background(), domain.Highlight{
 		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 5, Text: "hello",
 	})
@@ -251,7 +253,7 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	}
 	// Create a PENDING export row for each backend.
 	for _, name := range []string{"backend-a", "backend-b"} {
-		if err := store.CreateHighlightExport(context.Background(), h.ID, name); err != nil {
+		if err := database.CreateHighlightExport(context.Background(), h.ID, name); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -259,10 +261,10 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	a := &fakeBackend{name: "backend-a"}
 	b := &fakeBackend{name: "backend-b"}
 
-	w := newWorker(t, store, []export.Backend{a, b})
+	w := newWorker(t, database, []export.Backend{a, b})
 	runWorkerOnce(w)
 
-	got, err := store.ListExportsByHighlight(context.Background(), h.ID)
+	got, err := database.ListExportsByHighlight(context.Background(), h.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -272,13 +274,13 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 }
 
 func TestNewWorker_RequiresLogger(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = database.Close() })
 
-	_, err = export.NewWorker(store, nil, time.Hour, nil)
+	_, err = export.NewWorker(database, nil, time.Hour, nil)
 	if err == nil {
 		t.Fatal("expected error when logger is nil")
 	}
@@ -292,13 +294,13 @@ func TestNewWorker_RequiresStore(t *testing.T) {
 }
 
 func TestNewWorker_RequiresPositiveInterval(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	t.Cleanup(func() { _ = store.Close() })
+	t.Cleanup(func() { _ = database.Close() })
 
-	_, err = export.NewWorker(store, nil, 0, silentLogger())
+	_, err = export.NewWorker(database, nil, 0, silentLogger())
 	if err == nil {
 		t.Fatal("expected error when interval is zero")
 	}

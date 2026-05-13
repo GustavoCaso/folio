@@ -6,18 +6,19 @@ import (
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 )
 
 var content = []byte{'a', 'b', 'c'}
 
 func TestCreateAndGetJob(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	job, err := store.CreateJob(context.Background(), "book.pdf", content, "req-123")
+	job, err := database.CreateJob(context.Background(), "book.pdf", content, "req-123")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -34,7 +35,7 @@ func TestCreateAndGetJob(t *testing.T) {
 		t.Fatalf("expected content %s, got %q", content, job.Content)
 	}
 
-	got, err := store.GetJob(context.Background(), job.ID)
+	got, err := database.GetJob(context.Background(), job.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -50,67 +51,70 @@ func TestCreateAndGetJob(t *testing.T) {
 }
 
 func TestUpdateJobStatus(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
-	if err := store.UpdateJobStatus(context.Background(), job.ID, "PROCESSING"); err != nil {
+	job, err := database.CreateJob(context.Background(), "book.pdf", content, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := database.UpdateJobStatus(context.Background(), job.ID, "PROCESSING"); err != nil {
 		t.Fatal(err)
 	}
 
-	got, _ := store.GetJob(context.Background(), job.ID)
+	got, _ := database.GetJob(context.Background(), job.ID)
 	if got.Status != "PROCESSING" {
 		t.Fatalf("expected PROCESSING, got %s", got.Status)
 	}
 }
 
 func TestUpdateReadingProgress(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
-	if err := store.UpdateReadingProgress(context.Background(), job.ID, "paragraph-42"); err != nil {
+	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "")
+	if err := database.UpdateReadingProgress(context.Background(), job.ID, "paragraph-42"); err != nil {
 		t.Fatal(err)
 	}
 
-	got, _ := store.GetJob(context.Background(), job.ID)
+	got, _ := database.GetJob(context.Background(), job.ID)
 	if got.ReadingProgress != "paragraph-42" {
 		t.Fatalf("expected paragraph-42, got %q", got.ReadingProgress)
 	}
 }
 
 func TestGetPendingJobs(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
 
-	pending1, _ := store.CreateJob(ctx, "a.pdf", content, "")
-	pending2, _ := store.CreateJob(ctx, "b.pdf", content, "")
-	processing, _ := store.CreateJob(ctx, "c.pdf", content, "")
-	done, _ := store.CreateJob(ctx, "d.pdf", content, "")
-	failed, _ := store.CreateJob(ctx, "e.pdf", content, "")
+	pending1, _ := database.CreateJob(ctx, "a.pdf", content, "")
+	pending2, _ := database.CreateJob(ctx, "b.pdf", content, "")
+	processing, _ := database.CreateJob(ctx, "c.pdf", content, "")
+	done, _ := database.CreateJob(ctx, "d.pdf", content, "")
+	failed, _ := database.CreateJob(ctx, "e.pdf", content, "")
 
-	if err := store.UpdateJobStatus(ctx, processing.ID, "PROCESSING"); err != nil {
+	if err := database.UpdateJobStatus(ctx, processing.ID, "PROCESSING"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(ctx, done.ID, "/data/d.md"); err != nil {
+	if err := database.MarkJobDone(ctx, done.ID, "/data/d.md"); err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobFailed(ctx, failed.ID, "boom"); err != nil {
+	if err := database.MarkJobFailed(ctx, failed.ID, "boom"); err != nil {
 		t.Fatal(err)
 	}
 
-	jobs, err := store.GetPendingJobs(ctx)
+	jobs, err := database.GetPendingJobs(ctx)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -134,13 +138,13 @@ func TestGetPendingJobs(t *testing.T) {
 }
 
 func TestGetPendingJobsEmpty(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	jobs, err := store.GetPendingJobs(context.Background())
+	jobs, err := database.GetPendingJobs(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -150,22 +154,22 @@ func TestGetPendingJobsEmpty(t *testing.T) {
 }
 
 func TestMarkJobDone(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
+	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "")
 	if len(job.Content) == 0 {
 		t.Fatalf("expected content to not be empty, got %v", job.Content)
 	}
 
-	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
+	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
 
-	got, _ := store.GetJob(context.Background(), job.ID)
+	got, _ := database.GetJob(context.Background(), job.ID)
 	if got.Status != "DONE" {
 		t.Fatalf("expected DONE, got %s", got.Status)
 	}
@@ -179,15 +183,15 @@ func TestMarkJobDone(t *testing.T) {
 }
 
 func TestCreateAndListHighlights(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
+	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "")
 
-	h := db.Highlight{
+	h := domain.Highlight{
 		JobID:        job.ID,
 		StartBlockID: "introduction",
 		EndBlockID:   "introduction",
@@ -198,7 +202,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 		Note:         "my note",
 	}
 
-	created, err := store.CreateHighlight(context.Background(), h)
+	created, err := database.CreateHighlight(context.Background(), h)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -206,7 +210,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 		t.Fatal("expected non-empty highlight ID")
 	}
 
-	highlights, err := store.ListHighlights(context.Background(), job.ID)
+	highlights, err := database.ListHighlights(context.Background(), job.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,39 +223,39 @@ func TestCreateAndListHighlights(t *testing.T) {
 }
 
 func TestDeleteJob(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "test.pdf", content, "req-1")
+	job, err := database.CreateJob(ctx, "test.pdf", content, "req-1")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := store.DeleteJob(ctx, job.ID); err != nil {
+	if err := database.DeleteJob(ctx, job.ID); err != nil {
 		t.Fatalf("DeleteJob: %v", err)
 	}
 
-	_, err = store.GetJob(ctx, job.ID)
+	_, err = database.GetJob(ctx, job.ID)
 	if err == nil {
 		t.Error("expected error after delete, got nil")
 	}
 }
 
 func TestRetryJob(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "test.pdf", content, "req-1")
+	job, err := database.CreateJob(ctx, "test.pdf", content, "req-1")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -260,12 +264,12 @@ func TestRetryJob(t *testing.T) {
 		t.Fatalf("job must retry count to 0 after CreateJob, got: %d", job.RetryCount)
 	}
 
-	err = store.MarkJobFailed(ctx, job.ID, "testing retry logic")
+	err = database.MarkJobFailed(ctx, job.ID, "testing retry logic")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	job, err = store.GetJob(ctx, job.ID)
+	job, err = database.GetJob(ctx, job.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -274,12 +278,12 @@ func TestRetryJob(t *testing.T) {
 		t.Fatalf("job must have failed status after MarkJobFailed, got: %s", job.Status)
 	}
 
-	err = store.RetryJob(ctx, job.ID)
+	err = database.RetryJob(ctx, job.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	job, err = store.GetJob(ctx, job.ID)
+	job, err = database.GetJob(ctx, job.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,35 +298,41 @@ func TestRetryJob(t *testing.T) {
 }
 
 func TestDeleteHighlight(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
-	h, _ := store.CreateHighlight(context.Background(), db.Highlight{
+	job, err := database.CreateJob(context.Background(), "book.pdf", content, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := database.CreateHighlight(context.Background(), domain.Highlight{
 		JobID: job.ID, StartBlockID: "intro", EndBlockID: "intro", StartPos: 0, EndPos: 10, Text: "text",
 	})
-
-	if err := store.DeleteHighlight(context.Background(), h.ID); err != nil {
+	if err != nil {
 		t.Fatal(err)
 	}
 
-	highlights, _ := store.ListHighlights(context.Background(), job.ID)
+	if err := database.DeleteHighlight(context.Background(), h.ID); err != nil {
+		t.Fatal(err)
+	}
+
+	highlights, _ := database.ListHighlights(context.Background(), job.ID)
 	if len(highlights) != 0 {
 		t.Fatalf("expected 0 highlights, got %d", len(highlights))
 	}
 }
 
 func TestDeleteHighlight_NotFound(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer func() { _ = store.Close() }()
+	defer func() { _ = database.Close() }()
 
-	err = store.DeleteHighlight(context.Background(), "no-such-id")
+	err = database.DeleteHighlight(context.Background(), "no-such-id")
 	if err == nil {
 		t.Fatal("expected an error when deleting a non-existent highlight, got nil")
 	}

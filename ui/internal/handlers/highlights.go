@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"net/http"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/templui/templui/components/toast"
 )
@@ -32,7 +32,7 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	created, err := h.store.CreateHighlight(r.Context(), db.Highlight{
+	created, err := h.store.CreateHighlight(r.Context(), domain.Highlight{
 		JobID:        req.JobID,
 		StartBlockID: req.StartBlockID,
 		EndBlockID:   req.EndBlockID,

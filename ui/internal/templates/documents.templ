@@ -3,13 +3,13 @@ package templates
 import (
 	"strings"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
 )
 
-templ jobCard(j db.Job) {
+templ jobCard(j domain.Job) {
 	@card.Card(card.Props{ID: "job-" + j.ID}) {
 		@card.Content(card.ContentProps{Class: "flex flex-col gap-3"}) {
 			<div class="flex items-start justify-between gap-2">
@@ -90,7 +90,7 @@ templ jobBadge(status string) {
 	}
 }
 
-templ DocumentList(jobs []db.Job) {
+templ DocumentList(jobs []domain.Job) {
 	if len(jobs) > 0 {
 		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
 			for _, j := range jobs {
@@ -100,7 +100,7 @@ templ DocumentList(jobs []db.Job) {
 	}
 }
 
-templ Documents(jobs []db.Job, watchJobIDs []string, errMsg string) {
+templ Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) {
 	@Layout("Documents") {
 		@ErrorBanner(errMsg)
 		<div class="flex flex-col gap-8">

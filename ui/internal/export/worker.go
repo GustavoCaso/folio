@@ -7,17 +7,17 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 type Worker struct {
-	store    *db.Store
+	store    repository.ExportRepository
 	backends []Backend
 	interval time.Duration
 	logger   *slog.Logger
 }
 
-func NewWorker(store *db.Store, backends []Backend, interval time.Duration, logger *slog.Logger) (*Worker, error) {
+func NewWorker(store repository.ExportRepository, backends []Backend, interval time.Duration, logger *slog.Logger) (*Worker, error) {
 	if logger == nil {
 		return nil, errors.New("export.NewWorker: logger is required")
 	}
@@ -82,8 +82,8 @@ func (w *Worker) RunOnce(ctx context.Context) {
 		if err != nil {
 			w.logger.Error("export failed", "backend", backend.Name(), "err", err)
 			for _, rec := range records {
-				if dbErr := w.store.MarkHighlightExportFailed(ctx, rec.ID, err.Error()); dbErr != nil {
-					w.logger.Error("mark export failed", "export_id", rec.ID, "err", dbErr)
+				if repoErr := w.store.MarkHighlightExportFailed(ctx, rec.ID, err.Error()); repoErr != nil {
+					w.logger.Error("mark export failed", "export_id", rec.ID, "err", repoErr)
 				}
 			}
 			continue
@@ -99,13 +99,13 @@ func (w *Worker) RunOnce(ctx context.Context) {
 				}
 
 				w.logger.Warn("highlight export failed", "backend", backend.Name(), "export_id", res.ExportID, "err", res.Err)
-				if dbErr := w.store.MarkHighlightExportFailed(ctx, res.ExportID, errorMessage); dbErr != nil {
-					w.logger.Error("mark export failed", "export_id", res.ExportID, "err", dbErr)
+				if repoErr := w.store.MarkHighlightExportFailed(ctx, res.ExportID, errorMessage); repoErr != nil {
+					w.logger.Error("mark export failed", "export_id", res.ExportID, "err", repoErr)
 				}
 			} else {
 				w.logger.Info("highlight exported", "backend", backend.Name(), "export_id", res.ExportID, "external_id", res.ExternalID)
-				if dbErr := w.store.MarkHighlightExported(ctx, res.ExportID, res.ExternalID); dbErr != nil {
-					w.logger.Error("mark highlight exported", "export_id", res.ExportID, "err", dbErr)
+				if repoErr := w.store.MarkHighlightExported(ctx, res.ExportID, res.ExternalID); repoErr != nil {
+					w.logger.Error("mark highlight exported", "export_id", res.ExportID, "err", repoErr)
 				}
 			}
 		}

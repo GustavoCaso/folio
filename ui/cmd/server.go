@@ -33,13 +33,13 @@ func Execute() {
 		"log_level", *logLevel,
 	)
 
-	store, err := db.New(*dbPath)
+	database, err := db.New(*dbPath)
 	if err != nil {
 		logger.Error("db open failed", logging.Err(err), "db_path", *dbPath)
 		os.Exit(1)
 	}
 	defer func() {
-		if err := store.Close(); err != nil {
+		if err := database.Close(); err != nil {
 			logger.Error("db close failed", logging.Err(err))
 		}
 	}()
@@ -93,7 +93,7 @@ func Execute() {
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		worker, err := export.NewWorker(store, backends, exportInterval, logger.With("component", "export.worker"))
+		worker, err := export.NewWorker(database, backends, exportInterval, logger.With("component", "export.worker"))
 		if err != nil {
 			logger.Error("export init failed", logging.Err(err))
 			os.Exit(1)
@@ -102,7 +102,7 @@ func Execute() {
 		logger.Info("export worker started", "interval", exportInterval)
 	}
 
-	mux, err := handlers.Register(store, h, pc, *dataDir, logger.With("component", "handlers"), backends)
+	mux, err := handlers.Register(database, h, pc, *dataDir, logger.With("component", "handlers"), backends)
 	if err != nil {
 		logger.Error("handlers register failed", logging.Err(err))
 		os.Exit(1)
