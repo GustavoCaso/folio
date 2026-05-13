@@ -65,7 +65,10 @@ func TestUpdateJobStatus(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
+	job, err := store.CreateJob(context.Background(), "book.pdf", content, "")
+	if err != nil {
+		t.Fatal(err)
+	}
 	if err := store.UpdateJobStatus(context.Background(), job.ID, "PROCESSING"); err != nil {
 		t.Fatal(err)
 	}
@@ -341,10 +344,16 @@ func TestDeleteHighlight(t *testing.T) {
 	}
 	defer func() { _ = store.Close() }()
 
-	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
-	h, _ := store.CreateHighlight(context.Background(), repository.Highlight{
+	job, err := store.CreateJob(context.Background(), "book.pdf", content, "")
+	if err != nil {
+		t.Fatal(err)
+	}
+	h, err := store.CreateHighlight(context.Background(), repository.Highlight{
 		JobID: job.ID, StartBlockID: "intro", EndBlockID: "intro", StartPos: 0, EndPos: 10, Text: "text",
 	})
+	if err != nil {
+		t.Fatal(err)
+	}
 
 	if err := store.DeleteHighlight(context.Background(), h.ID); err != nil {
 		t.Fatal(err)
