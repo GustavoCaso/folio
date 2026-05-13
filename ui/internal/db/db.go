@@ -50,7 +50,7 @@ func (d *db) Close() error {
 	return d.rawConn.Close()
 }
 
-func (d *db) WithTx(ctx context.Context, fn repository.TxFn) error {
+func (d *db) WithTx(ctx context.Context, fn func(ctx context.Context, store repository.Store) error) error {
 	if d.rawConn == nil {
 		return errors.New("db.WithTx: cannot start a transaction inside a transaction")
 	}
@@ -60,8 +60,8 @@ func (d *db) WithTx(ctx context.Context, fn repository.TxFn) error {
 	}
 	txDB := &db{conn: tx, rawConn: nil}
 	if err := fn(ctx, txDB); err != nil {
-		_ = tx.Rollback()
-		return err
+		txError := tx.Rollback()
+		return errors.Join([]error{txError, err}...)
 	}
 	return tx.Commit()
 }

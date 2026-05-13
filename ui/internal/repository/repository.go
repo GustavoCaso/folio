@@ -34,12 +34,10 @@ type ExportRepository interface {
 	ListAllExports(ctx context.Context) ([]domain.ExportRecord, error)
 }
 
-type TxFn func(ctx context.Context, store Store) error
-
 type Store interface {
 	JobRepository
 	HighlightRepository
 	ExportRepository
-	WithTx(ctx context.Context, fn TxFn) error
+	WithTx(ctx context.Context, fn func(ctx context.Context, store Store) error) error
 	Close() error
 }
