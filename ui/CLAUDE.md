@@ -23,7 +23,8 @@ Python is treated as stateless — no file paths are exchanged.
 - `parser/client/` — gRPC client: sends PDF chunks, receives StatusUpdates + markdown, publishes to Hub
 - `parser/proto/` — generated protobuf bindings (do not edit manually)
 - `renderer/` — goldmark Markdown renderer with data-block-id injection for highlight anchoring
-- `repository/` — domain types, repository interfaces, and the SQL-backed repository implementation
+- `domain/` — domain types
+- `repository/` — repository interfaces
 - `handlers/` — HTTP handlers (documents, reader, highlights CRUD, SSE)
 - `handlers/static/js/` — client-side JS
 - `handlers/static/css/` - Custom CSS
