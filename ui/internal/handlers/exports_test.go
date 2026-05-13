@@ -9,7 +9,6 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
@@ -35,7 +34,7 @@ func (r *recordingBackend) Delete(_ context.Context, externalID string) error {
 	return nil
 }
 
-func newTestMuxWithBackends(t *testing.T, store *db.Store, backends ...export.Backend) (http.Handler, *hub.Hub) {
+func newTestMuxWithBackends(t *testing.T, store repository.Store, backends ...export.Backend) (http.Handler, *hub.Hub) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h, err := hub.New(logger)

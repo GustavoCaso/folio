@@ -21,9 +21,10 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
-func newTestStore(t *testing.T) *db.Store {
+func newTestStore(t *testing.T) repository.Store {
 	t.Helper()
 	store, err := db.New(":memory:")
 	if err != nil {
@@ -33,7 +34,7 @@ func newTestStore(t *testing.T) *db.Store {
 	return store
 }
 
-func newTestMux(t *testing.T, store *db.Store) (http.Handler, *hub.Hub) {
+func newTestMux(t *testing.T, store repository.Store) (http.Handler, *hub.Hub) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h, err := hub.New(logger)
@@ -47,7 +48,7 @@ func newTestMux(t *testing.T, store *db.Store) (http.Handler, *hub.Hub) {
 	return mux, h
 }
 
-func newTestMuxWithParser(t *testing.T, store *db.Store, parser handlers.ParserClient) http.Handler {
+func newTestMuxWithParser(t *testing.T, store repository.Store, parser handlers.ParserClient) http.Handler {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h, err := hub.New(logger)

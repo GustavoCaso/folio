@@ -14,9 +14,14 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 func Execute() {
+	execute(func(path string) (repository.Store, error) { return db.New(path) })
+}
+
+func execute(openStore func(path string) (repository.Store, error)) {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", envOr("DB_PATH", "/data/folio.db"), "SQLite DB path")
 	parserAddr := flag.String("parser", envOr("PARSER_GRPC_ADDR", "localhost:50051"), "Parser gRPC address")
@@ -33,7 +38,7 @@ func Execute() {
 		"log_level", *logLevel,
 	)
 
-	store, err := db.New(*dbPath)
+	store, err := openStore(*dbPath)
 	if err != nil {
 		logger.Error("db open failed", logging.Err(err), "db_path", *dbPath)
 		os.Exit(1)

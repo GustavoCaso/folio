@@ -9,13 +9,12 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 // seedJobAndHighlight creates a job, marks it done, then creates a highlight
 // attached to that job. Returns both for further assertions.
-func seedJobAndHighlight(t *testing.T, store *db.Store) (repository.Job, repository.Highlight) {
+func seedJobAndHighlight(t *testing.T, store repository.Store) (repository.Job, repository.Highlight) {
 	t.Helper()
 	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "req-1")
 	if err != nil {

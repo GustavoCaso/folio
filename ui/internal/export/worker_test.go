@@ -77,7 +77,7 @@ func silentLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-func newWorker(t *testing.T, store *db.Store, backends []export.Backend) *export.Worker {
+func newWorker(t *testing.T, store repository.ExportRepository, backends []export.Backend) *export.Worker {
 	t.Helper()
 	w, err := export.NewWorker(store, backends, time.Hour, silentLogger())
 	if err != nil {
