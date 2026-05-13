@@ -6,6 +6,7 @@ import (
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 var content = []byte{'a', 'b', 'c'}
@@ -187,7 +188,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 
 	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
 
-	h := db.Highlight{
+	h := repository.Highlight{
 		JobID:        job.ID,
 		StartBlockID: "introduction",
 		EndBlockID:   "introduction",
@@ -301,7 +302,7 @@ func TestDeleteHighlight(t *testing.T) {
 	defer func() { _ = store.Close() }()
 
 	job, _ := store.CreateJob(context.Background(), "book.pdf", content, "")
-	h, _ := store.CreateHighlight(context.Background(), db.Highlight{
+	h, _ := store.CreateHighlight(context.Background(), repository.Highlight{
 		JobID: job.ID, StartBlockID: "intro", EndBlockID: "intro", StartPos: 0, EndPos: 10, Text: "text",
 	})
 

@@ -11,7 +11,7 @@ import templruntime "github.com/a-h/templ/runtime"
 import (
 	"unicode/utf8"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/table"
 )
@@ -127,7 +127,7 @@ func exportStatusBadge(status string) templ.Component {
 	})
 }
 
-func Exports(records []db.ExportRecord) templ.Component {
+func Exports(records []repository.ExportRecord) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {

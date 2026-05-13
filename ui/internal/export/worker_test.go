@@ -10,6 +10,7 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/export"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 // fakeBackend is a controllable Backend for testing the Worker.
@@ -44,7 +45,7 @@ func (f *fakeBackend) Delete(_ context.Context, externalID string) error {
 }
 
 // newWorkerStore creates an in-memory store seeded with a DONE job and one highlight with a PENDING export row.
-func newWorkerStore(t *testing.T, backendName string) (*db.Store, db.Highlight) {
+func newWorkerStore(t *testing.T, backendName string) (*db.Store, repository.Highlight) {
 	t.Helper()
 	store, err := db.New(":memory:")
 	if err != nil {
@@ -59,7 +60,7 @@ func newWorkerStore(t *testing.T, backendName string) (*db.Store, db.Highlight) 
 	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h, err := store.CreateHighlight(context.Background(), repository.Highlight{
 		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 5, Text: "hello",
 	})
@@ -242,7 +243,7 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h, err := store.CreateHighlight(context.Background(), repository.Highlight{
 		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 5, Text: "hello",
 	})

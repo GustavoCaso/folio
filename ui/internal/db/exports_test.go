@@ -5,10 +5,11 @@ import (
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 // seedJobAndHighlightForExport creates a DONE job, one highlight, and a PENDING export row for backendName.
-func seedJobAndHighlightForExport(t *testing.T, store *db.Store, backendName string) (db.Job, db.Highlight) {
+func seedJobAndHighlightForExport(t *testing.T, store *db.Store, backendName string) (repository.Job, repository.Highlight) {
 	t.Helper()
 	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req")
 	if err != nil {
@@ -17,7 +18,7 @@ func seedJobAndHighlightForExport(t *testing.T, store *db.Store, backendName str
 	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h, err := store.CreateHighlight(context.Background(), repository.Highlight{
 		JobID:        job.ID,
 		StartBlockID: "p-1",
 		EndBlockID:   "p-1",
@@ -271,7 +272,7 @@ func TestListAllExports_ReturnsAllRecords(t *testing.T) {
 	exportID1 := pendingExportID(t, store, "readwise")
 
 	// Second highlight on the same job.
-	h2, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h2, err := store.CreateHighlight(context.Background(), repository.Highlight{
 		JobID: h1.JobID, StartBlockID: "p-2", EndBlockID: "p-2",
 		StartPos: 0, EndPos: 3, Text: "bye",
 	})

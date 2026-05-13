@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
 )
 
-func renderReader(t *testing.T, job db.Job, html string, hls []db.Highlight) string {
+func renderReader(t *testing.T, job repository.Job, html string, hls []repository.Highlight) string {
 	t.Helper()
 	var buf bytes.Buffer
 	if err := templates.Reader(job, html, hls).Render(context.Background(), &buf); err != nil {
@@ -20,8 +20,8 @@ func renderReader(t *testing.T, job db.Job, html string, hls []db.Highlight) str
 }
 
 func TestReaderEmbedsHighlightsJSON(t *testing.T) {
-	hls := []db.Highlight{{ID: "h1", StartBlockID: "paragraph-1", EndBlockID: "paragraph-1"}}
-	got := renderReader(t, db.Job{ID: "j1", Filename: "doc.pdf"}, "<p>x</p>", hls)
+	hls := []repository.Highlight{{ID: "h1", StartBlockID: "paragraph-1", EndBlockID: "paragraph-1"}}
+	got := renderReader(t, repository.Job{ID: "j1", Filename: "doc.pdf"}, "<p>x</p>", hls)
 
 	if !strings.Contains(got, `id="highlights-data"`) {
 		t.Errorf("expected highlights-data script tag, got: %s", got)
@@ -35,7 +35,7 @@ func TestReaderEmbedsHighlightsJSON(t *testing.T) {
 }
 
 func TestReaderScriptHasNoUnrenderedTemplExpression(t *testing.T) {
-	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, repository.Job{ID: "j1"}, "", nil)
 
 	// Regression: templ does NOT interpolate { ... } inside raw <script>.
 	// Previous code shipped `window.__highlights = { templ.Raw(...) };` literally,
@@ -48,7 +48,7 @@ func TestReaderScriptHasNoUnrenderedTemplExpression(t *testing.T) {
 }
 
 func TestReaderRendersHTMLAndJobID(t *testing.T) {
-	got := renderReader(t, db.Job{ID: "abc", Filename: "doc.pdf"}, "<h1>Title</h1>", nil)
+	got := renderReader(t, repository.Job{ID: "abc", Filename: "doc.pdf"}, "<h1>Title</h1>", nil)
 
 	if !strings.Contains(got, `data-job-id="abc"`) {
 		t.Errorf("expected job ID data attr, got: %s", got)
@@ -59,7 +59,7 @@ func TestReaderRendersHTMLAndJobID(t *testing.T) {
 }
 
 func TestReaderRendersPopover(t *testing.T) {
-	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, repository.Job{ID: "j1"}, "", nil)
 
 	if !strings.Contains(got, `id="hl-popover"`) {
 		t.Errorf("expected popover root id, got: %s", got)
@@ -82,14 +82,14 @@ func TestReaderRendersPopover(t *testing.T) {
 }
 
 func TestReaderRendersPopoverErrorElement(t *testing.T) {
-	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, repository.Job{ID: "j1"}, "", nil)
 
 	if !strings.Contains(got, `id="hl-error" class="hidden`) {
 		t.Errorf("expected error element id, got: %s", got)
 	}
 }
 func TestReaderRendersTooltip(t *testing.T) {
-	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, repository.Job{ID: "j1"}, "", nil)
 
 	if !strings.Contains(got, `id="hl-tooltip"`) {
 		t.Errorf("expected tooltip container, got: %s", got)
@@ -103,7 +103,7 @@ func TestReaderRendersTooltip(t *testing.T) {
 }
 
 func TestReaderHighlightsPanelEmpty(t *testing.T) {
-	got := renderReader(t, db.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, repository.Job{ID: "j1"}, "", nil)
 
 	if !strings.Contains(got, `id="highlights-panel"`) {
 		t.Errorf("expected highlights panel, got: %s", got)
@@ -114,11 +114,11 @@ func TestReaderHighlightsPanelEmpty(t *testing.T) {
 }
 
 func TestReaderHighlightsPanelWithHighlights(t *testing.T) {
-	hls := []db.Highlight{
+	hls := []repository.Highlight{
 		{ID: "h1", Text: "selected text", Tag: "important", Note: "a note"},
 		{ID: "h2", Text: "another selection", Tag: "", Note: ""},
 	}
-	got := renderReader(t, db.Job{ID: "j1"}, "", hls)
+	got := renderReader(t, repository.Job{ID: "j1"}, "", hls)
 
 	if strings.Contains(got, "No highlights yet") {
 		t.Errorf("unexpected empty-state message when highlights are present")

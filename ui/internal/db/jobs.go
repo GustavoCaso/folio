@@ -4,24 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/google/uuid"
 )
 
-type Job struct {
-	ID              string
-	Filename        string
-	RequestID       string
-	Content         []byte
-	RetryCount      int
-	Status          string
-	ReadingProgress string
-	Error           string
-	OutputPath      string
-	CreatedAt       time.Time
-	UpdatedAt       time.Time
-}
-
-func (s *Store) CreateJob(ctx context.Context, filename string, content []byte, requestID string) (Job, error) {
+func (s *Store) CreateJob(ctx context.Context, filename string, content []byte, requestID string) (repository.Job, error) {
 	now := time.Now().UTC()
 	id := uuid.NewString()
 	_, err := s.db.ExecContext(ctx,
@@ -30,19 +17,19 @@ func (s *Store) CreateJob(ctx context.Context, filename string, content []byte, 
 		id, filename, requestID, content, now.Format(time.RFC3339), now.Format(time.RFC3339),
 	)
 	if err != nil {
-		return Job{}, err
+		return repository.Job{}, err
 	}
-	return Job{ID: id, Filename: filename, RequestID: requestID, Content: content, Status: "PENDING", CreatedAt: now, UpdatedAt: now}, nil
+	return repository.Job{ID: id, Filename: filename, RequestID: requestID, Content: content, Status: "PENDING", CreatedAt: now, UpdatedAt: now}, nil
 }
 
-func (s *Store) GetJob(ctx context.Context, id string) (Job, error) {
+func (s *Store) GetJob(ctx context.Context, id string) (repository.Job, error) {
 	row := s.db.QueryRowContext(ctx,
 		`SELECT id, filename, request_id, content, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs WHERE id = ?`, id)
 	return scanJob(row)
 }
 
-func (s *Store) GetPendingJobs(ctx context.Context) ([]Job, error) {
+func (s *Store) GetPendingJobs(ctx context.Context) ([]repository.Job, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs WHERE status = 'PENDING'`)
@@ -52,7 +39,7 @@ func (s *Store) GetPendingJobs(ctx context.Context) ([]Job, error) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var jobs []Job
+	var jobs []repository.Job
 	for rows.Next() {
 		j, err := scanJob(rows)
 		if err != nil {
@@ -63,7 +50,7 @@ func (s *Store) GetPendingJobs(ctx context.Context) ([]Job, error) {
 	return jobs, rows.Err()
 }
 
-func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
+func (s *Store) ListJobs(ctx context.Context) ([]repository.Job, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, created_at, updated_at
 		 FROM jobs ORDER BY created_at DESC`)
@@ -72,7 +59,7 @@ func (s *Store) ListJobs(ctx context.Context) ([]Job, error) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var jobs []Job
+	var jobs []repository.Job
 	for rows.Next() {
 		j, err := scanJob(rows)
 		if err != nil {
@@ -132,8 +119,8 @@ type scanner interface {
 	Scan(dest ...any) error
 }
 
-func scanJob(s scanner) (Job, error) {
-	var j Job
+func scanJob(s scanner) (repository.Job, error) {
+	var j repository.Job
 	var createdAt, updatedAt string
 	err := s.Scan(
 		&j.ID, &j.Filename, &j.RequestID, &j.Content, &j.RetryCount, &j.Status,
@@ -142,7 +129,7 @@ func scanJob(s scanner) (Job, error) {
 		&createdAt, &updatedAt,
 	)
 	if err != nil {
-		return Job{}, err
+		return repository.Job{}, err
 	}
 	j.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	j.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)

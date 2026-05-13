@@ -3,7 +3,7 @@ package templates
 import (
 	"unicode/utf8"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/table"
 )
@@ -35,7 +35,7 @@ templ exportStatusBadge(status string) {
 	}
 }
 
-templ Exports(records []db.ExportRecord) {
+templ Exports(records []repository.ExportRecord) {
 	@Layout("Exports") {
 		<div class="flex flex-col gap-6">
 			<h1 class="text-2xl font-semibold">Export History</h1>

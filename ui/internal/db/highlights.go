@@ -5,23 +5,11 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/google/uuid"
 )
 
-type Highlight struct {
-	ID           string
-	JobID        string
-	StartBlockID string
-	EndBlockID   string
-	StartPos     int
-	EndPos       int
-	Text         string
-	Tag          string
-	Note         string
-	CreatedAt    time.Time
-}
-
-func (s *Store) CreateHighlight(ctx context.Context, h Highlight) (Highlight, error) {
+func (s *Store) CreateHighlight(ctx context.Context, h repository.Highlight) (repository.Highlight, error) {
 	h.ID = uuid.NewString()
 	h.CreatedAt = time.Now().UTC()
 	_, err := s.db.ExecContext(ctx,
@@ -33,7 +21,7 @@ func (s *Store) CreateHighlight(ctx context.Context, h Highlight) (Highlight, er
 	return h, err
 }
 
-func (s *Store) ListHighlights(ctx context.Context, jobID string) ([]Highlight, error) {
+func (s *Store) ListHighlights(ctx context.Context, jobID string) ([]repository.Highlight, error) {
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT id, job_id, start_block_id, end_block_id, start_pos, end_pos, text, tag, note, created_at
 		 FROM highlights WHERE job_id = ? ORDER BY created_at ASC`, jobID)
@@ -42,9 +30,9 @@ func (s *Store) ListHighlights(ctx context.Context, jobID string) ([]Highlight, 
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []Highlight
+	var out []repository.Highlight
 	for rows.Next() {
-		var h Highlight
+		var h repository.Highlight
 		var createdAt string
 		if err := rows.Scan(&h.ID, &h.JobID, &h.StartBlockID, &h.EndBlockID, &h.StartPos, &h.EndPos,
 			&h.Text, &h.Tag, &h.Note, &createdAt); err != nil {

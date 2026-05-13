@@ -6,11 +6,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
 )
 
-func renderDocuments(t *testing.T, jobs []db.Job, watchJobIDs ...string) string {
+func renderDocuments(t *testing.T, jobs []repository.Job, watchJobIDs ...string) string {
 	t.Helper()
 	var buf bytes.Buffer
 	if err := templates.Documents(jobs, watchJobIDs, "").Render(context.Background(), &buf); err != nil {
@@ -19,7 +19,7 @@ func renderDocuments(t *testing.T, jobs []db.Job, watchJobIDs ...string) string 
 	return buf.String()
 }
 
-func renderDocumentList(t *testing.T, jobs []db.Job) string {
+func renderDocumentList(t *testing.T, jobs []repository.Job) string {
 	t.Helper()
 	var buf bytes.Buffer
 	if err := templates.DocumentList(jobs).Render(context.Background(), &buf); err != nil {
@@ -29,7 +29,7 @@ func renderDocumentList(t *testing.T, jobs []db.Job) string {
 }
 
 func TestDocumentList_RendersIDAndFilename(t *testing.T) {
-	jobs := []db.Job{
+	jobs := []repository.Job{
 		{ID: "j1", Filename: "alpha.pdf", Status: "PENDING"},
 		{ID: "j2", Filename: "beta.pdf", Status: "PENDING"},
 	}
@@ -43,7 +43,7 @@ func TestDocumentList_RendersIDAndFilename(t *testing.T) {
 }
 
 func TestDocumentList_ProcessingOmitsPageCountWhenZero(t *testing.T) {
-	got := renderDocumentList(t, []db.Job{
+	got := renderDocumentList(t, []repository.Job{
 		{ID: "j1", Filename: "doc.pdf", Status: "PROCESSING"},
 	})
 
@@ -53,7 +53,7 @@ func TestDocumentList_ProcessingOmitsPageCountWhenZero(t *testing.T) {
 }
 
 func TestDocumentList_DoneShowsReadLink(t *testing.T) {
-	got := renderDocumentList(t, []db.Job{
+	got := renderDocumentList(t, []repository.Job{
 		{ID: "j2", Filename: "beta.pdf", Status: "DONE"},
 	})
 
@@ -63,7 +63,7 @@ func TestDocumentList_DoneShowsReadLink(t *testing.T) {
 }
 
 func TestDocumentList_FailedShowsErrorMessage(t *testing.T) {
-	got := renderDocumentList(t, []db.Job{
+	got := renderDocumentList(t, []repository.Job{
 		{ID: "j3", Filename: "bad.pdf", Status: "FAILED", Error: "parser timeout"},
 	})
 
@@ -108,7 +108,7 @@ func TestDocumentsOmitsScriptWhenNoWatchJobID(t *testing.T) {
 }
 
 func TestDocumentsIncludesDocumentList(t *testing.T) {
-	jobs := []db.Job{
+	jobs := []repository.Job{
 		{ID: "j1", Filename: "alpha.pdf", Status: "DONE"},
 	}
 	got := renderDocuments(t, jobs)
@@ -149,7 +149,7 @@ func TestDocumentsLoadsScript(t *testing.T) {
 }
 
 func TestDocumentList_ShowsDeleteForDone(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
+	body := renderDocumentList(t, []repository.Job{
 		{ID: "abc123", Filename: "done.pdf", Status: "DONE"},
 	})
 	if !strings.Contains(body, `data-delete-job="abc123"`) {
@@ -158,7 +158,7 @@ func TestDocumentList_ShowsDeleteForDone(t *testing.T) {
 }
 
 func TestDocumentList_ShowsDeleteForFailed(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
+	body := renderDocumentList(t, []repository.Job{
 		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
 	})
 	if !strings.Contains(body, `data-delete-job="def456"`) {
@@ -167,7 +167,7 @@ func TestDocumentList_ShowsDeleteForFailed(t *testing.T) {
 }
 
 func TestDocumentList_ShowsRetryForFailed(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
+	body := renderDocumentList(t, []repository.Job{
 		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
 	})
 	if !strings.Contains(body, `/documents/def456/retry`) {
@@ -176,7 +176,7 @@ func TestDocumentList_ShowsRetryForFailed(t *testing.T) {
 }
 
 func TestDocumentList_ShowsCancelForPending(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
+	body := renderDocumentList(t, []repository.Job{
 		{ID: "ghi789", Filename: "pending.pdf", Status: "PENDING"},
 	})
 	if !strings.Contains(body, `data-cancel-job="ghi789"`) {
@@ -185,7 +185,7 @@ func TestDocumentList_ShowsCancelForPending(t *testing.T) {
 }
 
 func TestDocumentList_NoCancelForDone(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
+	body := renderDocumentList(t, []repository.Job{
 		{ID: "abc123", Filename: "done.pdf", Status: "DONE"},
 	})
 	if strings.Contains(body, `data-cancel-job=`) {
@@ -194,7 +194,7 @@ func TestDocumentList_NoCancelForDone(t *testing.T) {
 }
 
 func TestDocumentList_NoCancelForFailed(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
+	body := renderDocumentList(t, []repository.Job{
 		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
 	})
 	if strings.Contains(body, `data-cancel-job=`) {
@@ -203,7 +203,7 @@ func TestDocumentList_NoCancelForFailed(t *testing.T) {
 }
 
 func TestDocumentList_NoDeleteForPending(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
+	body := renderDocumentList(t, []repository.Job{
 		{ID: "ghi789", Filename: "pending.pdf", Status: "PENDING"},
 	})
 	if strings.Contains(body, `/documents/ghi789/delete`) {
@@ -212,7 +212,7 @@ func TestDocumentList_NoDeleteForPending(t *testing.T) {
 }
 
 func TestDocumentList_NoDeleteForProcessing(t *testing.T) {
-	body := renderDocumentList(t, []db.Job{
+	body := renderDocumentList(t, []repository.Job{
 		{ID: "jkl012", Filename: "processing.pdf", Status: "PROCESSING"},
 	})
 	if strings.Contains(body, `/documents/jkl012/delete`) {

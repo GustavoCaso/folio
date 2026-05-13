@@ -13,6 +13,7 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 // recordingBackend implements export.Backend and records calls for assertions.
@@ -79,7 +80,7 @@ func TestListExports_ShowsExportedRecord(t *testing.T) {
 	if err := store.MarkJobDone(ctx, job.ID, "/data/paper.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(ctx, db.Highlight{
+	h, err := store.CreateHighlight(ctx, repository.Highlight{
 		JobID:        job.ID,
 		StartBlockID: "p-1",
 		EndBlockID:   "p-1",
@@ -137,7 +138,7 @@ func TestListExports_ShowsFailedRecord(t *testing.T) {
 	if err := store.MarkJobDone(ctx, job.ID, "/data/doc.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(ctx, db.Highlight{
+	h, err := store.CreateHighlight(ctx, repository.Highlight{
 		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 4, Text: "highlight text",
 	})

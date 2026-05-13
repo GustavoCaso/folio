@@ -4,6 +4,7 @@ import (
 	"database/sql"
 	"embed"
 
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/golang-migrate/migrate/v4"
 	migratesqlite "github.com/golang-migrate/migrate/v4/database/sqlite"
 	"github.com/golang-migrate/migrate/v4/source/iofs"
@@ -16,6 +17,8 @@ var migrations embed.FS
 type Store struct {
 	db *sql.DB
 }
+
+var _ repository.Store = (*Store)(nil)
 
 func New(path string) (*Store, error) {
 	db, err := sql.Open("sqlite", path)

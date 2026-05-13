@@ -4,24 +4,11 @@ import (
 	"context"
 	"time"
 
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/google/uuid"
 )
 
-type ExportRecord struct {
-	ID            string
-	HighlightID   string
-	HighlightText string
-	HighlightNote string
-	HighlightTag  string
-	JobFilename   string
-	BackendName   string
-	ExternalID    string
-	Status        string // "PENDING" | "EXPORTED" | "FAILED"
-	Error         string
-	ExportedAt    time.Time
-}
-
-func (s *Store) ListUnexportedHighlights(ctx context.Context, backendName string) ([]ExportRecord, error) {
+func (s *Store) ListUnexportedHighlights(ctx context.Context, backendName string) ([]repository.ExportRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT he.id, he.highlight_id, he.backend_name, COALESCE(he.external_id, ''), he.status, COALESCE(he.error, ''), COALESCE(he.exported_at, ''),
 		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename
@@ -35,9 +22,9 @@ func (s *Store) ListUnexportedHighlights(ctx context.Context, backendName string
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []ExportRecord
+	var out []repository.ExportRecord
 	for rows.Next() {
-		var rec ExportRecord
+		var rec repository.ExportRecord
 		var exportedAt string
 		if err := rows.Scan(
 			&rec.ID, &rec.HighlightID, &rec.BackendName, &rec.ExternalID,
@@ -83,7 +70,7 @@ func (s *Store) MarkHighlightExportFailed(ctx context.Context, exportID, errMsg 
 	return err
 }
 
-func (s *Store) ListExportsByHighlight(ctx context.Context, highlightID string) ([]ExportRecord, error) {
+func (s *Store) ListExportsByHighlight(ctx context.Context, highlightID string) ([]repository.ExportRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT id, highlight_id, backend_name, COALESCE(external_id, ''), status, COALESCE(error, ''), COALESCE(exported_at, '')
 		FROM highlight_exports
@@ -94,9 +81,9 @@ func (s *Store) ListExportsByHighlight(ctx context.Context, highlightID string) 
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []ExportRecord
+	var out []repository.ExportRecord
 	for rows.Next() {
-		var rec ExportRecord
+		var rec repository.ExportRecord
 		var exportedAt string
 		if err := rows.Scan(
 			&rec.ID, &rec.HighlightID, &rec.BackendName, &rec.ExternalID,
@@ -110,7 +97,7 @@ func (s *Store) ListExportsByHighlight(ctx context.Context, highlightID string) 
 	return out, rows.Err()
 }
 
-func (s *Store) ListAllExports(ctx context.Context) ([]ExportRecord, error) {
+func (s *Store) ListAllExports(ctx context.Context) ([]repository.ExportRecord, error) {
 	rows, err := s.db.QueryContext(ctx, `
 		SELECT he.id, he.highlight_id, he.backend_name, COALESCE(he.external_id, ''), he.status, COALESCE(he.error, ''), COALESCE(he.exported_at, ''),
 		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename
@@ -123,9 +110,9 @@ func (s *Store) ListAllExports(ctx context.Context) ([]ExportRecord, error) {
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []ExportRecord
+	var out []repository.ExportRecord
 	for rows.Next() {
-		var rec ExportRecord
+		var rec repository.ExportRecord
 		var exportedAt string
 		if err := rows.Scan(
 			&rec.ID, &rec.HighlightID, &rec.BackendName, &rec.ExternalID,
