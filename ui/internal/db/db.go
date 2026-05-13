@@ -1,8 +1,10 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"embed"
+	"errors"
 
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/golang-migrate/migrate/v4"
@@ -14,9 +16,17 @@ import (
 //go:embed migrations/*.sql
 var migrations embed.FS
 
+// sqlExecutor is satisfied by both *sql.DB and *sql.Tx.
+type sqlExecutor interface {
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (*sql.Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) *sql.Row
+}
+
 // db is the SQLite storage layer. It owns all SQL operations and satisfies repository.Store.
 type db struct {
-	conn *sql.DB
+	conn    sqlExecutor // *sql.DB normally, *sql.Tx inside a transaction
+	rawConn *sql.DB     // nil inside a transaction
 }
 
 func New(path string) (repository.Store, error) {
@@ -30,11 +40,30 @@ func New(path string) (repository.Store, error) {
 		return nil, err
 	}
 
-	return &db{conn: sqlDB}, nil
+	return &db{conn: sqlDB, rawConn: sqlDB}, nil
 }
 
 func (d *db) Close() error {
-	return d.conn.Close()
+	if d.rawConn == nil {
+		return nil
+	}
+	return d.rawConn.Close()
+}
+
+func (d *db) WithTx(ctx context.Context, fn repository.TxFn) error {
+	if d.rawConn == nil {
+		return errors.New("db.WithTx: cannot start a transaction inside a transaction")
+	}
+	tx, err := d.rawConn.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	txDB := &db{conn: tx, rawConn: nil}
+	if err := fn(ctx, txDB); err != nil {
+		_ = tx.Rollback()
+		return err
+	}
+	return tx.Commit()
 }
 
 func runMigrations(db *sql.DB) error {
