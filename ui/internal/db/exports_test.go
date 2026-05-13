@@ -9,7 +9,7 @@ import (
 )
 
 // seedJobAndHighlightForExport creates a DONE job, one highlight, and a PENDING export row for backendName.
-func seedJobAndHighlightForExport(t *testing.T, store *db.Store, backendName string) (repository.Job, repository.Highlight) {
+func seedJobAndHighlightForExport(t *testing.T, store *db.Repository, backendName string) (repository.Job, repository.Highlight) {
 	t.Helper()
 	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req")
 	if err != nil {
@@ -37,7 +37,7 @@ func seedJobAndHighlightForExport(t *testing.T, store *db.Store, backendName str
 }
 
 // pendingExportID fetches the single PENDING export row ID for a highlight+backend.
-func pendingExportID(t *testing.T, store *db.Store, backendName string) string {
+func pendingExportID(t *testing.T, store *db.Repository, backendName string) string {
 	t.Helper()
 	records, err := store.ListUnexportedHighlights(context.Background(), backendName)
 	if err != nil {
@@ -50,7 +50,11 @@ func pendingExportID(t *testing.T, store *db.Store, backendName string) string {
 }
 
 func TestListUnexportedHighlights_AllUnexported(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -80,7 +84,11 @@ func TestListUnexportedHighlights_AllUnexported(t *testing.T) {
 }
 
 func TestListUnexportedHighlights_MarkedExportedIsExcluded(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +111,11 @@ func TestListUnexportedHighlights_MarkedExportedIsExcluded(t *testing.T) {
 }
 
 func TestListUnexportedHighlights_FailedIsNotRetried(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,7 +139,11 @@ func TestListUnexportedHighlights_FailedIsNotRetried(t *testing.T) {
 }
 
 func TestListUnexportedHighlights_IsolatedByBackend(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -156,7 +172,11 @@ func TestListUnexportedHighlights_IsolatedByBackend(t *testing.T) {
 }
 
 func TestMarkHighlightExported(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -195,7 +215,11 @@ func TestMarkHighlightExported(t *testing.T) {
 }
 
 func TestMarkHighlightExportFailed(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -228,7 +252,11 @@ func TestMarkHighlightExportFailed(t *testing.T) {
 }
 
 func TestListAllExports_JoinsHighlightAndJob(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -262,7 +290,11 @@ func TestListAllExports_JoinsHighlightAndJob(t *testing.T) {
 }
 
 func TestListAllExports_ReturnsAllRecords(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -321,7 +353,11 @@ func TestListAllExports_ReturnsAllRecords(t *testing.T) {
 }
 
 func TestExportRecord_CascadesOnHighlightDelete(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}

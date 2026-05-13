@@ -14,14 +14,9 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
-	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 func Execute() {
-	execute(func(path string) (repository.Store, error) { return db.New(path) })
-}
-
-func execute(openStore func(path string) (repository.Store, error)) {
 	addr := flag.String("addr", ":8080", "HTTP listen address")
 	dbPath := flag.String("db", envOr("DB_PATH", "/data/folio.db"), "SQLite DB path")
 	parserAddr := flag.String("parser", envOr("PARSER_GRPC_ADDR", "localhost:50051"), "Parser gRPC address")
@@ -38,16 +33,22 @@ func execute(openStore func(path string) (repository.Store, error)) {
 		"log_level", *logLevel,
 	)
 
-	store, err := openStore(*dbPath)
+	database, err := db.New(*dbPath)
 	if err != nil {
 		logger.Error("db open failed", logging.Err(err), "db_path", *dbPath)
 		os.Exit(1)
 	}
 	defer func() {
-		if err := store.Close(); err != nil {
+		if err := database.Close(); err != nil {
 			logger.Error("db close failed", logging.Err(err))
 		}
 	}()
+
+	repo, err := db.NewRepository(database)
+	if err != nil {
+		logger.Error("repository init failed", logging.Err(err))
+		os.Exit(1)
+	}
 
 	h, err := hub.New(logger.With("component", "hub"))
 	if err != nil {
@@ -98,7 +99,7 @@ func execute(openStore func(path string) (repository.Store, error)) {
 		}
 		ctx, cancel := context.WithCancel(context.Background())
 		defer cancel()
-		worker, err := export.NewWorker(store, backends, exportInterval, logger.With("component", "export.worker"))
+		worker, err := export.NewWorker(repo, backends, exportInterval, logger.With("component", "export.worker"))
 		if err != nil {
 			logger.Error("export init failed", logging.Err(err))
 			os.Exit(1)
@@ -107,7 +108,7 @@ func execute(openStore func(path string) (repository.Store, error)) {
 		logger.Info("export worker started", "interval", exportInterval)
 	}
 
-	mux, err := handlers.Register(store, h, pc, *dataDir, logger.With("component", "handlers"), backends)
+	mux, err := handlers.Register(repo, h, pc, *dataDir, logger.With("component", "handlers"), backends)
 	if err != nil {
 		logger.Error("handlers register failed", logging.Err(err))
 		os.Exit(1)

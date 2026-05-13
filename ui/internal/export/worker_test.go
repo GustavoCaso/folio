@@ -45,9 +45,13 @@ func (f *fakeBackend) Delete(_ context.Context, externalID string) error {
 }
 
 // newWorkerStore creates an in-memory store seeded with a DONE job and one highlight with a PENDING export row.
-func newWorkerStore(t *testing.T, backendName string) (*db.Store, repository.Highlight) {
+func newWorkerStore(t *testing.T, backendName string) (repository.Store, repository.Highlight) {
 	t.Helper()
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +234,11 @@ func TestWorker_AlreadyExportedIsSkipped(t *testing.T) {
 }
 
 func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -273,7 +281,11 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 }
 
 func TestNewWorker_RequiresLogger(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -293,7 +305,11 @@ func TestNewWorker_RequiresStore(t *testing.T) {
 }
 
 func TestNewWorker_RequiresPositiveInterval(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}

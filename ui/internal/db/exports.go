@@ -8,8 +8,8 @@ import (
 	"github.com/google/uuid"
 )
 
-func (s *Store) ListUnexportedHighlights(ctx context.Context, backendName string) ([]repository.ExportRecord, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func (r *Repository) ListUnexportedHighlights(ctx context.Context, backendName string) ([]repository.ExportRecord, error) {
+	rows, err := r.db.db.QueryContext(ctx, `
 		SELECT he.id, he.highlight_id, he.backend_name, COALESCE(he.external_id, ''), he.status, COALESCE(he.error, ''), COALESCE(he.exported_at, ''),
 		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename
 		FROM highlight_exports he
@@ -39,18 +39,18 @@ func (s *Store) ListUnexportedHighlights(ctx context.Context, backendName string
 	return out, rows.Err()
 }
 
-func (s *Store) CreateHighlightExport(ctx context.Context, highlightID, backendName string) error {
+func (r *Repository) CreateHighlightExport(ctx context.Context, highlightID, backendName string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.db.ExecContext(ctx, `
+	_, err := r.db.db.ExecContext(ctx, `
 		INSERT INTO highlight_exports (id, highlight_id, status, backend_name, created_at, updated_at)
 		VALUES (?, ?, 'PENDING', ?, ?, ?)`, uuid.NewString(), highlightID, backendName, now, now,
 	)
 	return err
 }
 
-func (s *Store) MarkHighlightExported(ctx context.Context, exportID, externalID string) error {
+func (r *Repository) MarkHighlightExported(ctx context.Context, exportID, externalID string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.db.ExecContext(ctx, `
+	_, err := r.db.db.ExecContext(ctx, `
 		UPDATE highlight_exports
 		SET external_id = ?, status = 'EXPORTED', error = '', exported_at = ?, updated_at = ?
 		WHERE id = ?`,
@@ -59,9 +59,9 @@ func (s *Store) MarkHighlightExported(ctx context.Context, exportID, externalID 
 	return err
 }
 
-func (s *Store) MarkHighlightExportFailed(ctx context.Context, exportID, errMsg string) error {
+func (r *Repository) MarkHighlightExportFailed(ctx context.Context, exportID, errMsg string) error {
 	now := time.Now().UTC().Format(time.RFC3339)
-	_, err := s.db.ExecContext(ctx, `
+	_, err := r.db.db.ExecContext(ctx, `
 		UPDATE highlight_exports
 		SET status = 'FAILED', error = ?, exported_at = ?, updated_at = ?
 		WHERE id = ?`,
@@ -70,8 +70,8 @@ func (s *Store) MarkHighlightExportFailed(ctx context.Context, exportID, errMsg 
 	return err
 }
 
-func (s *Store) ListExportsByHighlight(ctx context.Context, highlightID string) ([]repository.ExportRecord, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func (r *Repository) ListExportsByHighlight(ctx context.Context, highlightID string) ([]repository.ExportRecord, error) {
+	rows, err := r.db.db.QueryContext(ctx, `
 		SELECT id, highlight_id, backend_name, COALESCE(external_id, ''), status, COALESCE(error, ''), COALESCE(exported_at, '')
 		FROM highlight_exports
 		WHERE highlight_id = ?
@@ -97,8 +97,8 @@ func (s *Store) ListExportsByHighlight(ctx context.Context, highlightID string) 
 	return out, rows.Err()
 }
 
-func (s *Store) ListAllExports(ctx context.Context) ([]repository.ExportRecord, error) {
-	rows, err := s.db.QueryContext(ctx, `
+func (r *Repository) ListAllExports(ctx context.Context) ([]repository.ExportRecord, error) {
+	rows, err := r.db.db.QueryContext(ctx, `
 		SELECT he.id, he.highlight_id, he.backend_name, COALESCE(he.external_id, ''), he.status, COALESCE(he.error, ''), COALESCE(he.exported_at, ''),
 		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename
 		FROM highlight_exports he

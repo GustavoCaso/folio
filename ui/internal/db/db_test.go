@@ -12,7 +12,11 @@ import (
 var content = []byte{'a', 'b', 'c'}
 
 func TestCreateAndGetJob(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -51,7 +55,11 @@ func TestCreateAndGetJob(t *testing.T) {
 }
 
 func TestUpdateJobStatus(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,7 +77,11 @@ func TestUpdateJobStatus(t *testing.T) {
 }
 
 func TestUpdateReadingProgress(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -87,7 +99,11 @@ func TestUpdateReadingProgress(t *testing.T) {
 }
 
 func TestGetPendingJobs(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -135,7 +151,11 @@ func TestGetPendingJobs(t *testing.T) {
 }
 
 func TestGetPendingJobsEmpty(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +171,11 @@ func TestGetPendingJobsEmpty(t *testing.T) {
 }
 
 func TestMarkJobDone(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -180,7 +204,11 @@ func TestMarkJobDone(t *testing.T) {
 }
 
 func TestCreateAndListHighlights(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -220,7 +248,11 @@ func TestCreateAndListHighlights(t *testing.T) {
 }
 
 func TestDeleteJob(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -244,7 +276,11 @@ func TestDeleteJob(t *testing.T) {
 }
 
 func TestRetryJob(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +331,11 @@ func TestRetryJob(t *testing.T) {
 }
 
 func TestDeleteHighlight(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -317,7 +357,11 @@ func TestDeleteHighlight(t *testing.T) {
 }
 
 func TestDeleteHighlight_NotFound(t *testing.T) {
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}

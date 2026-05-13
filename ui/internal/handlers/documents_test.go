@@ -26,7 +26,11 @@ import (
 
 func newTestStore(t *testing.T) repository.Store {
 	t.Helper()
-	store, err := db.New(":memory:")
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	store, err := db.NewRepository(database)
 	if err != nil {
 		t.Fatal(err)
 	}
