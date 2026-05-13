@@ -18,11 +18,13 @@ Python is treated as stateless — no file paths are exchanged.
 **Entry point:** `main.go` → `cmd/Execute()`
 
 **Components (`internal/`):**
-- `db/` — SQLite store (jobs + highlights), golang-migrate migrations, modernc.org/sqlite driver
+- `db/` — SQLite connection lifecycle + golang-migrate migrations, modernc.org/sqlite driver
 - `hub/` — in-memory pub/sub: routes gRPC stream status events to SSE connections per job ID
 - `parser/client/` — gRPC client: sends PDF chunks, receives StatusUpdates + markdown, publishes to Hub
 - `parser/proto/` — generated protobuf bindings (do not edit manually)
 - `renderer/` — goldmark Markdown renderer with data-block-id injection for highlight anchoring
+- `domain/` — domain types
+- `repository/` — repository interfaces
 - `handlers/` — HTTP handlers (documents, reader, highlights CRUD, SSE)
 - `handlers/static/js/` — client-side JS
 - `handlers/static/css/` - Custom CSS

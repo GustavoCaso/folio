@@ -9,12 +9,13 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 // seedJobAndHighlight creates a job, marks it done, then creates a highlight
 // attached to that job. Returns both for further assertions.
-func seedJobAndHighlight(t *testing.T, store *db.Store) (db.Job, db.Highlight) {
+func seedJobAndHighlight(t *testing.T, store repository.Store) (domain.Job, domain.Highlight) {
 	t.Helper()
 	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "req-1")
 	if err != nil {
@@ -23,7 +24,7 @@ func seedJobAndHighlight(t *testing.T, store *db.Store) (db.Job, db.Highlight) {
 	if err := store.MarkJobDone(context.Background(), job.ID, "/dev/null"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(context.Background(), db.Highlight{
+	h, err := store.CreateHighlight(context.Background(), domain.Highlight{
 		JobID:        job.ID,
 		StartBlockID: "paragraph-1",
 		EndBlockID:   "paragraph-1",

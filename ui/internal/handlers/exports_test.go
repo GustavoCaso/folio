@@ -9,10 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 // recordingBackend implements export.Backend and records calls for assertions.
@@ -34,7 +35,7 @@ func (r *recordingBackend) Delete(_ context.Context, externalID string) error {
 	return nil
 }
 
-func newTestMuxWithBackends(t *testing.T, store *db.Store, backends ...export.Backend) (http.Handler, *hub.Hub) {
+func newTestMuxWithBackends(t *testing.T, store repository.Store, backends ...export.Backend) (http.Handler, *hub.Hub) {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h, err := hub.New(logger)
@@ -79,7 +80,7 @@ func TestListExports_ShowsExportedRecord(t *testing.T) {
 	if err := store.MarkJobDone(ctx, job.ID, "/data/paper.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(ctx, db.Highlight{
+	h, err := store.CreateHighlight(ctx, domain.Highlight{
 		JobID:        job.ID,
 		StartBlockID: "p-1",
 		EndBlockID:   "p-1",
@@ -137,7 +138,7 @@ func TestListExports_ShowsFailedRecord(t *testing.T) {
 	if err := store.MarkJobDone(ctx, job.ID, "/data/doc.md"); err != nil {
 		t.Fatal(err)
 	}
-	h, err := store.CreateHighlight(ctx, db.Highlight{
+	h, err := store.CreateHighlight(ctx, domain.Highlight{
 		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 4, Text: "highlight text",
 	})

@@ -1,7 +1,7 @@
 package templates
 
 import (
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
 	"github.com/templui/templui/components/input"
@@ -10,7 +10,7 @@ import (
 	"github.com/templui/templui/components/textarea"
 )
 
-templ highlightCard(h db.Highlight) {
+templ highlightCard(h domain.Highlight) {
 	@card.Card(card.Props{Class: "cursor-pointer", Attributes: map[string]any{"data-scroll-to-highlight": h.ID}}) {
 		@card.Content(card.ContentProps{Class: "group flex flex-col gap-1.5"}) {
 			<p class="text-sm font-medium text-card-foreground line-clamp-3">{ h.Text }</p>
@@ -37,7 +37,7 @@ templ highlightCard(h db.Highlight) {
 	}
 }
 
-templ highlightsPanel(highlights []db.Highlight) {
+templ highlightsPanel(highlights []domain.Highlight) {
 	@sheet.Sheet(sheet.Props{
 		ID:   "highlights-panel",
 		Side: sheet.SideRight,
@@ -64,7 +64,7 @@ templ highlightsPanel(highlights []db.Highlight) {
 	}
 }
 
-templ Reader(job db.Job, renderedHTML string, highlights []db.Highlight) {
+templ Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight) {
 	@Layout(job.Filename) {
 		<div id="progress-bar"></div>
 		@highlightsPanel(highlights)

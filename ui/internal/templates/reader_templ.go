@@ -9,7 +9,7 @@ import "github.com/a-h/templ"
 import templruntime "github.com/a-h/templ/runtime"
 
 import (
-	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
 	"github.com/templui/templui/components/input"
@@ -18,7 +18,7 @@ import (
 	"github.com/templui/templui/components/textarea"
 )
 
-func highlightCard(h db.Highlight) templ.Component {
+func highlightCard(h domain.Highlight) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -176,7 +176,7 @@ func highlightCard(h db.Highlight) templ.Component {
 	})
 }
 
-func highlightsPanel(highlights []db.Highlight) templ.Component {
+func highlightsPanel(highlights []domain.Highlight) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -328,7 +328,7 @@ func highlightsPanel(highlights []db.Highlight) templ.Component {
 	})
 }
 
-func Reader(job db.Job, renderedHTML string, highlights []db.Highlight) templ.Component {
+func Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {

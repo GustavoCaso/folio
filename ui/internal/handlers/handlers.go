@@ -11,10 +11,10 @@ import (
 	"sync"
 	"time"
 
-	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/templui/templui/utils"
 )
 
@@ -28,7 +28,7 @@ type ParserClient interface {
 }
 
 type Handlers struct {
-	store   *db.Store
+	store   repository.Store
 	hub     *hub.Hub
 	parser  ParserClient
 	dataDir string
@@ -50,7 +50,7 @@ func (h *Handlers) backendByName(name string) export.Backend {
 	return nil
 }
 
-func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logger *slog.Logger, backends []export.Backend) (*http.ServeMux, error) {
+func Register(store repository.Store, h *hub.Hub, pc ParserClient, dataDir string, logger *slog.Logger, backends []export.Backend) (*http.ServeMux, error) {
 	if logger == nil {
 		return nil, errors.New("handlers.Register: logger is required")
 	}
