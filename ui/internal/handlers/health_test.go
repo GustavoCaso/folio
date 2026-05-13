@@ -9,6 +9,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
+	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
@@ -29,7 +30,7 @@ func newHealthMux(t *testing.T, healthy bool) http.Handler {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mux, err := handlers.Register(nil, h, &fakeParserClient{healthy: healthy}, t.TempDir(), logger)
+	mux, err := handlers.Register(newTestStore(t), h, &fakeParserClient{healthy: healthy}, t.TempDir(), logger, []export.Backend{})
 	if err != nil {
 		t.Fatal(err)
 	}

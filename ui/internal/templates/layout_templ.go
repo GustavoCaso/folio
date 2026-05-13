@@ -58,7 +58,7 @@ func Layout(title string) templ.Component {
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</head><body class=\"min-h-screen bg-background text-foreground\"><header class=\"border-b border-border\"><div class=\"mx-auto max-w-4xl flex items-center justify-between px-4 py-3\"><a href=\"/\" class=\"font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity\" style=\"font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;\">Folio</a><div id=\"parser-status-badge\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 3, "</head><body class=\"min-h-screen bg-background text-foreground\"><header class=\"border-b border-border\"><div class=\"mx-auto max-w-4xl flex items-center justify-between px-4 py-3\"><div class=\"flex items-center gap-6\"><a href=\"/\" class=\"font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity\" style=\"font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;\">Folio</a> <a href=\"/exports\" class=\"text-sm text-muted-foreground hover:text-foreground transition-colors\">Exports</a></div><div id=\"parser-status-badge\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -129,7 +129,7 @@ func ErrorBanner(msg string) templ.Component {
 			var templ_7745c5c3_Var5 string
 			templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 80, Col: 128}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 83, Col: 128}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 			if templ_7745c5c3_Err != nil {

@@ -1,0 +1,102 @@
+package templates
+
+import (
+	"unicode/utf8"
+
+	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/templui/templui/components/badge"
+	"github.com/templui/templui/components/table"
+)
+
+func truncate(s string, n int) string {
+	if utf8.RuneCountInString(s) <= n {
+		return s
+	}
+	runes := []rune(s)
+	return string(runes[:n]) + "…"
+}
+
+templ exportStatusBadge(status string) {
+	switch status {
+		case "EXPORTED":
+			@badge.Badge(badge.Props{
+				Class:   "bg-green-100 text-green-800 border-green-200",
+				Variant: badge.VariantDefault}) {
+				Exported
+			}
+		case "FAILED":
+			@badge.Badge(badge.Props{Variant: badge.VariantDestructive}) {
+				Failed
+			}
+		default:
+			@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+				{ status }
+			}
+	}
+}
+
+templ Exports(records []db.ExportRecord) {
+	@Layout("Exports") {
+		<div class="flex flex-col gap-6">
+			<h1 class="text-2xl font-semibold">Export History</h1>
+			if len(records) == 0 {
+				<p class="text-sm text-muted-foreground">No exports yet. Configure a backend via environment variables to start exporting highlights.</p>
+			} else {
+				@table.Table() {
+					@table.Header() {
+						@table.Row() {
+							@table.Head() {
+								Highlight 
+							}
+							@table.Head() {
+								Document 
+							}
+							@table.Head() {
+								Backend 
+							}
+							@table.Head() {
+								Status 
+							}
+							@table.Head() {
+								Exported At 
+							}
+							@table.Head() {
+								Error 
+							}
+						}
+					}
+					@table.Body() {
+						for _, rec := range records {
+							@table.Row() {
+								@table.Cell() {
+									<p class="line-clamp-2 font-medium">{ truncate(rec.HighlightText, 80) }</p>
+								}
+								@table.Cell() {
+									<span class="text-muted-foreground truncate max-w-xs block">{ rec.JobFilename }</span>
+								}
+								@table.Cell() {
+									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+										{ rec.BackendName }
+									}
+								}
+								@table.Cell() {
+									@exportStatusBadge(rec.Status)
+								}
+								@table.Cell() {
+									if rec.ExportedAt.IsZero() {
+										<span class="text-muted-foreground whitespace-nowrap">--</span>
+									} else {
+										<span class="text-muted-foreground whitespace-nowrap">{ rec.ExportedAt.Format("2006-01-02 15:04") }</span>
+									}
+								}
+								@table.Cell() {
+									<span class="text-destructive text-xs truncate max-w-xs block">{ rec.Error }</span>
+								}
+							}
+						}
+					}
+				}
+			}
+		</div>
+	}
+}
