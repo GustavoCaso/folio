@@ -73,7 +73,7 @@ func TestReadwiseExport_HappyPath(t *testing.T) {
 	b, _ := newTestReadwise(t, handler)
 
 	records := []*export.ExportRecord{
-		{ExportID: "exp-1", HighlighText: "some text", Note: "my note", Title: "book.pdf"},
+		{ExportID: "exp-1", HighlightText: "some text", Note: "my note", Title: "book.pdf"},
 	}
 	err := b.Export(context.Background(), records)
 	if err != nil {
@@ -118,7 +118,7 @@ func TestReadwiseExport_SendsTagAfterCreation(t *testing.T) {
 	b, _ := newTestReadwise(t, handler)
 
 	records := []*export.ExportRecord{
-		{ExportID: "exp-1", HighlighText: "text", Tag: "science", Title: "book.pdf"},
+		{ExportID: "exp-1", HighlightText: "text", Tag: "science", Title: "book.pdf"},
 	}
 	if err := b.Export(context.Background(), records); err != nil {
 		t.Fatal(err)
@@ -144,7 +144,7 @@ func TestReadwiseExport_NoTagRequestWhenTagEmpty(t *testing.T) {
 	b, _ := newTestReadwise(t, handler)
 
 	records := []*export.ExportRecord{
-		{ExportID: "exp-1", HighlighText: "text", Title: "book.pdf"},
+		{ExportID: "exp-1", HighlightText: "text", Title: "book.pdf"},
 	}
 	if err := b.Export(context.Background(), records); err != nil {
 		t.Fatal(err)
@@ -162,7 +162,7 @@ func TestReadwiseExport_NonOKStatusReturnsError(t *testing.T) {
 	b, _ := newTestReadwise(t, handler)
 
 	records := []*export.ExportRecord{
-		{ExportID: "exp-1", HighlighText: "text", Title: "book.pdf"},
+		{ExportID: "exp-1", HighlightText: "text", Title: "book.pdf"},
 	}
 	if err := b.Export(context.Background(), records); err == nil {
 		t.Fatal("expected error for non-2xx status, got nil")
@@ -179,8 +179,8 @@ func TestReadwiseExport_BatchPreservesOrder(t *testing.T) {
 	b, _ := newTestReadwise(t, handler)
 
 	records := []*export.ExportRecord{
-		{ExportID: "exp-1", HighlighText: "first", Title: "a.pdf"},
-		{ExportID: "exp-2", HighlighText: "second", Title: "a.pdf"},
+		{ExportID: "exp-1", HighlightText: "first", Title: "a.pdf"},
+		{ExportID: "exp-2", HighlightText: "second", Title: "a.pdf"},
 	}
 	if err := b.Export(context.Background(), records); err != nil {
 		t.Fatal(err)
@@ -227,5 +227,52 @@ func TestReadwiseNew_RequiresLogger(t *testing.T) {
 	_, err := readwise.New(readwise.Config{APIToken: "tok"}, nil)
 	if err == nil {
 		t.Fatal("expected error when logger is nil")
+	}
+}
+
+func TestReadwiseExport_PartialResponseSetsErrOnMissingRecords(t *testing.T) {
+	// Server returns only 1 ID for a batch of 2 highlights.
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		result := []readwise.ReadwiseHighlightResponse{{ModifiedHighlights: []int64{10}}}
+		json.NewEncoder(w).Encode(result) //nolint:errcheck
+	})
+
+	b, _ := newTestReadwise(t, handler)
+
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlightText: "first", Title: "a.pdf"},
+		{ExportID: "exp-2", HighlightText: "second", Title: "a.pdf"},
+	}
+	if err := b.Export(context.Background(), records); err != nil {
+		t.Fatal(err)
+	}
+	if records[0].ExternalID != "10" {
+		t.Errorf("expected first record ExternalID 10, got %q", records[0].ExternalID)
+	}
+	if records[0].Err != nil {
+		t.Errorf("expected no error for first record, got %v", records[0].Err)
+	}
+	if records[1].Err == nil {
+		t.Error("expected error for second record when no ID returned, got nil")
+	}
+	if records[1].ExternalID != "" {
+		t.Errorf("expected empty ExternalID for failed record, got %q", records[1].ExternalID)
+	}
+}
+
+func TestReadwiseExport_EmptyResponseReturnsError(t *testing.T) {
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode([]readwise.ReadwiseHighlightResponse{}) //nolint:errcheck
+	})
+
+	b, _ := newTestReadwise(t, handler)
+
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlightText: "text", Title: "a.pdf"},
+	}
+	if err := b.Export(context.Background(), records); err == nil {
+		t.Fatal("expected error for empty response, got nil")
 	}
 }

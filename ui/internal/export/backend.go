@@ -9,7 +9,7 @@ import (
 // otherwise must populate the Err
 type ExportRecord struct {
 	ExportID     string // ID of the highlight_exports row
-	HighlighText string
+	HighlightText string
 	Title        string
 	Note         string
 	Tag          string

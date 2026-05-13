@@ -3,6 +3,7 @@ package export
 import (
 	"context"
 	"errors"
+	"fmt"
 	"log/slog"
 	"time"
 
@@ -18,11 +19,15 @@ type Worker struct {
 
 func NewWorker(store *db.Store, backends []Backend, interval time.Duration, logger *slog.Logger) (*Worker, error) {
 	if logger == nil {
-		return nil, errors.New("export.NewWork: logger is required")
+		return nil, errors.New("export.NewWorker: logger is required")
 	}
 
 	if store == nil {
-		return nil, errors.New("export.NewWork: store is required")
+		return nil, errors.New("export.NewWorker: store is required")
+	}
+
+	if interval <= 0 {
+		return nil, errors.New("export.NewWorker: interval must be greater than zero")
 	}
 
 	return &Worker{
@@ -63,11 +68,11 @@ func (w *Worker) RunOnce(ctx context.Context) {
 
 		for _, record := range records {
 			exports = append(exports, &ExportRecord{
-				ExportID:     record.ID,
-				Title:        record.JobFilename,
-				HighlighText: record.HighlightText,
-				Note:         record.HighlightNote,
-				Tag:          record.HighlightTag,
+				ExportID:      record.ID,
+				Title:         record.JobFilename,
+				HighlightText: record.HighlightText,
+				Note:          record.HighlightNote,
+				Tag:           record.HighlightTag,
 			})
 		}
 
@@ -90,7 +95,7 @@ func (w *Worker) RunOnce(ctx context.Context) {
 				if res.Err != nil {
 					errorMessage = res.Err.Error()
 				} else {
-					errorMessage = "export function not populate external ID"
+					errorMessage = fmt.Sprintf("backend %s did not populate ExternalID for highlight_expert %s", backend.Name(), res.ExportID)
 				}
 
 				w.logger.Warn("highlight export failed", "backend", backend.Name(), "export_id", res.ExportID, "err", res.Err)

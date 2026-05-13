@@ -173,6 +173,35 @@ func TestWorker_PerResultErrorMarksAsFailed(t *testing.T) {
 	}
 }
 
+func TestWorker_EmptyExternalIDWithNoErrMarksAsFailed(t *testing.T) {
+	store, h := newWorkerStore(t, "readwise")
+
+	records, err := store.ListUnexportedHighlights(context.Background(), "readwise")
+	if err != nil || len(records) == 0 {
+		t.Fatal("expected pending export record")
+	}
+
+	// Backend returns nil error but does not set ExternalID — violates the contract.
+	fake := &fakeBackend{
+		name:      "readwise",
+		perRecord: map[string]export.ExportRecord{records[0].ID: {ExternalID: ""}},
+	}
+
+	w := newWorker(t, store, []export.Backend{fake})
+	runWorkerOnce(w)
+
+	got, err := store.ListExportsByHighlight(context.Background(), h.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 1 {
+		t.Fatalf("expected 1 export record, got %d", len(got))
+	}
+	if got[0].Status != "FAILED" {
+		t.Errorf("expected status FAILED when ExternalID is empty, got %s", got[0].Status)
+	}
+}
+
 func TestWorker_AlreadyExportedIsSkipped(t *testing.T) {
 	store, h := newWorkerStore(t, "readwise")
 
@@ -259,5 +288,18 @@ func TestNewWorker_RequiresStore(t *testing.T) {
 	_, err := export.NewWorker(nil, nil, time.Hour, silentLogger())
 	if err == nil {
 		t.Fatal("expected error when store is nil")
+	}
+}
+
+func TestNewWorker_RequiresPositiveInterval(t *testing.T) {
+	store, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = store.Close() })
+
+	_, err = export.NewWorker(store, nil, 0, silentLogger())
+	if err == nil {
+		t.Fatal("expected error when interval is zero")
 	}
 }

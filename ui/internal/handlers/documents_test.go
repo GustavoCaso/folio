@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
@@ -39,7 +40,7 @@ func newTestMux(t *testing.T, store *db.Store) (http.Handler, *hub.Hub) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	mux, err := handlers.Register(store, h, nil, t.TempDir(), logger, nil)
+	mux, err := handlers.Register(store, h, nil, t.TempDir(), logger, []export.Backend{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +54,7 @@ func newTestMuxWithParser(t *testing.T, store *db.Store, parser handlers.ParserC
 	if err != nil {
 		t.Fatal(err)
 	}
-	mux, err := handlers.Register(store, h, parser, t.TempDir(), logger, nil)
+	mux, err := handlers.Register(store, h, parser, t.TempDir(), logger, []export.Backend{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +172,7 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h, _ := hub.New(logger)
-	mux, _ := handlers.Register(store, h, nil, dir, logger, nil)
+	mux, _ := handlers.Register(store, h, nil, dir, logger, []export.Backend{})
 	mux.ServeHTTP(rec, req)
 
 	if rec.Code != http.StatusOK {

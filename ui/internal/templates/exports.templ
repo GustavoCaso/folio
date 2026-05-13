@@ -83,7 +83,11 @@ templ Exports(records []db.ExportRecord) {
 									@exportStatusBadge(rec.Status)
 								}
 								@table.Cell() {
-									<span class="text-muted-foreground whitespace-nowrap">{ rec.ExportedAt.Format("2006-01-02 15:04") }</span>
+									if rec.ExportedAt.IsZero() {
+										<span class="text-muted-foreground whitespace-nowrap">--</span>
+									} else {
+										<span class="text-muted-foreground whitespace-nowrap">{ rec.ExportedAt.Format("2006-01-02 15:04") }</span>
+									}
 								}
 								@table.Cell() {
 									<span class="text-destructive text-xs truncate max-w-xs block">{ rec.Error }</span>

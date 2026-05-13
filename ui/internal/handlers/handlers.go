@@ -55,6 +55,14 @@ func Register(store *db.Store, h *hub.Hub, pc ParserClient, dataDir string, logg
 		return nil, errors.New("handlers.Register: logger is required")
 	}
 
+	if h == nil {
+		return nil, errors.New("handlers.Register: hub.Hub is required")
+	}
+
+	if store == nil {
+		return nil, errors.New("handlers.Register: store is required")
+	}
+
 	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir, logger: logger, backends: backends}
 	mux := http.NewServeMux()
 

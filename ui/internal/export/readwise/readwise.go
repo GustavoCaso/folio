@@ -55,7 +55,7 @@ func (r *ReadwiseBackend) Export(ctx context.Context, exports []*export.ExportRe
 	inputs := make([]ReadwiseHighlightInput, len(exports))
 	for i, rec := range exports {
 		inputs[i] = ReadwiseHighlightInput{
-			Text:     rec.HighlighText,
+			Text:     rec.HighlightText,
 			Title:    rec.Title,
 			Category: "books",
 			Note:     rec.Note,
@@ -95,9 +95,14 @@ func (r *ReadwiseBackend) Export(ctx context.Context, exports []*export.ExportRe
 	}
 
 	modifiedHighlights := created[0].ModifiedHighlights
+	createdHighlights := len(modifiedHighlights)
 
-	for i, id := range modifiedHighlights {
-		exports[i].ExternalID = strconv.FormatInt(id, 10)
+	for i, export := range exports {
+		if i < createdHighlights {
+			export.ExternalID = strconv.FormatInt(modifiedHighlights[i], 10)
+		} else {
+			export.Err = fmt.Errorf("readwise: no ID returned for highlight_export %s", export.ExportID)
+		}
 	}
 
 	// Add tags via a separate per-highlight endpoint (Readwise has no tag field on creation).
