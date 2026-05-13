@@ -51,7 +51,7 @@ func newWorkerStore(t *testing.T, backendName string) (repository.Store, reposit
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -238,7 +238,7 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -285,7 +285,7 @@ func TestNewWorker_RequiresLogger(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -309,7 +309,7 @@ func TestNewWorker_RequiresPositiveInterval(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}

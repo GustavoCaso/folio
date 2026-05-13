@@ -2,6 +2,8 @@ package repository
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"time"
 )
 
@@ -79,4 +81,39 @@ type Store interface {
 	HighlightRepository
 	ExportRepository
 	Close() error
+}
+
+type Row interface {
+	Scan(dest ...any) error
+}
+
+type Rows interface {
+	Close() error
+	Err() error
+	Next() bool
+	Scan(dest ...any) error
+}
+
+type SQLDB interface {
+	Close() error
+	ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error)
+	QueryContext(ctx context.Context, query string, args ...any) (Rows, error)
+	QueryRowContext(ctx context.Context, query string, args ...any) Row
+}
+
+type Repository struct {
+	db SQLDB
+}
+
+var _ Store = (*Repository)(nil)
+
+func New(db SQLDB) (*Repository, error) {
+	if db == nil {
+		return nil, errors.New("repository.New: db is required")
+	}
+	return &Repository{db: db}, nil
+}
+
+func (r *Repository) Close() error {
+	return r.db.Close()
 }

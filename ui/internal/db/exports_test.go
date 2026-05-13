@@ -9,7 +9,7 @@ import (
 )
 
 // seedJobAndHighlightForExport creates a DONE job, one highlight, and a PENDING export row for backendName.
-func seedJobAndHighlightForExport(t *testing.T, store *db.Repository, backendName string) (repository.Job, repository.Highlight) {
+func seedJobAndHighlightForExport(t *testing.T, store repository.Store, backendName string) (repository.Job, repository.Highlight) {
 	t.Helper()
 	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req")
 	if err != nil {
@@ -37,7 +37,7 @@ func seedJobAndHighlightForExport(t *testing.T, store *db.Repository, backendNam
 }
 
 // pendingExportID fetches the single PENDING export row ID for a highlight+backend.
-func pendingExportID(t *testing.T, store *db.Repository, backendName string) string {
+func pendingExportID(t *testing.T, store repository.Store, backendName string) string {
 	t.Helper()
 	records, err := store.ListUnexportedHighlights(context.Background(), backendName)
 	if err != nil {
@@ -54,7 +54,7 @@ func TestListUnexportedHighlights_AllUnexported(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -88,7 +88,7 @@ func TestListUnexportedHighlights_MarkedExportedIsExcluded(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -115,7 +115,7 @@ func TestListUnexportedHighlights_FailedIsNotRetried(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -143,7 +143,7 @@ func TestListUnexportedHighlights_IsolatedByBackend(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -176,7 +176,7 @@ func TestMarkHighlightExported(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -219,7 +219,7 @@ func TestMarkHighlightExportFailed(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -256,7 +256,7 @@ func TestListAllExports_JoinsHighlightAndJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -294,7 +294,7 @@ func TestListAllExports_ReturnsAllRecords(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -357,7 +357,7 @@ func TestExportRecord_CascadesOnHighlightDelete(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}

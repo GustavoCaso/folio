@@ -1,18 +1,17 @@
-package db
+package repository
 
 import (
 	"context"
 	"fmt"
 	"time"
 
-	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/google/uuid"
 )
 
-func (r *Repository) CreateHighlight(ctx context.Context, h repository.Highlight) (repository.Highlight, error) {
+func (r *Repository) CreateHighlight(ctx context.Context, h Highlight) (Highlight, error) {
 	h.ID = uuid.NewString()
 	h.CreatedAt = time.Now().UTC()
-	_, err := r.db.db.ExecContext(ctx,
+	_, err := r.db.ExecContext(ctx,
 		`INSERT INTO highlights (id, job_id, start_block_id, end_block_id, start_pos, end_pos, text, tag, note, created_at)
 		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		h.ID, h.JobID, h.StartBlockID, h.EndBlockID, h.StartPos, h.EndPos, h.Text, h.Tag, h.Note,
@@ -21,8 +20,8 @@ func (r *Repository) CreateHighlight(ctx context.Context, h repository.Highlight
 	return h, err
 }
 
-func (r *Repository) ListHighlights(ctx context.Context, jobID string) ([]repository.Highlight, error) {
-	rows, err := r.db.db.QueryContext(ctx,
+func (r *Repository) ListHighlights(ctx context.Context, jobID string) ([]Highlight, error) {
+	rows, err := r.db.QueryContext(ctx,
 		`SELECT id, job_id, start_block_id, end_block_id, start_pos, end_pos, text, tag, note, created_at
 		 FROM highlights WHERE job_id = ? ORDER BY created_at ASC`, jobID)
 	if err != nil {
@@ -30,9 +29,9 @@ func (r *Repository) ListHighlights(ctx context.Context, jobID string) ([]reposi
 	}
 	defer func() { _ = rows.Close() }()
 
-	var out []repository.Highlight
+	var out []Highlight
 	for rows.Next() {
-		var h repository.Highlight
+		var h Highlight
 		var createdAt string
 		if err := rows.Scan(&h.ID, &h.JobID, &h.StartBlockID, &h.EndBlockID, &h.StartPos, &h.EndPos,
 			&h.Text, &h.Tag, &h.Note, &createdAt); err != nil {
@@ -45,7 +44,7 @@ func (r *Repository) ListHighlights(ctx context.Context, jobID string) ([]reposi
 }
 
 func (r *Repository) DeleteHighlight(ctx context.Context, id string) error {
-	res, err := r.db.db.ExecContext(ctx, `DELETE FROM highlights WHERE id = ?`, id)
+	res, err := r.db.ExecContext(ctx, `DELETE FROM highlights WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}

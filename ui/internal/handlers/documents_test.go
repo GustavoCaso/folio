@@ -30,7 +30,7 @@ func newTestStore(t *testing.T) repository.Store {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}

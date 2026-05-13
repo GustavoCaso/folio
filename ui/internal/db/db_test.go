@@ -16,7 +16,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -59,7 +59,7 @@ func TestUpdateJobStatus(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -81,7 +81,7 @@ func TestUpdateReadingProgress(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -103,7 +103,7 @@ func TestGetPendingJobs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -155,7 +155,7 @@ func TestGetPendingJobsEmpty(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -175,7 +175,7 @@ func TestMarkJobDone(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -208,7 +208,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -252,7 +252,7 @@ func TestDeleteJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -280,7 +280,7 @@ func TestRetryJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -335,7 +335,7 @@ func TestDeleteHighlight(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -361,7 +361,7 @@ func TestDeleteHighlight_NotFound(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	store, err := db.NewRepository(database)
+	store, err := repository.New(database)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -14,6 +14,7 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 func Execute() {
@@ -44,7 +45,7 @@ func Execute() {
 		}
 	}()
 
-	repo, err := db.NewRepository(database)
+	repo, err := repository.New(database)
 	if err != nil {
 		logger.Error("repository init failed", logging.Err(err))
 		os.Exit(1)

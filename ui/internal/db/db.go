@@ -1,9 +1,9 @@
 package db
 
 import (
+	"context"
 	"database/sql"
 	"embed"
-	"errors"
 
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/golang-migrate/migrate/v4"
@@ -38,23 +38,19 @@ func (d *DB) Close() error {
 	return d.db.Close()
 }
 
-// Repository wraps a DB and implements all repository interfaces.
-type Repository struct {
-	db *DB
+func (d *DB) ExecContext(ctx context.Context, query string, args ...any) (sql.Result, error) {
+	return d.db.ExecContext(ctx, query, args...)
 }
 
-var _ repository.Store = (*Repository)(nil)
-
-func NewRepository(d *DB) (*Repository, error) {
-	if d == nil {
-		return nil, errors.New("db.NewRepository: db is required")
-	}
-	return &Repository{db: d}, nil
+func (d *DB) QueryContext(ctx context.Context, query string, args ...any) (repository.Rows, error) {
+	return d.db.QueryContext(ctx, query, args...)
 }
 
-func (r *Repository) Close() error {
-	return r.db.Close()
+func (d *DB) QueryRowContext(ctx context.Context, query string, args ...any) repository.Row {
+	return d.db.QueryRowContext(ctx, query, args...)
 }
+
+var _ repository.SQLDB = (*DB)(nil)
 
 func runMigrations(db *sql.DB) error {
 	src, err := iofs.New(migrations, "migrations")
