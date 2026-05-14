@@ -63,14 +63,14 @@ export function watchJob(jobID) {
           const p = document.createElement("p");
           p.dataset.title = "";
           p.className = "text-xs font-medium truncate";
-          p.textContent = d.Title;
+          p.textContent = "Title: " + d.Title;
           meta.append(p);
         }
         if (d.Author && !meta.querySelector("[data-author]")) {
           const p = document.createElement("p");
           p.dataset.author = "";
           p.className = "text-xs text-muted-foreground truncate";
-          p.textContent = d.Author;
+          p.textContent = "Author: " + d.Author;
           meta.append(p);
         }
       }

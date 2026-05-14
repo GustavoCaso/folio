@@ -33,10 +33,10 @@ templ jobCard(j domain.Job) {
 					/>
 				}
 				if j.Title != "" {
-					<p data-title class="text-xs font-medium truncate">{ j.Title }</p>
+					<p data-title class="text-xs font-medium truncate">Title: { j.Title }</p>
 				}
 				if j.Author != "" {
-					<p data-author class="text-xs text-muted-foreground truncate">{ j.Author }</p>
+					<p data-author class="text-xs text-muted-foreground truncate">Author: { j.Author }</p>
 				}
 			</div>
 			<p class="text-xs text-muted-foreground" data-error-text>

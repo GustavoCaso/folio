@@ -2,6 +2,8 @@ package domain
 
 import "time"
 
+const Unknown = "unknown"
+
 type Job struct {
 	ID              string
 	Filename        string

@@ -138,14 +138,18 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 				"pages_done", p.Status.PagesDone,
 				"pages_total", p.Status.PagesTotal,
 			)
-			h.Publish(jobID, hub.StatusEvent{
-				Status:     p.Status.Status,
-				PagesDone:  int(p.Status.PagesDone),
-				PagesTotal: int(p.Status.PagesTotal),
-				Error:      p.Status.Error,
-				Stage:      p.Status.Stage,
-				Message:    p.Status.Message,
-			})
+			// DONE is published by runConversion after metadata is attached.
+			// FAILED is terminal and must be published here since runConversion won't see it.
+			if p.Status.Status != "DONE" {
+				h.Publish(jobID, hub.StatusEvent{
+					Status:     p.Status.Status,
+					PagesDone:  int(p.Status.PagesDone),
+					PagesTotal: int(p.Status.PagesTotal),
+					Error:      p.Status.Error,
+					Stage:      p.Status.Stage,
+					Message:    p.Status.Message,
+				})
+			}
 		case *pb.ConvertResult_MarkdownChunk:
 			mdBuf.Write(p.MarkdownChunk)
 			mdChunks++

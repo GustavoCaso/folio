@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
@@ -282,7 +283,17 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 		return
 	}
 
-	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath, result.Title, result.Author, result.Cover); err != nil {
+	title := domain.Unknown
+	if result.Title != "" {
+		title = result.Title
+	}
+
+	author := domain.Unknown
+	if result.Author != "" {
+		author = result.Author
+	}
+
+	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath, title, author, result.Cover); err != nil {
 		log.Error("mark job done failed", logging.Err(err))
 		return
 	}
@@ -294,8 +305,8 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 	)
 	h.hub.Publish(jobID, hub.StatusEvent{
 		Status: "DONE",
-		Title:  result.Title,
-		Author: result.Author,
+		Title:  title,
+		Author: author,
 		Cover:  base64.StdEncoding.EncodeToString(result.Cover),
 	})
 }
