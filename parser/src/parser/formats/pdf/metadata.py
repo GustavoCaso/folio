@@ -18,7 +18,7 @@ def extract_metadata(pdf_path: Path, generate_cover: bool) -> tuple[str, str, by
         pdf = pypdfium2.PdfDocument(str(pdf_path))
         try:
             title = pdf.get_metadata_value("Title")
-            author = pdf.get_metadata_value("Author") or pdf.get_metadata_value("Creator")
+            author = pdf.get_metadata_value("Author")
             cover = b""
             if generate_cover:
                 cover = render_pdf_page(pdf[0])

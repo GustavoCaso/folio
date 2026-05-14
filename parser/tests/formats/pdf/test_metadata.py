@@ -5,12 +5,11 @@ from unittest.mock import MagicMock, patch
 from parser.formats.pdf.metadata import extract_metadata
 
 
-def _mock_pdf(title: str = "", author: str = "", creator: str = "") -> MagicMock:
+def _mock_pdf(title: str = "", author: str = "") -> MagicMock:
     mock_doc = MagicMock()
     mock_doc.get_metadata_value.side_effect = lambda key: {
         "Title": title,
         "Author": author,
-        "Creator": creator,
     }.get(key, "")
     mock_doc.close = MagicMock()
     return mock_doc
@@ -40,15 +39,6 @@ def test_extract_metadata_returns_title_and_author(tmp_path):
     assert title == "My Book"
     assert author == "Jane Doe"
     assert cover == b""
-
-
-def test_extract_metadata_falls_back_to_creator(tmp_path):
-    with patch(
-        "parser.formats.pdf.metadata.pypdfium2.PdfDocument",
-        return_value=_mock_pdf(author="", creator="Tool Inc."),
-    ):
-        _, author, _ = extract_metadata(tmp_path / "fake.pdf", generate_cover=False)
-    assert author == "Tool Inc."
 
 
 def test_extract_metadata_empty_when_missing(tmp_path):
