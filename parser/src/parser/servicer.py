@@ -16,7 +16,10 @@ import grpc
 
 from parser.converter import convert
 from parser.formats.pdf import count_pdf_pages
+from parser.formats.pdf.metadata import extract_metadata, render_cover
+from parser.formats.pdf.pdf import _image_mode_value, _post_process_code_blocks
 from parser.grpc import parser_pb2, parser_pb2_grpc
+from parser.postprocess import enrich_code_blocks
 from parser.progress import ProgressEvent, attach
 
 logger = logging.getLogger(__name__)
@@ -147,7 +150,11 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                         )
                     )
 
-                markdown: str = await convert_task
+                doc = await convert_task  # DoclingDocument
+
+            markdown = doc.export_to_markdown(image_mode=_image_mode_value)
+            if _post_process_code_blocks:
+                markdown = enrich_code_blocks(markdown)
 
             encoded = markdown.encode("utf-8")
             logger.info(
@@ -170,6 +177,16 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             for i in range(0, len(encoded), _CHUNK_SIZE):
                 yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
                 md_chunks += 1
+
+            title, author = extract_metadata(doc, tmp_path)
+            cover = render_cover(tmp_path)
+            yield parser_pb2.ConvertResult(
+                metadata=parser_pb2.DocumentMetadata(
+                    title=title,
+                    author=author,
+                    cover=cover,
+                )
+            )
 
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(

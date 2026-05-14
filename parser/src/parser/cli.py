@@ -6,7 +6,9 @@ import time
 from pathlib import Path
 
 from parser.converter import convert
+from parser.formats.pdf.pdf import _image_mode_value, _post_process_code_blocks
 from parser.logging_config import configure
+from parser.postprocess import enrich_code_blocks
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,10 @@ def _convert(args: argparse.Namespace) -> None:
         extra={"input_path": str(input_path), "output_path": str(output_path)},
     )
     started = time.monotonic()
-    markdown = convert(input_path)
+    doc = convert(input_path)
+    markdown = doc.export_to_markdown(image_mode=_image_mode_value)
+    if _post_process_code_blocks:
+        markdown = enrich_code_blocks(markdown)
     output_path.write_text(markdown, encoding="utf-8")
     logger.info(
         "cli convert done",

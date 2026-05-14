@@ -29,7 +29,14 @@ async def test_convert_document_yields_processing_then_done():
 
     stream = _make_stream("doc.pdf", b"%PDF")
 
-    with patch("parser.servicer.convert", return_value="# Hello"):
+    mock_doc = MagicMock()
+    mock_doc.export_to_markdown.return_value = "# Hello"
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("", "")),
+        patch("parser.servicer.render_cover", return_value=b""),
+    ):
         results = []
         async for result in servicer.ConvertDocument(stream, context):
             results.append(result)
@@ -46,7 +53,14 @@ async def test_convert_document_yields_markdown_chunk():
 
     stream = _make_stream("doc.pdf", b"%PDF")
 
-    with patch("parser.servicer.convert", return_value="# Hello World"):
+    mock_doc = MagicMock()
+    mock_doc.export_to_markdown.return_value = "# Hello World"
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("", "")),
+        patch("parser.servicer.render_cover", return_value=b""),
+    ):
         results = []
         async for result in servicer.ConvertDocument(stream, context):
             results.append(result)
@@ -63,9 +77,14 @@ async def test_convert_document_emits_stage_transitions():
 
     stream = _make_stream("doc.pdf", b"%PDF")
 
+    mock_doc = MagicMock()
+    mock_doc.export_to_markdown.return_value = "# Hi"
+
     with (
-        patch("parser.servicer.convert", return_value="# Hi"),
+        patch("parser.servicer.convert", return_value=mock_doc),
         patch("parser.servicer.count_pdf_pages", return_value=7),
+        patch("parser.servicer.extract_metadata", return_value=("", "")),
+        patch("parser.servicer.render_cover", return_value=b""),
     ):
         results = []
         async for result in servicer.ConvertDocument(stream, context):
@@ -94,10 +113,15 @@ async def test_convert_document_logs_request_id_from_meta(caplog):
     context = MagicMock()
     stream = _make_stream("doc.pdf", b"%PDF", request_id="req-xyz")
 
+    mock_doc = MagicMock()
+    mock_doc.export_to_markdown.return_value = "# Hi"
+
     fmt = JSONFormatter()
     with (
         caplog.at_level(logging.INFO, logger="parser.servicer"),
-        patch("parser.servicer.convert", return_value="# Hi"),
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("", "")),
+        patch("parser.servicer.render_cover", return_value=b""),
     ):
         async for _ in servicer.ConvertDocument(stream, context):
             pass
@@ -126,3 +150,51 @@ async def test_convert_document_yields_failed_on_error():
 
     statuses = {r.status.status for r in results if r.HasField("status")}
     assert "FAILED" in statuses
+
+
+@pytest.mark.asyncio
+async def test_convert_document_yields_metadata_on_success():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+    stream = _make_stream("doc.pdf", b"%PDF")
+
+    mock_doc = MagicMock()
+    mock_doc.export_to_markdown.return_value = "# Hello"
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("My Title", "Jane")),
+        patch("parser.servicer.render_cover", return_value=b"\x89PNG"),
+    ):
+        results = []
+        async for result in servicer.ConvertDocument(stream, context):
+            results.append(result)
+
+    metadata_msgs = [r for r in results if r.HasField("metadata")]
+    assert len(metadata_msgs) == 1
+    meta = metadata_msgs[0].metadata
+    assert meta.title == "My Title"
+    assert meta.author == "Jane"
+    assert meta.cover == b"\x89PNG"
+
+    # metadata must arrive before DONE
+    metadata_idx = next(i for i, r in enumerate(results) if r.HasField("metadata"))
+    done_idx = next(
+        i for i, r in enumerate(results) if r.HasField("status") and r.status.status == "DONE"
+    )
+    assert metadata_idx < done_idx
+
+
+@pytest.mark.asyncio
+async def test_convert_document_no_metadata_on_failure():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+    stream = _make_stream("doc.pdf", b"%PDF")
+
+    with patch("parser.servicer.convert", side_effect=RuntimeError("boom")):
+        results = []
+        async for result in servicer.ConvertDocument(stream, context):
+            results.append(result)
+
+    metadata_msgs = [r for r in results if r.HasField("metadata")]
+    assert len(metadata_msgs) == 0

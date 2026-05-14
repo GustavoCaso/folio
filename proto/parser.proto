@@ -29,9 +29,16 @@ message ConvertMeta {
 // StatusUpdate messages arrive before and after the markdown chunks.
 message ConvertResult {
   oneof payload {
-    StatusUpdate status  = 1;
-    bytes markdown_chunk = 2;
+    StatusUpdate     status         = 1;
+    bytes            markdown_chunk = 2;
+    DocumentMetadata metadata       = 3;
   }
+}
+
+message DocumentMetadata {
+  string title  = 1;
+  string author = 2;
+  bytes  cover  = 3;  // raw PNG image bytes; empty if unavailable
 }
 
 message StatusUpdate {

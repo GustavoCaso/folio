@@ -12,6 +12,9 @@ type Job struct {
 	ReadingProgress string
 	Error           string
 	OutputPath      string
+	Title           string
+	Author          string
+	Cover           []byte
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }

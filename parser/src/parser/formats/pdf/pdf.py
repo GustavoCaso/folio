@@ -6,8 +6,7 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import CodeFormulaVlmOptions, PdfPipelineOptions
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc.base import ImageRefMode
-
-from parser.postprocess import enrich_code_blocks
+from docling_core.types.doc.document import DoclingDocument
 
 
 def _bool_env(var: str, default: bool) -> bool:
@@ -66,13 +65,10 @@ _image_mode_value: ImageRefMode = _image_mode()
 _post_process_code_blocks: bool = _bool_env("PDF_POST_PROCESS_CODE_BLOCKS", True)
 
 
-def convert_pdf(path: Path) -> str:
-    """Convert a PDF file to Markdown using Docling. Blocking call."""
+def convert_pdf(path: Path) -> DoclingDocument:
+    """Convert a PDF file using Docling. Returns the DoclingDocument."""
     result = _converter.convert(str(path))
-    markdown = result.document.export_to_markdown(image_mode=_image_mode_value)
-    if _post_process_code_blocks:
-        markdown = enrich_code_blocks(markdown)
-    return markdown
+    return result.document
 
 
 def count_pdf_pages(path: Path) -> int:

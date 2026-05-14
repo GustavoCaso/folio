@@ -31,9 +31,10 @@ Stateless document parser. Wraps [Docling](https://github.com/docling-project/do
 **Components (`src/parser/`):**
 - `servicer.py` — `ParserServicer.ConvertDocument`. Reads all `ConvertChunk`s into a buffer, writes to a temp file, runs Docling in a `ThreadPoolExecutor` (blocking → executor), streams progress + 64KB markdown chunks back on the same stream.
 - `converter.py` — dispatcher. Maps file extension → handler in `parser.formats`. Raises `UnsupportedFormatError` for unknown extensions.
-- `formats/pdf.py` — Docling `DocumentConverter` instance (module-level, shared across requests). `PdfPipelineOptions` tuned via `PDF_*_BATCH_SIZE` env vars. Exports markdown with `ImageRefMode.EMBEDDED`. `count_pdf_pages` via `pypdfium2`.
+- `formats/pdf/pdf.py` — Docling `DocumentConverter` instance (module-level, shared across requests). `PdfPipelineOptions` tuned via `PDF_*_BATCH_SIZE` env vars. Returns `DoclingDocument`; markdown export and post-processing happen in `servicer.py`. `count_pdf_pages` via `pypdfium2`.
+- `formats/pdf/metadata.py` — `extract_metadata(doc)` and `render_cover(pdf_path)`: extract title/author from `DoclingDocument.origin` and render page 1 as a PNG thumbnail. Both return empty values on failure and never raise.
 - `progress.py` — `attach(queue, loop)` context manager adds a `logging.Handler` to the `docling` logger, parses lines like `Finished converting pages X/Y` into `ProgressEvent`s, and forwards them to an asyncio queue from the executor thread (`loop.call_soon_threadsafe`).
-- `postprocess.py` — `enrich_code_blocks`: pattern-based language detection for fenced code blocks; called from `formats/pdf.py` when `PDF_POST_PROCESS_CODE_BLOCKS=true`.
+- `postprocess.py` — `enrich_code_blocks`: pattern-based language detection for fenced code blocks; called from `servicer.py` when `PDF_POST_PROCESS_CODE_BLOCKS=true`.
 - `logging_config.py` — JSON-to-stderr formatter. `extra={...}` on log calls becomes top-level fields. Caps `docling` logger at INFO unless root is DEBUG.
 - `grpc/` — generated protobuf bindings (do not edit manually; the `make proto` step post-processes the import).
 
@@ -44,7 +45,7 @@ Using `uv add <dependency>` or uv add --dev <dependency>. To avoid getting unwan
 
 ## Adding a new format
 
-1. New module in `src/parser/formats/` with a `convert_<fmt>(path: Path) -> str` function.
+1. New module in `src/parser/formats/` with a `convert_<fmt>(path: Path) -> DoclingDocument` function. The servicer calls `doc.export_to_markdown(...)` on the result.
 2. Register it in `parser/converter.py::_HANDLERS` (`".ext": "parser.formats.mod:convert_fn"`).
 3. Page counting: `servicer.py` only calls `count_pdf_pages` for `.pdf`; extend if needed.
 

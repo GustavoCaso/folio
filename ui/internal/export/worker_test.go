@@ -58,7 +58,7 @@ func newWorkerStore(t *testing.T, backendName string) (repository.Store, domain.
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
+	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := database.CreateHighlight(context.Background(), domain.Highlight{
@@ -241,7 +241,7 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
+	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := database.CreateHighlight(context.Background(), domain.Highlight{

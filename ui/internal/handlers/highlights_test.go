@@ -21,7 +21,7 @@ func seedJobAndHighlight(t *testing.T, store repository.Store) (domain.Job, doma
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, "/dev/null"); err != nil {
+	if err := store.MarkJobDone(context.Background(), job.ID, "/dev/null", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := store.CreateHighlight(context.Background(), domain.Highlight{
