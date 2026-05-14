@@ -16,7 +16,7 @@ import grpc
 
 from parser.converter import convert
 from parser.formats.pdf import count_pdf_pages
-from parser.formats.pdf.metadata import extract_metadata, render_cover
+from parser.formats.pdf.metadata import extract_metadata
 from parser.formats.pdf.pdf import _image_mode_value, _post_process_code_blocks
 from parser.grpc import parser_pb2, parser_pb2_grpc
 from parser.postprocess import enrich_code_blocks
@@ -178,8 +178,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                 yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
                 md_chunks += 1
 
-            title, author = extract_metadata(doc, tmp_path)
-            cover = render_cover(tmp_path)
+            title, author, cover = extract_metadata(tmp_path, generate_cover=True)
             yield parser_pb2.ConvertResult(
                 metadata=parser_pb2.DocumentMetadata(
                     title=title,
