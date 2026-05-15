@@ -165,6 +165,7 @@ type ConvertResult struct {
 	//
 	//	*ConvertResult_Status
 	//	*ConvertResult_MarkdownChunk
+	//	*ConvertResult_Metadata
 	Payload       isConvertResult_Payload `protobuf_oneof:"payload"`
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
@@ -225,6 +226,15 @@ func (x *ConvertResult) GetMarkdownChunk() []byte {
 	return nil
 }
 
+func (x *ConvertResult) GetMetadata() *DocumentMetadata {
+	if x != nil {
+		if x, ok := x.Payload.(*ConvertResult_Metadata); ok {
+			return x.Metadata
+		}
+	}
+	return nil
+}
+
 type isConvertResult_Payload interface {
 	isConvertResult_Payload()
 }
@@ -237,9 +247,75 @@ type ConvertResult_MarkdownChunk struct {
 	MarkdownChunk []byte `protobuf:"bytes,2,opt,name=markdown_chunk,json=markdownChunk,proto3,oneof"`
 }
 
+type ConvertResult_Metadata struct {
+	Metadata *DocumentMetadata `protobuf:"bytes,3,opt,name=metadata,proto3,oneof"`
+}
+
 func (*ConvertResult_Status) isConvertResult_Payload() {}
 
 func (*ConvertResult_MarkdownChunk) isConvertResult_Payload() {}
+
+func (*ConvertResult_Metadata) isConvertResult_Payload() {}
+
+type DocumentMetadata struct {
+	state         protoimpl.MessageState `protogen:"open.v1"`
+	Title         string                 `protobuf:"bytes,1,opt,name=title,proto3" json:"title,omitempty"`
+	Author        string                 `protobuf:"bytes,2,opt,name=author,proto3" json:"author,omitempty"`
+	Cover         []byte                 `protobuf:"bytes,3,opt,name=cover,proto3" json:"cover,omitempty"` // raw PNG image bytes; empty if unavailable
+	unknownFields protoimpl.UnknownFields
+	sizeCache     protoimpl.SizeCache
+}
+
+func (x *DocumentMetadata) Reset() {
+	*x = DocumentMetadata{}
+	mi := &file_parser_proto_msgTypes[3]
+	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+	ms.StoreMessageInfo(mi)
+}
+
+func (x *DocumentMetadata) String() string {
+	return protoimpl.X.MessageStringOf(x)
+}
+
+func (*DocumentMetadata) ProtoMessage() {}
+
+func (x *DocumentMetadata) ProtoReflect() protoreflect.Message {
+	mi := &file_parser_proto_msgTypes[3]
+	if x != nil {
+		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
+		if ms.LoadMessageInfo() == nil {
+			ms.StoreMessageInfo(mi)
+		}
+		return ms
+	}
+	return mi.MessageOf(x)
+}
+
+// Deprecated: Use DocumentMetadata.ProtoReflect.Descriptor instead.
+func (*DocumentMetadata) Descriptor() ([]byte, []int) {
+	return file_parser_proto_rawDescGZIP(), []int{3}
+}
+
+func (x *DocumentMetadata) GetTitle() string {
+	if x != nil {
+		return x.Title
+	}
+	return ""
+}
+
+func (x *DocumentMetadata) GetAuthor() string {
+	if x != nil {
+		return x.Author
+	}
+	return ""
+}
+
+func (x *DocumentMetadata) GetCover() []byte {
+	if x != nil {
+		return x.Cover
+	}
+	return nil
+}
 
 type StatusUpdate struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
@@ -255,7 +331,7 @@ type StatusUpdate struct {
 
 func (x *StatusUpdate) Reset() {
 	*x = StatusUpdate{}
-	mi := &file_parser_proto_msgTypes[3]
+	mi := &file_parser_proto_msgTypes[4]
 	ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 	ms.StoreMessageInfo(mi)
 }
@@ -267,7 +343,7 @@ func (x *StatusUpdate) String() string {
 func (*StatusUpdate) ProtoMessage() {}
 
 func (x *StatusUpdate) ProtoReflect() protoreflect.Message {
-	mi := &file_parser_proto_msgTypes[3]
+	mi := &file_parser_proto_msgTypes[4]
 	if x != nil {
 		ms := protoimpl.X.MessageStateOf(protoimpl.Pointer(x))
 		if ms.LoadMessageInfo() == nil {
@@ -280,7 +356,7 @@ func (x *StatusUpdate) ProtoReflect() protoreflect.Message {
 
 // Deprecated: Use StatusUpdate.ProtoReflect.Descriptor instead.
 func (*StatusUpdate) Descriptor() ([]byte, []int) {
-	return file_parser_proto_rawDescGZIP(), []int{3}
+	return file_parser_proto_rawDescGZIP(), []int{4}
 }
 
 func (x *StatusUpdate) GetStatus() string {
@@ -337,11 +413,16 @@ const file_parser_proto_rawDesc = "" +
 	"\vConvertMeta\x12\x1a\n" +
 	"\bfilename\x18\x01 \x01(\tR\bfilename\x12\x1d\n" +
 	"\n" +
-	"request_id\x18\x02 \x01(\tR\trequestId\"s\n" +
+	"request_id\x18\x02 \x01(\tR\trequestId\"\xab\x01\n" +
 	"\rConvertResult\x12.\n" +
 	"\x06status\x18\x01 \x01(\v2\x14.parser.StatusUpdateH\x00R\x06status\x12'\n" +
-	"\x0emarkdown_chunk\x18\x02 \x01(\fH\x00R\rmarkdownChunkB\t\n" +
-	"\apayload\"\xac\x01\n" +
+	"\x0emarkdown_chunk\x18\x02 \x01(\fH\x00R\rmarkdownChunk\x126\n" +
+	"\bmetadata\x18\x03 \x01(\v2\x18.parser.DocumentMetadataH\x00R\bmetadataB\t\n" +
+	"\apayload\"V\n" +
+	"\x10DocumentMetadata\x12\x14\n" +
+	"\x05title\x18\x01 \x01(\tR\x05title\x12\x16\n" +
+	"\x06author\x18\x02 \x01(\tR\x06author\x12\x14\n" +
+	"\x05cover\x18\x03 \x01(\fR\x05cover\"\xac\x01\n" +
 	"\fStatusUpdate\x12\x16\n" +
 	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1d\n" +
 	"\n" +
@@ -366,23 +447,25 @@ func file_parser_proto_rawDescGZIP() []byte {
 	return file_parser_proto_rawDescData
 }
 
-var file_parser_proto_msgTypes = make([]protoimpl.MessageInfo, 4)
+var file_parser_proto_msgTypes = make([]protoimpl.MessageInfo, 5)
 var file_parser_proto_goTypes = []any{
-	(*ConvertChunk)(nil),  // 0: parser.ConvertChunk
-	(*ConvertMeta)(nil),   // 1: parser.ConvertMeta
-	(*ConvertResult)(nil), // 2: parser.ConvertResult
-	(*StatusUpdate)(nil),  // 3: parser.StatusUpdate
+	(*ConvertChunk)(nil),     // 0: parser.ConvertChunk
+	(*ConvertMeta)(nil),      // 1: parser.ConvertMeta
+	(*ConvertResult)(nil),    // 2: parser.ConvertResult
+	(*DocumentMetadata)(nil), // 3: parser.DocumentMetadata
+	(*StatusUpdate)(nil),     // 4: parser.StatusUpdate
 }
 var file_parser_proto_depIdxs = []int32{
 	1, // 0: parser.ConvertChunk.meta:type_name -> parser.ConvertMeta
-	3, // 1: parser.ConvertResult.status:type_name -> parser.StatusUpdate
-	0, // 2: parser.ParserService.ConvertDocument:input_type -> parser.ConvertChunk
-	2, // 3: parser.ParserService.ConvertDocument:output_type -> parser.ConvertResult
-	3, // [3:4] is the sub-list for method output_type
-	2, // [2:3] is the sub-list for method input_type
-	2, // [2:2] is the sub-list for extension type_name
-	2, // [2:2] is the sub-list for extension extendee
-	0, // [0:2] is the sub-list for field type_name
+	4, // 1: parser.ConvertResult.status:type_name -> parser.StatusUpdate
+	3, // 2: parser.ConvertResult.metadata:type_name -> parser.DocumentMetadata
+	0, // 3: parser.ParserService.ConvertDocument:input_type -> parser.ConvertChunk
+	2, // 4: parser.ParserService.ConvertDocument:output_type -> parser.ConvertResult
+	4, // [4:5] is the sub-list for method output_type
+	3, // [3:4] is the sub-list for method input_type
+	3, // [3:3] is the sub-list for extension type_name
+	3, // [3:3] is the sub-list for extension extendee
+	0, // [0:3] is the sub-list for field type_name
 }
 
 func init() { file_parser_proto_init() }
@@ -397,6 +480,7 @@ func file_parser_proto_init() {
 	file_parser_proto_msgTypes[2].OneofWrappers = []any{
 		(*ConvertResult_Status)(nil),
 		(*ConvertResult_MarkdownChunk)(nil),
+		(*ConvertResult_Metadata)(nil),
 	}
 	type x struct{}
 	out := protoimpl.TypeBuilder{
@@ -404,7 +488,7 @@ func file_parser_proto_init() {
 			GoPackagePath: reflect.TypeOf(x{}).PkgPath(),
 			RawDescriptor: unsafe.Slice(unsafe.StringData(file_parser_proto_rawDesc), len(file_parser_proto_rawDesc)),
 			NumEnums:      0,
-			NumMessages:   4,
+			NumMessages:   5,
 			NumExtensions: 0,
 			NumServices:   1,
 		},

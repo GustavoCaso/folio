@@ -1,6 +1,7 @@
 package templates
 
 import (
+	"encoding/base64"
 	"strings"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
@@ -8,6 +9,10 @@ import (
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
 )
+
+func coverBase64(j domain.Job) string {
+	return base64.StdEncoding.EncodeToString(j.Cover)
+}
 
 templ jobCard(j domain.Job) {
 	@card.Card(card.Props{ID: "job-" + j.ID}) {
@@ -17,6 +22,22 @@ templ jobCard(j domain.Job) {
 				<span data-status-badge>
 					@jobBadge(j.Status)
 				</span>
+			</div>
+			<div data-metadata class="flex flex-col gap-1">
+				if len(j.Cover) > 0 {
+					<img
+						data-cover
+						src={ "data:image/png;base64," + coverBase64(j) }
+						alt="cover"
+						class="w-full rounded object-cover aspect-[3/4] bg-muted"
+					/>
+				}
+				if j.Title != "" {
+					<p data-title class="text-xs font-medium truncate">Title: { j.Title }</p>
+				}
+				if j.Author != "" {
+					<p data-author class="text-xs text-muted-foreground truncate">Author: { j.Author }</p>
+				}
 			</div>
 			<p class="text-xs text-muted-foreground" data-error-text>
 				if j.Status == "FAILED" {

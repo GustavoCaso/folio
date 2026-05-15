@@ -2,8 +2,9 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from docling_core.types.doc.base import ImageRefMode
+from docling_core.types.doc.document import DoclingDocument
 
-import parser.formats.pdf as pdf_mod
+import parser.formats.pdf.pdf as pdf_mod
 
 
 class TestBoolEnv:
@@ -128,53 +129,26 @@ class TestPipelineOptions:
 
 
 class TestConvertPdf:
-    def test_uses_configured_image_mode(self, tmp_path):
+    def test_returns_docling_document(self, tmp_path):
+        pdf = tmp_path / "doc.pdf"
+        pdf.write_bytes(b"%PDF")
+
+        mock_document = MagicMock(spec=DoclingDocument)
+        mock_result = MagicMock()
+        mock_result.document = mock_document
+
+        with patch.object(pdf_mod._converter, "convert", return_value=mock_result):
+            result = pdf_mod.convert_pdf(pdf)
+
+        assert result is mock_document
+
+    def test_calls_converter_with_path_string(self, tmp_path):
         pdf = tmp_path / "doc.pdf"
         pdf.write_bytes(b"%PDF")
 
         mock_result = MagicMock()
-        mock_result.document.export_to_markdown.return_value = "# Hello"
 
-        with (
-            patch.dict("os.environ", {"PDF_IMAGE_MODE": "embedded"}, clear=True),
-            patch.object(pdf_mod._converter, "convert", return_value=mock_result),
-            patch.object(pdf_mod, "_image_mode_value", ImageRefMode.EMBEDDED),
-        ):
-            result = pdf_mod.convert_pdf(pdf)
+        with patch.object(pdf_mod._converter, "convert", return_value=mock_result) as mock_convert:
+            pdf_mod.convert_pdf(pdf)
 
-        mock_result.document.export_to_markdown.assert_called_once_with(
-            image_mode=ImageRefMode.EMBEDDED
-        )
-        assert result == "# Hello"
-
-    def test_enrich_code_blocks_when_enabled(self, tmp_path):
-        pdf = tmp_path / "doc.pdf"
-        pdf.write_bytes(b"%PDF")
-
-        mock_result = MagicMock()
-        mock_result.document.export_to_markdown.return_value = "```\nprint('hi')\n```"
-
-        with (
-            patch.object(pdf_mod._converter, "convert", return_value=mock_result),
-            patch.object(pdf_mod, "_image_mode_value", ImageRefMode.PLACEHOLDER),
-            patch.object(pdf_mod, "_post_process_code_blocks", True),
-        ):
-            result = pdf_mod.convert_pdf(pdf)
-
-        assert result.startswith("```py")
-
-    def test_enrich_code_blocks_skipped_when_disabled(self, tmp_path):
-        pdf = tmp_path / "doc.pdf"
-        pdf.write_bytes(b"%PDF")
-
-        mock_result = MagicMock()
-        mock_result.document.export_to_markdown.return_value = "```\nprint('hi')\n```"
-
-        with (
-            patch.object(pdf_mod._converter, "convert", return_value=mock_result),
-            patch.object(pdf_mod, "_image_mode_value", ImageRefMode.PLACEHOLDER),
-            patch.object(pdf_mod, "_post_process_code_blocks", False),
-        ):
-            result = pdf_mod.convert_pdf(pdf)
-
-        assert result == "```\nprint('hi')\n```"
+        mock_convert.assert_called_once_with(str(pdf))

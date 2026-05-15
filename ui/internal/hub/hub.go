@@ -14,6 +14,10 @@ type StatusEvent struct {
 	Error      string
 	Stage      string
 	Message    string
+	// populated only when Status == "DONE"
+	Title  string
+	Author string
+	Cover  string // base64-encoded PNG; empty if unavailable
 }
 
 // Hub routes StatusEvents from gRPC stream goroutines to SSE connections.

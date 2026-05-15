@@ -23,6 +23,9 @@ const chunkSize = 512 * 1024 // 512 KB per gRPC send chunk
 // ConversionResult is returned when the stream completes successfully.
 type ConversionResult struct {
 	Markdown []byte
+	Title    string
+	Author   string
+	Cover    []byte
 }
 
 // Client wraps the gRPC ParserService connection.
@@ -109,8 +112,9 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 		return ConversionResult{}, fmt.Errorf("close send: %w", err)
 	}
 
-	// Receive status updates and markdown chunks
+	// Receive status updates, markdown chunks, and document metadata
 	var mdBuf bytes.Buffer
+	var result ConversionResult
 	mdChunks := 0
 	for {
 		msg, err := stream.Recv()
@@ -134,17 +138,25 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 				"pages_done", p.Status.PagesDone,
 				"pages_total", p.Status.PagesTotal,
 			)
-			h.Publish(jobID, hub.StatusEvent{
-				Status:     p.Status.Status,
-				PagesDone:  int(p.Status.PagesDone),
-				PagesTotal: int(p.Status.PagesTotal),
-				Error:      p.Status.Error,
-				Stage:      p.Status.Stage,
-				Message:    p.Status.Message,
-			})
+			// DONE is published by runConversion after metadata is attached.
+			// FAILED is terminal and must be published here since runConversion won't see it.
+			if p.Status.Status != "DONE" {
+				h.Publish(jobID, hub.StatusEvent{
+					Status:     p.Status.Status,
+					PagesDone:  int(p.Status.PagesDone),
+					PagesTotal: int(p.Status.PagesTotal),
+					Error:      p.Status.Error,
+					Stage:      p.Status.Stage,
+					Message:    p.Status.Message,
+				})
+			}
 		case *pb.ConvertResult_MarkdownChunk:
 			mdBuf.Write(p.MarkdownChunk)
 			mdChunks++
+		case *pb.ConvertResult_Metadata:
+			result.Title = p.Metadata.Title
+			result.Author = p.Metadata.Author
+			result.Cover = p.Metadata.Cover
 		}
 	}
 
@@ -153,7 +165,8 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 		"md_bytes", mdBuf.Len(),
 		"md_chunks", mdChunks,
 	)
-	return ConversionResult{Markdown: mdBuf.Bytes()}, nil
+	result.Markdown = mdBuf.Bytes()
+	return result, nil
 }
 
 // Health returns true if the parser reports SERVING via grpc health protocol.

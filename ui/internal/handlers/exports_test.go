@@ -77,7 +77,7 @@ func TestListExports_ShowsExportedRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(ctx, job.ID, "/data/paper.md"); err != nil {
+	if err := store.MarkJobDone(ctx, job.ID, "/data/paper.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := store.CreateHighlight(ctx, domain.Highlight{
@@ -135,7 +135,7 @@ func TestListExports_ShowsFailedRecord(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(ctx, job.ID, "/data/doc.md"); err != nil {
+	if err := store.MarkJobDone(ctx, job.ID, "/data/doc.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := store.CreateHighlight(ctx, domain.Highlight{

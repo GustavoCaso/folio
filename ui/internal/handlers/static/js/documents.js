@@ -49,6 +49,31 @@ export function watchJob(jobID) {
       if (actions && !actions.querySelector("a[href]")) {
         actions.innerHTML = readButtonHTML(jobID) + deleteFormButton(jobID, filename);
       }
+      const meta = card.querySelector("[data-metadata]");
+      if (meta && (d.Cover || d.Title || d.Author)) {
+        if (d.Cover && !meta.querySelector("[data-cover]")) {
+          const img = document.createElement("img");
+          img.dataset.cover = "";
+          img.src = "data:image/png;base64," + d.Cover;
+          img.alt = "cover";
+          img.className = "w-full rounded object-cover aspect-[3/4] bg-muted";
+          meta.prepend(img);
+        }
+        if (d.Title && !meta.querySelector("[data-title]")) {
+          const p = document.createElement("p");
+          p.dataset.title = "";
+          p.className = "text-xs font-medium truncate";
+          p.textContent = "Title: " + d.Title;
+          meta.append(p);
+        }
+        if (d.Author && !meta.querySelector("[data-author]")) {
+          const p = document.createElement("p");
+          p.dataset.author = "";
+          p.className = "text-xs text-muted-foreground truncate";
+          p.textContent = "Author: " + d.Author;
+          meta.append(p);
+        }
+      }
       es.close();
     } else if (d.Status === "FAILED") {
       if (errorText) errorText.textContent = d.Error || "";

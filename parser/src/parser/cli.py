@@ -6,6 +6,8 @@ import time
 from pathlib import Path
 
 from parser.converter import convert
+from parser.formats.pdf.metadata import extract_metadata
+from parser.formats.pdf.pdf import image_mode_value, post_process_code_blocks
 from parser.logging_config import configure
 
 logger = logging.getLogger(__name__)
@@ -22,6 +24,17 @@ def build_parser() -> argparse.ArgumentParser:
     )
     convert_cmd.set_defaults(func=_convert)
 
+    metadata_cmd = subparsers.add_parser("metadata", help="Extract metadata from a PDF")
+    metadata_cmd.add_argument("input", help="Path to PDF")
+    metadata_cmd.add_argument(
+        "--cover",
+        "-c",
+        help="Save cover PNG to this path (default: <input>.cover.png)",
+        nargs="?",
+        const="",
+    )
+    metadata_cmd.set_defaults(func=_metadata)
+
     return p
 
 
@@ -33,7 +46,12 @@ def _convert(args: argparse.Namespace) -> None:
         extra={"input_path": str(input_path), "output_path": str(output_path)},
     )
     started = time.monotonic()
-    markdown = convert(input_path)
+    doc = convert(input_path)
+    markdown = doc.export_to_markdown(image_mode=image_mode_value)
+    if post_process_code_blocks:
+        from parser.postprocess import enrich_code_blocks
+
+        markdown = enrich_code_blocks(markdown)
     output_path.write_text(markdown, encoding="utf-8")
     logger.info(
         "cli convert done",
@@ -45,6 +63,22 @@ def _convert(args: argparse.Namespace) -> None:
         },
     )
     print(f"Written: {output_path}")
+
+
+def _metadata(args: argparse.Namespace) -> None:
+    input_path = Path(args.input)
+    generate_cover = args.cover is not None
+    title, author, cover = extract_metadata(input_path, generate_cover=generate_cover)
+    print(f"Title:  {title or '(none)'}")
+    print(f"Author: {author or '(none)'}")
+
+    if generate_cover:
+        cover_path = Path(args.cover) if args.cover else input_path.with_suffix(".cover.png")
+        if cover:
+            cover_path.write_bytes(cover)
+            print(f"Cover:  {cover_path} ({len(cover)} bytes)")
+        else:
+            print("Cover:  (failed)")
 
 
 def main() -> None:

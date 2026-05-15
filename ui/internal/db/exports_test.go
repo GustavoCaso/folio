@@ -16,7 +16,7 @@ func seedJobAndHighlightForExport(t *testing.T, store repository.Store, backendN
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
+	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := store.CreateHighlight(context.Background(), domain.Highlight{

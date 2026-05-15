@@ -1,0 +1,3 @@
+ALTER TABLE jobs DROP COLUMN cover;
+ALTER TABLE jobs DROP COLUMN author;
+ALTER TABLE jobs DROP COLUMN title;

@@ -106,7 +106,7 @@ func TestGetPendingJobs(t *testing.T) {
 	if err := database.UpdateJobStatus(ctx, processing.ID, "PROCESSING"); err != nil {
 		t.Fatal(err)
 	}
-	if err := database.MarkJobDone(ctx, done.ID, "/data/d.md"); err != nil {
+	if err := database.MarkJobDone(ctx, done.ID, "/data/d.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	if err := database.MarkJobFailed(ctx, failed.ID, "boom"); err != nil {
@@ -164,7 +164,7 @@ func TestMarkJobDone(t *testing.T) {
 		t.Fatalf("expected content to not be empty, got %v", job.Content)
 	}
 
-	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md"); err != nil {
+	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -202,6 +202,42 @@ func TestDeleteJob(t *testing.T) {
 	_, err = database.GetJob(ctx, job.ID)
 	if err == nil {
 		t.Error("expected error after delete, got nil")
+	}
+}
+
+func TestMarkJobDonePersistsMetadata(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+
+	ctx := context.Background()
+	job, err := database.CreateJob(ctx, "test.pdf", []byte("%PDF"), "req-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	cover := []byte{0x89, 0x50, 0x4e, 0x47}
+	if err := database.MarkJobDone(ctx, job.ID, "/data/out.md", "My Title", "Jane Doe", cover); err != nil {
+		t.Fatal(err)
+	}
+
+	got, err := database.GetJob(ctx, job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "DONE" {
+		t.Errorf("status: got %q, want %q", got.Status, "DONE")
+	}
+	if got.Title != "My Title" {
+		t.Errorf("title: got %q, want %q", got.Title, "My Title")
+	}
+	if got.Author != "Jane Doe" {
+		t.Errorf("author: got %q, want %q", got.Author, "Jane Doe")
+	}
+	if !reflect.DeepEqual(got.Cover, cover) {
+		t.Errorf("cover: got %v, want %v", got.Cover, cover)
 	}
 }
 

@@ -73,7 +73,7 @@ func TestReadDocument_MarkdownFileMissing(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, "/nonexistent/path/gone.md"); err != nil {
+	if err := store.MarkJobDone(context.Background(), job.ID, "/nonexistent/path/gone.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -102,7 +102,7 @@ func TestReadDocument_HappyPath(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, mdPath); err != nil {
+	if err := store.MarkJobDone(context.Background(), job.ID, mdPath, "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 

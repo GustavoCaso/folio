@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"context"
+	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
@@ -281,7 +282,10 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 		return
 	}
 
-	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath); err != nil {
+	title := result.Title
+	author := result.Author
+
+	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath, title, author, result.Cover); err != nil {
 		log.Error("mark job done failed", logging.Err(err))
 		return
 	}
@@ -291,5 +295,10 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 		"md_bytes", len(result.Markdown),
 		"dur_ms", time.Since(start).Milliseconds(),
 	)
-	h.hub.Publish(jobID, hub.StatusEvent{Status: "DONE"})
+	h.hub.Publish(jobID, hub.StatusEvent{
+		Status: "DONE",
+		Title:  title,
+		Author: author,
+		Cover:  base64.StdEncoding.EncodeToString(result.Cover),
+	})
 }

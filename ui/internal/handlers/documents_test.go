@@ -164,7 +164,7 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, mdPath); err != nil {
+	if err := store.MarkJobDone(context.Background(), job.ID, mdPath, "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -277,7 +277,7 @@ func TestCancelDocument_InvalidState(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	err = store.MarkJobDone(context.Background(), job.ID, "fake/path")
+	err = store.MarkJobDone(context.Background(), job.ID, "fake/path", "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -417,7 +417,7 @@ func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	if err := store.MarkJobDone(t.Context(), job1.ID, "./whatever"); err != nil {
+	if err := store.MarkJobDone(t.Context(), job1.ID, "./whatever", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
