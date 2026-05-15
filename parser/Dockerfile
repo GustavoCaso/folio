@@ -27,12 +27,15 @@ FROM python:3.12-slim-bookworm AS base
 RUN apt-get update && apt-get install -y curl libgl1-mesa-dev libglib2.0-0 gosu passwd \
     && curl -fsSL https://deb.nodesource.com/setup_24.x | bash - \
     && apt-get install -y nodejs \
+    && curl -fsSL https://get.pnpm.io/install.sh | env PNPM_VERSION=10.33.4 bash - \
     && rm -rf /var/lib/apt/lists/* \
     && groupadd -r folio && useradd -r -g folio folio
 
+ENV PATH=/root/.local/share/pnpm:$PATH
+
 WORKDIR /app
-COPY package.json package-lock.json ./
-RUN npm ci
+COPY package.json pnpm-lock.yaml ./
+RUN pnpm install --frozen-lockfile --ignore-scripts && pnpm store prune
 
 COPY --chown=folio:folio --from=builder /app/src ./src
 COPY entrypoint.sh .
