@@ -12,7 +12,6 @@ import (
 	"strings"
 	"time"
 
-	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
@@ -283,15 +282,8 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 		return
 	}
 
-	title := domain.Unknown
-	if result.Title != "" {
-		title = result.Title
-	}
-
-	author := domain.Unknown
-	if result.Author != "" {
-		author = result.Author
-	}
+	title := result.Title
+	author := result.Author
 
 	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath, title, author, result.Cover); err != nil {
 		log.Error("mark job done failed", logging.Err(err))

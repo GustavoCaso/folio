@@ -60,9 +60,9 @@ _converter: DocumentConverter = DocumentConverter(
     }
 )
 
-_image_mode_value: ImageRefMode = _image_mode()
+image_mode_value: ImageRefMode = _image_mode()
 
-_post_process_code_blocks: bool = _bool_env("PDF_POST_PROCESS_CODE_BLOCKS", True)
+post_process_code_blocks: bool = _bool_env("PDF_POST_PROCESS_CODE_BLOCKS", True)
 
 
 def convert_pdf(path: Path) -> DoclingDocument:

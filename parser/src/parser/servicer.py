@@ -17,7 +17,7 @@ import grpc
 from parser.converter import convert
 from parser.formats.pdf import count_pdf_pages
 from parser.formats.pdf.metadata import extract_metadata
-from parser.formats.pdf.pdf import _image_mode_value, _post_process_code_blocks
+from parser.formats.pdf.pdf import image_mode_value, post_process_code_blocks
 from parser.grpc import parser_pb2, parser_pb2_grpc
 from parser.postprocess import enrich_code_blocks
 from parser.progress import ProgressEvent, attach
@@ -152,8 +152,8 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
 
                 doc = await convert_task  # DoclingDocument
 
-            markdown = doc.export_to_markdown(image_mode=_image_mode_value)
-            if _post_process_code_blocks:
+            markdown = doc.export_to_markdown(image_mode=image_mode_value)
+            if post_process_code_blocks:
                 markdown = enrich_code_blocks(markdown)
 
             encoded = markdown.encode("utf-8")
