@@ -8,20 +8,8 @@ from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc.base import ImageRefMode
 from docling_core.types.doc.document import DoclingDocument
 
-
-def _bool_env(var: str, default: bool) -> bool:
-    val = os.environ.get(var)
-    if val is None:
-        return default
-    return val.lower() in ("1", "true", "yes")
-
-
-def _image_mode() -> ImageRefMode:
-    val = os.environ.get("PDF_IMAGE_MODE", "placeholder").lower()
-    return {"embedded": ImageRefMode.EMBEDDED, "referenced": ImageRefMode.REFERENCED}.get(
-        val, ImageRefMode.PLACEHOLDER
-    )
-
+from parser.formats.helpers import bool_env
+from parser.formats.helpers import image_mode as _image_mode_from_env
 
 _VALID_CODE_FORMULA_PRESETS = {"codeformulav2", "granite_docling"}
 
@@ -36,10 +24,10 @@ def _code_formula_options() -> CodeFormulaVlmOptions:
 
 def _pipeline_options() -> PdfPipelineOptions:
     kwargs: dict[str, object] = {
-        "generate_picture_images": _bool_env("PDF_GENERATE_IMAGES", True),
-        "do_ocr": _bool_env("PDF_DO_OCR", True),
-        "do_table_structure": _bool_env("PDF_DO_TABLE_STRUCTURE", True),
-        "do_code_enrichment": _bool_env("PDF_DO_CODE_ENRICHMENT", False),
+        "generate_picture_images": bool_env("PDF_GENERATE_IMAGES", True),
+        "do_ocr": bool_env("PDF_DO_OCR", True),
+        "do_table_structure": bool_env("PDF_DO_TABLE_STRUCTURE", True),
+        "do_code_enrichment": bool_env("PDF_DO_CODE_ENRICHMENT", False),
         "code_formula_options": _code_formula_options(),
     }
     for env_var, field in (
@@ -60,9 +48,9 @@ _converter: DocumentConverter = DocumentConverter(
     }
 )
 
-image_mode_value: ImageRefMode = _image_mode()
+image_mode_value: ImageRefMode = _image_mode_from_env("PDF_IMAGE_MODE")
 
-post_process_code_blocks: bool = _bool_env("PDF_POST_PROCESS_CODE_BLOCKS", True)
+post_process_code_blocks: bool = bool_env("PDF_POST_PROCESS_CODE_BLOCKS", True)
 
 
 def convert_pdf(path: Path) -> DoclingDocument:

@@ -1,4 +1,3 @@
-import os
 from pathlib import Path
 
 from docling.datamodel.backend_options import HTMLBackendOptions
@@ -7,24 +6,13 @@ from docling.document_converter import DocumentConverter, HTMLFormatOption
 from docling_core.types.doc.base import ImageRefMode
 from docling_core.types.doc.document import DoclingDocument
 
-
-def _bool_env(var: str, default: bool) -> bool:
-    val = os.environ.get(var)
-    if val is None:
-        return default
-    return val.lower() in ("1", "true", "yes")
-
-
-def _image_mode() -> ImageRefMode:
-    val = os.environ.get("HTML_IMAGE_MODE", "placeholder").lower()
-    return {"embedded": ImageRefMode.EMBEDDED, "referenced": ImageRefMode.REFERENCED}.get(
-        val, ImageRefMode.PLACEHOLDER
-    )
+from parser.formats.helpers import bool_env
+from parser.formats.helpers import image_mode as _image_mode_from_env
 
 
 def _backend_options() -> HTMLBackendOptions:
     return HTMLBackendOptions(
-        fetch_images=_bool_env("HTML_FETCH_IMAGES", False),
+        fetch_images=bool_env("HTML_FETCH_IMAGES", False),
     )  # type: ignore[call-arg]  # Pydantic BaseModel fields have defaults; mypy requires plugin for accurate inference
 
 
@@ -34,9 +22,9 @@ _converter: DocumentConverter = DocumentConverter(
     }
 )
 
-image_mode_value: ImageRefMode = _image_mode()
+image_mode_value: ImageRefMode = _image_mode_from_env("HTML_IMAGE_MODE")
 
-post_process_code_blocks: bool = _bool_env("HTML_POST_PROCESS_CODE_BLOCKS", True)
+post_process_code_blocks: bool = bool_env("HTML_POST_PROCESS_CODE_BLOCKS", True)
 
 
 def convert_html(path: Path) -> DoclingDocument:
