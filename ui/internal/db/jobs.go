@@ -2,7 +2,7 @@ package db
 
 import (
 	"context"
-	"strings"
+	"encoding/json"
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
@@ -109,10 +109,16 @@ func (d *db) DeleteJob(ctx context.Context, id string) error {
 }
 
 func (d *db) UpdateJob(ctx context.Context, id, title, author string, tags []string, cover []byte) error {
-	tagsStr := strings.Join(tags, ",")
-	_, err := d.conn.ExecContext(ctx,
+	if tags == nil {
+		tags = []string{}
+	}
+	tagsJSON, err := json.Marshal(tags)
+	if err != nil {
+		return err
+	}
+	_, err = d.conn.ExecContext(ctx,
 		`UPDATE jobs SET title = ?, author = ?, tags = ?, cover = ?, updated_at = ? WHERE id = ?`,
-		title, author, tagsStr, cover, time.Now().UTC().Format(time.RFC3339), id,
+		title, author, string(tagsJSON), cover, time.Now().UTC().Format(time.RFC3339), id,
 	)
 	return err
 }
@@ -141,8 +147,11 @@ func scanJob(s scanner) (domain.Job, error) {
 	if err != nil {
 		return domain.Job{}, err
 	}
+	j.Tags = []string{}
 	if tagsStr != "" {
-		j.Tags = strings.Split(tagsStr, ",")
+		if jsonErr := json.Unmarshal([]byte(tagsStr), &j.Tags); jsonErr != nil {
+			return domain.Job{}, jsonErr
+		}
 	}
 	j.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	j.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
