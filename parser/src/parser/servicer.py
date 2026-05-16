@@ -15,6 +15,7 @@ if TYPE_CHECKING:
 import grpc
 
 from parser.converter import convert
+from parser.formats.html import convert_html_url
 from parser.formats.pdf import count_pdf_pages
 from parser.formats.pdf.metadata import extract_metadata
 from parser.formats.pdf.pdf import image_mode_value, post_process_code_blocks
@@ -59,6 +60,85 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             logger.warning("missing ConvertMeta", extra={"job_id": job_id})
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Missing ConvertMeta")
             return
+
+        # Dispatch to URL-based or file-based conversion
+        if meta.url:
+            async for result in self._convert_from_url(meta, job_id):
+                yield result
+        else:
+            async for result in self._convert_from_bytes(meta, buf, job_id, started):
+                yield result
+
+    async def _convert_from_url(  # noqa: N802
+        self,
+        meta: parser_pb2.ConvertMeta,
+        job_id: str,
+    ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
+        ctx: dict[str, object] = {"job_id": job_id, "url": meta.url}
+        if meta.request_id:
+            ctx["request_id"] = meta.request_id
+        logger.info("convert url received", extra=ctx)
+
+        yield parser_pb2.ConvertResult(
+            status=parser_pb2.StatusUpdate(
+                status="PROCESSING",
+                stage="received",
+                message=f"received url: {meta.url}",
+            )
+        )
+
+        try:
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(
+                    status="PROCESSING",
+                    stage="loading",
+                    message="fetching and loading document",
+                )
+            )
+
+            loop = asyncio.get_running_loop()
+            convert_task = loop.run_in_executor(self._executor, convert_html_url, meta.url)
+            doc = await convert_task
+
+            markdown = doc.export_to_markdown(image_mode=image_mode_value)
+            encoded = markdown.encode("utf-8")
+            logger.info("convert url exporting", extra={**ctx, "md_bytes": len(encoded)})
+
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(
+                    status="PROCESSING",
+                    stage="exporting",
+                    message="streaming markdown",
+                )
+            )
+
+            for i in range(0, len(encoded), _CHUNK_SIZE):
+                yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
+
+            # Use doc name as title if available; no PDF-style cover for web pages
+            title = doc.name or ""
+            yield parser_pb2.ConvertResult(
+                metadata=parser_pb2.DocumentMetadata(title=title, author="", cover=b"")
+            )
+
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(status="DONE", stage="done")
+            )
+            logger.info("convert url done", extra=ctx)
+
+        except Exception as exc:
+            logger.exception("convert url failed", extra=ctx)
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(status="FAILED", error=str(exc))
+            )
+
+    async def _convert_from_bytes(  # noqa: N802
+        self,
+        meta: parser_pb2.ConvertMeta,
+        buf: bytearray,
+        job_id: str,
+        started: float,
+    ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
 
         ctx: dict[str, object] = {
             "job_id": job_id,

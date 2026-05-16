@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"net/url"
 	"os"
 	"path/filepath"
 	"strings"
@@ -132,7 +133,11 @@ func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
 
 	// Start conversion in background — does not block the HTTP response.
 	// Snapshot the request_id so parser logs link back to the originating upload.
-	go h.runConversion(job.ID, job.RequestID, job.Filename, job.Content)
+	if job.SourceURL != "" {
+		go h.runConversionFromURL(job.ID, job.RequestID, job.SourceURL)
+	} else {
+		go h.runConversion(job.ID, job.RequestID, job.Filename, job.Content)
+	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -264,16 +269,63 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 		return
 	}
 
-	// Write Markdown to disk
 	safe := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
 			return r
 		}
 		return '-'
 	}, strings.TrimSuffix(filename, filepath.Ext(filename)))
-	outputPath := filepath.Join(h.dataDir, fmt.Sprintf("%s-%s.md", safe, jobID[:8]))
+	h.writeAndComplete(jobID, safe, log, result.Markdown, result.Title, result.Author, result.Cover, start)
+}
 
-	if err := os.WriteFile(outputPath, result.Markdown, 0644); err != nil {
+func (h *Handlers) runConversionFromURL(jobID, requestID, sourceURL string) {
+	log := h.logger.With("job_id", jobID, "request_id", requestID, "source_url", sourceURL)
+	start := time.Now()
+
+	log.Info("url conversion start")
+
+	convertCtx, convertCancel := context.WithCancel(context.Background())
+	h.cancels.Store(jobID, convertCancel)
+	result, err := h.parser.ConvertFromURL(convertCtx, jobID, requestID, sourceURL, h.hub)
+	h.cancels.Delete(jobID)
+	convertCancel()
+
+	if err != nil {
+		log.Error("url conversion failed", logging.Err(err), "dur_ms", time.Since(start).Milliseconds())
+		errMsg := err.Error()
+		if errors.Is(err, context.Canceled) {
+			errMsg = "cancelled by user"
+		}
+		if markErr := h.store.MarkJobFailed(context.Background(), jobID, errMsg); markErr != nil {
+			log.Error("mark job failed errored", logging.Err(markErr))
+		}
+		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: errMsg})
+		return
+	}
+
+	// Derive a safe slug from the URL for the output path
+	parsed, _ := url.Parse(sourceURL)
+	urlSlug := parsed.Host + parsed.Path
+	safe := strings.Map(func(r rune) rune {
+		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
+			return r
+		}
+		return '-'
+	}, urlSlug)
+	if len(safe) > 64 {
+		safe = safe[:64]
+	}
+	h.writeAndComplete(jobID, safe, log, result.Markdown, result.Title, result.Author, result.Cover, start)
+}
+
+// writeAndComplete writes the markdown to disk and marks the job done (or failed on error).
+func (h *Handlers) writeAndComplete(jobID, nameSlug string, log interface {
+	Error(msg string, args ...any)
+	Info(msg string, args ...any)
+}, markdown []byte, title, author string, cover []byte, start time.Time) {
+	outputPath := filepath.Join(h.dataDir, fmt.Sprintf("%s-%s.md", nameSlug, jobID[:8]))
+
+	if err := os.WriteFile(outputPath, markdown, 0644); err != nil {
 		log.Error("write markdown failed", logging.Err(err), "output_path", outputPath)
 		if markErr := h.store.MarkJobFailed(context.Background(), jobID, err.Error()); markErr != nil {
 			log.Error("mark job failed errored", logging.Err(markErr))
@@ -282,23 +334,105 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 		return
 	}
 
-	title := result.Title
-	author := result.Author
-
-	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath, title, author, result.Cover); err != nil {
+	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath, title, author, cover); err != nil {
 		log.Error("mark job done failed", logging.Err(err))
 		return
 	}
 
 	log.Info("conversion done",
 		"output_path", outputPath,
-		"md_bytes", len(result.Markdown),
+		"md_bytes", len(markdown),
 		"dur_ms", time.Since(start).Milliseconds(),
 	)
 	h.hub.Publish(jobID, hub.StatusEvent{
 		Status: "DONE",
 		Title:  title,
 		Author: author,
-		Cover:  base64.StdEncoding.EncodeToString(result.Cover),
+		Cover:  base64.StdEncoding.EncodeToString(cover),
 	})
+}
+
+// ImportDocument handles POST /documents/import and starts a URL-based conversion.
+func (h *Handlers) ImportDocument(w http.ResponseWriter, r *http.Request) {
+	log := logging.LoggerFrom(r.Context())
+
+	renderErr := func(status int, msg string) {
+		jobs, listErr := h.store.ListJobs(r.Context())
+		if listErr != nil {
+			log.Error("list jobs failed during error render", logging.Err(listErr))
+		}
+		w.WriteHeader(status)
+		if err := templates.Documents(jobs, nil, msg).Render(r.Context(), w); err != nil {
+			log.Error("render error page failed", logging.Err(err))
+		}
+	}
+
+	if err := r.ParseForm(); err != nil {
+		renderErr(http.StatusBadRequest, "Invalid form data.")
+		return
+	}
+
+	rawURL := strings.TrimSpace(r.FormValue("url"))
+	if rawURL == "" {
+		renderErr(http.StatusBadRequest, "URL is required.")
+		return
+	}
+
+	if err := validateImportURL(rawURL); err != nil {
+		renderErr(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	parsed, _ := url.Parse(rawURL)
+	filename := parsed.Host + parsed.Path
+	if filename == "" {
+		filename = rawURL
+	}
+
+	reqID := logging.RequestIDFrom(r.Context())
+	job, err := h.store.CreateJobFromURL(r.Context(), rawURL, filename, reqID)
+	if err != nil {
+		log.Error("create url job failed", logging.Err(err), "url", rawURL)
+		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store job. %v", err))
+		return
+	}
+
+	log.Info("url import accepted", "job_id", job.ID, "url", rawURL)
+	go h.runConversionFromURL(job.ID, reqID, rawURL)
+
+	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// validateImportURL checks that rawURL is reachable and its content type is HTML or PDF.
+func validateImportURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("URL must use http or https scheme")
+	}
+
+	client := &http.Client{Timeout: 10 * time.Second}
+	resp, err := client.Head(rawURL)
+	if err != nil || (resp != nil && resp.StatusCode == http.StatusMethodNotAllowed) {
+		// Fall back to GET if HEAD is not supported
+		req, newErr := http.NewRequest(http.MethodGet, rawURL, nil)
+		if newErr != nil {
+			return fmt.Errorf("could not reach URL: %v", rawURL)
+		}
+		resp, err = client.Do(req)
+		if err != nil {
+			return fmt.Errorf("could not reach URL: %v", rawURL)
+		}
+	}
+	if resp == nil {
+		return fmt.Errorf("could not reach URL: %v", rawURL)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	ct := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "text/html") &&
+		!strings.HasPrefix(ct, "application/xhtml+xml") &&
+		!strings.HasPrefix(ct, "application/pdf") {
+		return fmt.Errorf("unsupported content type %q — only HTML pages and PDFs are supported", ct)
+	}
+	return nil
 }

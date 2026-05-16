@@ -67,6 +67,9 @@ type errorParser struct{}
 func (errorParser) Convert(_ context.Context, _, _, _ string, _ []byte, _ *hub.Hub) (parserclient.ConversionResult, error) {
 	return parserclient.ConversionResult{}, errors.New("stubbed")
 }
+func (errorParser) ConvertFromURL(_ context.Context, _, _, _ string, _ *hub.Hub) (parserclient.ConversionResult, error) {
+	return parserclient.ConversionResult{}, errors.New("stubbed")
+}
 func (errorParser) Health(_ context.Context) bool { return false }
 
 // emptyMultipartRequest builds a POST /documents request with a valid
@@ -340,6 +343,9 @@ func (p *blockingParser) Convert(ctx context.Context, _, _, _ string, _ []byte, 
 	close(p.started)
 	<-ctx.Done()
 	return parserclient.ConversionResult{}, ctx.Err()
+}
+func (p *blockingParser) ConvertFromURL(_ context.Context, _, _, _ string, _ *hub.Hub) (parserclient.ConversionResult, error) {
+	return parserclient.ConversionResult{}, errors.New("not implemented in test stub")
 }
 func (p *blockingParser) Health(_ context.Context) bool { return true }
 

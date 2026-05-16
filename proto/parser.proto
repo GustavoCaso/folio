@@ -23,6 +23,7 @@ message ConvertChunk {
 message ConvertMeta {
   string filename   = 1;  // original filename, used to infer format
   string request_id = 2;  // caller-assigned correlation id; surfaced in parser logs
+  string url        = 3;  // source URL when importing from the web; if set, no data chunks are sent
 }
 
 // ConvertResult is streamed back by the parser.
