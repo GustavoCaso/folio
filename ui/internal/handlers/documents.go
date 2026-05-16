@@ -308,7 +308,7 @@ func (h *Handlers) runConversionFromURL(jobID, requestID, sourceURL string) {
 	// Derive a safe slug from the URL for the output filename.
 	// strings.Map below restricts to [a-zA-Z0-9\-_] so the result cannot
 	// traverse above h.dataDir inside writeAndComplete.
-	parsed, _ := url.Parse(sourceURL) // error impossible: already validated by validateImportURL
+	parsed, _ := url.Parse(sourceURL) // sourceURL was validated by validateImportURL before job creation
 	urlSlug := parsed.Host + parsed.Path
 	safe := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
@@ -424,7 +424,10 @@ func validateImportURL(rawURL string) error {
 
 	client := &http.Client{
 		Timeout: 10 * time.Second,
-		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
 			return validateHostNotPrivate(req.URL.Hostname())
 		},
 	}

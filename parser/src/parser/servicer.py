@@ -73,6 +73,12 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
         ctx: dict[str, object] = {"job_id": job_id, "url": request.url}
         if request.request_id:
             ctx["request_id"] = request.request_id
+
+        # Defense-in-depth: validate scheme even though the Go caller does it too.
+        if not request.url.startswith(("http://", "https://")):
+            await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "URL must use http or https scheme")
+            return
+
         logger.info("convert url received", extra=ctx)
 
         yield parser_pb2.ConvertResult(
