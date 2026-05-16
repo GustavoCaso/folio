@@ -34,7 +34,7 @@ async def test_convert_document_yields_processing_then_done():
 
     with (
         patch("parser.servicer.convert", return_value=mock_doc),
-        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer._extract_metadata", return_value=("", "", b"")),
     ):
         results = []
         async for result in servicer.ConvertDocument(stream, context):
@@ -57,7 +57,7 @@ async def test_convert_document_yields_markdown_chunk():
 
     with (
         patch("parser.servicer.convert", return_value=mock_doc),
-        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer._extract_metadata", return_value=("", "", b"")),
     ):
         results = []
         async for result in servicer.ConvertDocument(stream, context):
@@ -81,7 +81,7 @@ async def test_convert_document_emits_stage_transitions():
     with (
         patch("parser.servicer.convert", return_value=mock_doc),
         patch("parser.servicer.count_pdf_pages", return_value=7),
-        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer._extract_metadata", return_value=("", "", b"")),
     ):
         results = []
         async for result in servicer.ConvertDocument(stream, context):
@@ -117,7 +117,7 @@ async def test_convert_document_logs_request_id_from_meta(caplog):
     with (
         caplog.at_level(logging.INFO, logger="parser.servicer"),
         patch("parser.servicer.convert", return_value=mock_doc),
-        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer._extract_metadata", return_value=("", "", b"")),
     ):
         async for _ in servicer.ConvertDocument(stream, context):
             pass
@@ -159,7 +159,7 @@ async def test_convert_document_yields_metadata_on_success():
 
     with (
         patch("parser.servicer.convert", return_value=mock_doc),
-        patch("parser.servicer.extract_metadata", return_value=("My Title", "Jane", b"\x89PNG")),
+        patch("parser.servicer._extract_metadata", return_value=("My Title", "Jane", b"\x89PNG")),
     ):
         results = []
         async for result in servicer.ConvertDocument(stream, context):
@@ -193,3 +193,31 @@ async def test_convert_document_no_metadata_on_failure():
 
     metadata_msgs = [r for r in results if r.HasField("metadata")]
     assert len(metadata_msgs) == 0
+
+
+@pytest.mark.asyncio
+async def test_convert_html_document_yields_processing_then_done():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+
+    stream = _make_stream("page.html", b"<html></html>")
+
+    mock_doc = MagicMock()
+    mock_doc.export_to_markdown.return_value = "# Hello"
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer._extract_metadata", return_value=("My Title", "Author", b"")),
+    ):
+        results = []
+        async for result in servicer.ConvertDocument(stream, context):
+            results.append(result)
+
+    statuses = [r.status.status for r in results if r.HasField("status")]
+    assert "PROCESSING" in statuses
+    assert "DONE" in statuses
+
+    metadata_msgs = [r for r in results if r.HasField("metadata")]
+    assert len(metadata_msgs) == 1
+    assert metadata_msgs[0].metadata.title == "My Title"
+    assert metadata_msgs[0].metadata.author == "Author"

@@ -16,16 +16,43 @@ import grpc
 
 from parser.converter import convert
 from parser.formats.pdf import count_pdf_pages
-from parser.formats.pdf.metadata import extract_metadata
-from parser.formats.pdf.pdf import image_mode_value, post_process_code_blocks
 from parser.grpc import parser_pb2, parser_pb2_grpc
 from parser.postprocess import enrich_code_blocks
 from parser.progress import ProgressEvent, attach
+
+if TYPE_CHECKING:
+    from docling_core.types.doc.base import ImageRefMode
 
 logger = logging.getLogger(__name__)
 
 _CHUNK_SIZE = 64 * 1024  # 64 KB per markdown chunk
 _DRAIN_POLL_INTERVAL = 0.5  # seconds
+
+_HTML_SUFFIXES = frozenset({".html", ".htm"})
+
+
+def _get_format_settings(suffix: str) -> tuple[ImageRefMode, bool]:
+    """Return (image_mode, post_process_code_blocks) for the given file extension."""
+    if suffix in _HTML_SUFFIXES:
+        from parser.formats.html.html import image_mode_value, post_process_code_blocks
+
+        return image_mode_value, post_process_code_blocks
+    from parser.formats.pdf.pdf import image_mode_value, post_process_code_blocks
+
+    return image_mode_value, post_process_code_blocks
+
+
+def _extract_metadata(path: Path, suffix: str) -> tuple[str, str, bytes]:
+    """Extract (title, author, cover) from a document based on its file extension."""
+    if suffix in _HTML_SUFFIXES:
+        from parser.formats.html.metadata import extract_metadata as _html_meta
+
+        return _html_meta(path, generate_cover=True)
+    if suffix == ".pdf":
+        from parser.formats.pdf.metadata import extract_metadata as _pdf_meta
+
+        return _pdf_meta(path, generate_cover=True)
+    return "", "", b""
 
 
 class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[misc]
@@ -69,7 +96,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             ctx["request_id"] = meta.request_id
         logger.info("convert received", extra=ctx)
 
-        suffix = Path(meta.filename).suffix or ".pdf"
+        suffix = Path(meta.filename).suffix.lower() or ".pdf"
 
         yield parser_pb2.ConvertResult(
             status=parser_pb2.StatusUpdate(
@@ -87,7 +114,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                 tmp_path = Path(f.name)
 
             pages_total = 0
-            if suffix.lower() == ".pdf":
+            if suffix == ".pdf":
                 try:
                     pages_total = count_pdf_pages(tmp_path)
                 except Exception:
@@ -152,8 +179,9 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
 
                 doc = await convert_task  # DoclingDocument
 
-            markdown = doc.export_to_markdown(image_mode=image_mode_value)
-            if post_process_code_blocks:
+            image_mode, do_post_process = _get_format_settings(suffix)
+            markdown = doc.export_to_markdown(image_mode=image_mode)
+            if do_post_process:
                 markdown = enrich_code_blocks(markdown)
 
             encoded = markdown.encode("utf-8")
@@ -178,7 +206,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                 yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
                 md_chunks += 1
 
-            title, author, cover = extract_metadata(tmp_path, generate_cover=True)
+            title, author, cover = _extract_metadata(tmp_path, suffix)
             yield parser_pb2.ConvertResult(
                 metadata=parser_pb2.DocumentMetadata(
                     title=title,
