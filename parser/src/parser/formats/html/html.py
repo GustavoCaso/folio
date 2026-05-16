@@ -25,7 +25,7 @@ def _image_mode() -> ImageRefMode:
 def _backend_options() -> HTMLBackendOptions:
     return HTMLBackendOptions(
         fetch_images=_bool_env("HTML_FETCH_IMAGES", False),
-    )  # type: ignore[call-arg]
+    )  # type: ignore[call-arg]  # Pydantic BaseModel fields have defaults; mypy requires plugin for accurate inference
 
 
 _converter: DocumentConverter = DocumentConverter(

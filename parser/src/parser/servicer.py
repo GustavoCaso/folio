@@ -32,7 +32,10 @@ _HTML_SUFFIXES = frozenset({".html", ".htm"})
 
 
 def _get_format_settings(suffix: str) -> tuple[ImageRefMode, bool]:
-    """Return (image_mode, post_process_code_blocks) for the given file extension."""
+    """Return (image_mode, post_process_code_blocks) for the given file extension.
+
+    Falls back to PDF settings for unrecognised extensions.
+    """
     if suffix in _HTML_SUFFIXES:
         from parser.formats.html.html import image_mode_value, post_process_code_blocks
 
