@@ -6,6 +6,8 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"log/slog"
+	"net"
 	"net/http"
 	"net/url"
 	"os"
@@ -303,8 +305,10 @@ func (h *Handlers) runConversionFromURL(jobID, requestID, sourceURL string) {
 		return
 	}
 
-	// Derive a safe slug from the URL for the output path
-	parsed, _ := url.Parse(sourceURL)
+	// Derive a safe slug from the URL for the output filename.
+	// strings.Map below restricts to [a-zA-Z0-9\-_] so the result cannot
+	// traverse above h.dataDir inside writeAndComplete.
+	parsed, _ := url.Parse(sourceURL) // error impossible: already validated by validateImportURL
 	urlSlug := parsed.Host + parsed.Path
 	safe := strings.Map(func(r rune) rune {
 		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
@@ -319,10 +323,9 @@ func (h *Handlers) runConversionFromURL(jobID, requestID, sourceURL string) {
 }
 
 // writeAndComplete writes the markdown to disk and marks the job done (or failed on error).
-func (h *Handlers) writeAndComplete(jobID, nameSlug string, log interface {
-	Error(msg string, args ...any)
-	Info(msg string, args ...any)
-}, markdown []byte, title, author string, cover []byte, start time.Time) {
+// nameSlug must already be sanitized to [a-zA-Z0-9\-_] so that filepath.Join cannot
+// produce a path outside h.dataDir.
+func (h *Handlers) writeAndComplete(jobID, nameSlug string, log *slog.Logger, markdown []byte, title, author string, cover []byte, start time.Time) {
 	outputPath := filepath.Join(h.dataDir, fmt.Sprintf("%s-%s.md", nameSlug, jobID[:8]))
 
 	if err := os.WriteFile(outputPath, markdown, 0644); err != nil {
@@ -383,7 +386,11 @@ func (h *Handlers) ImportDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	parsed, _ := url.Parse(rawURL)
+	parsed, err := url.Parse(rawURL)
+	if err != nil {
+		renderErr(http.StatusBadRequest, "Invalid URL.")
+		return
+	}
 	filename := parsed.Host + parsed.Path
 	if filename == "" {
 		filename = rawURL
@@ -404,26 +411,34 @@ func (h *Handlers) ImportDocument(w http.ResponseWriter, r *http.Request) {
 }
 
 // validateImportURL checks that rawURL is reachable and its content type is HTML or PDF.
+// It blocks requests to private/internal addresses as a basic SSRF mitigation.
 func validateImportURL(rawURL string) error {
 	u, err := url.Parse(rawURL)
 	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
 		return fmt.Errorf("URL must use http or https scheme")
 	}
 
-	client := &http.Client{Timeout: 10 * time.Second}
+	if err := validateHostNotPrivate(u.Hostname()); err != nil {
+		return err
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(req *http.Request, _ []*http.Request) error {
+			return validateHostNotPrivate(req.URL.Hostname())
+		},
+	}
+
 	resp, err := client.Head(rawURL)
-	if err != nil || (resp != nil && resp.StatusCode == http.StatusMethodNotAllowed) {
-		// Fall back to GET if HEAD is not supported
+	if err == nil && resp.StatusCode == http.StatusMethodNotAllowed {
+		_ = resp.Body.Close()
 		req, newErr := http.NewRequest(http.MethodGet, rawURL, nil)
 		if newErr != nil {
 			return fmt.Errorf("could not reach URL: %v", rawURL)
 		}
 		resp, err = client.Do(req)
-		if err != nil {
-			return fmt.Errorf("could not reach URL: %v", rawURL)
-		}
 	}
-	if resp == nil {
+	if err != nil {
 		return fmt.Errorf("could not reach URL: %v", rawURL)
 	}
 	defer func() { _ = resp.Body.Close() }()
@@ -433,6 +448,25 @@ func validateImportURL(rawURL string) error {
 		!strings.HasPrefix(ct, "application/xhtml+xml") &&
 		!strings.HasPrefix(ct, "application/pdf") {
 		return fmt.Errorf("unsupported content type %q — only HTML pages and PDFs are supported", ct)
+	}
+	return nil
+}
+
+// validateHostNotPrivate resolves host and returns an error if any resolved IP
+// is a loopback, link-local, or private address (basic SSRF mitigation).
+func validateHostNotPrivate(host string) error {
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		return fmt.Errorf("could not resolve host %q: %v", host, err)
+	}
+	for _, addr := range addrs {
+		ip := net.ParseIP(addr)
+		if ip == nil {
+			continue
+		}
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsPrivate() {
+			return fmt.Errorf("URL resolves to a private or internal address")
+		}
 	}
 	return nil
 }
