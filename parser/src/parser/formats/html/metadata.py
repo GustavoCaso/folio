@@ -10,6 +10,8 @@ if TYPE_CHECKING:
 
 logger = logging.getLogger(__name__)
 
+_OG_IMAGE = "og:image"
+
 
 class _MetadataParser(HTMLParser):
     def __init__(self) -> None:
@@ -29,7 +31,7 @@ class _MetadataParser(HTMLParser):
             content = attr_dict.get("content") or ""
             if name == "author":
                 self.author = content
-            elif prop == "og:image" or name == "og:image":
+            elif prop == _OG_IMAGE or name == _OG_IMAGE:
                 self.og_image = content
 
     def handle_data(self, data: str) -> None:

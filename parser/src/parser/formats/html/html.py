@@ -13,7 +13,7 @@ from parser.formats.helpers import image_mode as _image_mode_from_env
 def _backend_options() -> HTMLBackendOptions:
     return HTMLBackendOptions(
         fetch_images=bool_env("HTML_FETCH_IMAGES", False),
-    )  # type: ignore[call-arg]  # Pydantic BaseModel fields have defaults; mypy requires plugin for accurate inference
+    )  # type: ignore[call-arg]
 
 
 _converter: DocumentConverter = DocumentConverter(
