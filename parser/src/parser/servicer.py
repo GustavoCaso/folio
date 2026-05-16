@@ -61,29 +61,25 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Missing ConvertMeta")
             return
 
-        # Dispatch to URL-based or file-based conversion
-        if meta.url:
-            async for result in self._convert_from_url(meta, job_id):
-                yield result
-        else:
-            async for result in self._convert_from_bytes(meta, buf, job_id, started):
-                yield result
+        async for result in self._convert_from_bytes(meta, buf, job_id, started):
+            yield result
 
-    async def _convert_from_url(  # noqa: N802
+    async def ConvertURL(  # noqa: N802
         self,
-        meta: parser_pb2.ConvertMeta,
-        job_id: str,
+        request: parser_pb2.ConvertURLRequest,
+        context: grpc.aio.ServicerContext[parser_pb2.ConvertURLRequest, parser_pb2.ConvertResult],
     ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
-        ctx: dict[str, object] = {"job_id": job_id, "url": meta.url}
-        if meta.request_id:
-            ctx["request_id"] = meta.request_id
+        job_id = uuid.uuid4().hex[:8]
+        ctx: dict[str, object] = {"job_id": job_id, "url": request.url}
+        if request.request_id:
+            ctx["request_id"] = request.request_id
         logger.info("convert url received", extra=ctx)
 
         yield parser_pb2.ConvertResult(
             status=parser_pb2.StatusUpdate(
                 status="PROCESSING",
                 stage="received",
-                message=f"received url: {meta.url}",
+                message=f"received url: {request.url}",
             )
         )
 
@@ -97,7 +93,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             )
 
             loop = asyncio.get_running_loop()
-            convert_task = loop.run_in_executor(self._executor, convert_html_url, meta.url)
+            convert_task = loop.run_in_executor(self._executor, convert_html_url, request.url)
             doc = await convert_task
 
             markdown = doc.export_to_markdown(image_mode=image_mode_value)

@@ -169,14 +169,17 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 	return result, nil
 }
 
-// ConvertFromURL sends a source URL to the parser (no file data), publishes StatusEvents
-// to h for jobID, and returns the assembled Markdown when the stream completes.
+// ConvertFromURL sends a source URL to the parser, publishes StatusEvents to h
+// for jobID, and returns the assembled Markdown when the stream completes.
 // Blocking: returns only when conversion is done or has failed.
 func (c *Client) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL string, h *hub.Hub) (ConversionResult, error) {
 	log := c.logger.With("job_id", jobID, "request_id", requestID, "source_url", sourceURL)
 	start := time.Now()
 
-	stream, err := c.client.ConvertDocument(ctx)
+	stream, err := c.client.ConvertURL(ctx, &pb.ConvertURLRequest{
+		Url:       sourceURL,
+		RequestId: requestID,
+	})
 	if err != nil {
 		log.Error("open stream failed", "err", err.Error())
 		if status.Code(err) == codes.Canceled {
@@ -184,23 +187,7 @@ func (c *Client) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL
 		}
 		return ConversionResult{}, fmt.Errorf("stream: %w", err)
 	}
-	log.Info("stream opened for url")
-
-	// Send meta frame with URL; no data chunks follow
-	if err := stream.Send(&pb.ConvertChunk{
-		Payload: &pb.ConvertChunk_Meta{
-			Meta: &pb.ConvertMeta{Url: sourceURL, RequestId: requestID},
-		},
-	}); err != nil {
-		log.Error("send meta failed", "err", err.Error())
-		return ConversionResult{}, fmt.Errorf("send meta: %w", err)
-	}
-
-	// Signal end of client stream immediately (no data to send)
-	if err := stream.CloseSend(); err != nil {
-		log.Error("close send failed", "err", err.Error())
-		return ConversionResult{}, fmt.Errorf("close send: %w", err)
-	}
+	log.Info("url stream opened")
 
 	// Receive status updates, markdown chunks, and document metadata
 	var mdBuf bytes.Buffer
@@ -246,7 +233,7 @@ func (c *Client) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL
 		}
 	}
 
-	log.Info("stream done",
+	log.Info("url stream done",
 		"dur_ms", time.Since(start).Milliseconds(),
 		"md_bytes", mdBuf.Len(),
 		"md_chunks", mdChunks,

@@ -20,17 +20,19 @@ const _ = grpc.SupportPackageIsVersion9
 
 const (
 	ParserService_ConvertDocument_FullMethodName = "/parser.ParserService/ConvertDocument"
+	ParserService_ConvertURL_FullMethodName      = "/parser.ParserService/ConvertURL"
 )
 
 // ParserServiceClient is the client API for ParserService service.
 //
 // For semantics around ctx use and closing/ending streaming RPCs, please refer to https://pkg.go.dev/google.golang.org/grpc/?tab=doc#ClientConn.NewStream.
 //
-// ParserService is stateless. The caller sends PDF bytes in chunks and receives
-// status updates and markdown bytes back on the same stream. No state is retained
-// after the stream closes.
+// ParserService is stateless. No state is retained after a stream closes.
 type ParserServiceClient interface {
+	// ConvertDocument streams file bytes from the caller and streams results back.
 	ConvertDocument(ctx context.Context, opts ...grpc.CallOption) (grpc.BidiStreamingClient[ConvertChunk, ConvertResult], error)
+	// ConvertURL fetches a document from a URL and streams results back.
+	ConvertURL(ctx context.Context, in *ConvertURLRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ConvertResult], error)
 }
 
 type parserServiceClient struct {
@@ -54,15 +56,35 @@ func (c *parserServiceClient) ConvertDocument(ctx context.Context, opts ...grpc.
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type ParserService_ConvertDocumentClient = grpc.BidiStreamingClient[ConvertChunk, ConvertResult]
 
+func (c *parserServiceClient) ConvertURL(ctx context.Context, in *ConvertURLRequest, opts ...grpc.CallOption) (grpc.ServerStreamingClient[ConvertResult], error) {
+	cOpts := append([]grpc.CallOption{grpc.StaticMethod()}, opts...)
+	stream, err := c.cc.NewStream(ctx, &ParserService_ServiceDesc.Streams[1], ParserService_ConvertURL_FullMethodName, cOpts...)
+	if err != nil {
+		return nil, err
+	}
+	x := &grpc.GenericClientStream[ConvertURLRequest, ConvertResult]{ClientStream: stream}
+	if err := x.ClientStream.SendMsg(in); err != nil {
+		return nil, err
+	}
+	if err := x.ClientStream.CloseSend(); err != nil {
+		return nil, err
+	}
+	return x, nil
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ParserService_ConvertURLClient = grpc.ServerStreamingClient[ConvertResult]
+
 // ParserServiceServer is the server API for ParserService service.
 // All implementations must embed UnimplementedParserServiceServer
 // for forward compatibility.
 //
-// ParserService is stateless. The caller sends PDF bytes in chunks and receives
-// status updates and markdown bytes back on the same stream. No state is retained
-// after the stream closes.
+// ParserService is stateless. No state is retained after a stream closes.
 type ParserServiceServer interface {
+	// ConvertDocument streams file bytes from the caller and streams results back.
 	ConvertDocument(grpc.BidiStreamingServer[ConvertChunk, ConvertResult]) error
+	// ConvertURL fetches a document from a URL and streams results back.
+	ConvertURL(*ConvertURLRequest, grpc.ServerStreamingServer[ConvertResult]) error
 	mustEmbedUnimplementedParserServiceServer()
 }
 
@@ -75,6 +97,9 @@ type UnimplementedParserServiceServer struct{}
 
 func (UnimplementedParserServiceServer) ConvertDocument(grpc.BidiStreamingServer[ConvertChunk, ConvertResult]) error {
 	return status.Error(codes.Unimplemented, "method ConvertDocument not implemented")
+}
+func (UnimplementedParserServiceServer) ConvertURL(*ConvertURLRequest, grpc.ServerStreamingServer[ConvertResult]) error {
+	return status.Error(codes.Unimplemented, "method ConvertURL not implemented")
 }
 func (UnimplementedParserServiceServer) mustEmbedUnimplementedParserServiceServer() {}
 func (UnimplementedParserServiceServer) testEmbeddedByValue()                       {}
@@ -104,6 +129,17 @@ func _ParserService_ConvertDocument_Handler(srv interface{}, stream grpc.ServerS
 // This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
 type ParserService_ConvertDocumentServer = grpc.BidiStreamingServer[ConvertChunk, ConvertResult]
 
+func _ParserService_ConvertURL_Handler(srv interface{}, stream grpc.ServerStream) error {
+	m := new(ConvertURLRequest)
+	if err := stream.RecvMsg(m); err != nil {
+		return err
+	}
+	return srv.(ParserServiceServer).ConvertURL(m, &grpc.GenericServerStream[ConvertURLRequest, ConvertResult]{ServerStream: stream})
+}
+
+// This type alias is provided for backwards compatibility with existing code that references the prior non-generic stream type by name.
+type ParserService_ConvertURLServer = grpc.ServerStreamingServer[ConvertResult]
+
 // ParserService_ServiceDesc is the grpc.ServiceDesc for ParserService service.
 // It's only intended for direct use with grpc.RegisterService,
 // and not to be introspected or modified (even as a copy)
@@ -117,6 +153,11 @@ var ParserService_ServiceDesc = grpc.ServiceDesc{
 			Handler:       _ParserService_ConvertDocument_Handler,
 			ServerStreams: true,
 			ClientStreams: true,
+		},
+		{
+			StreamName:    "ConvertURL",
+			Handler:       _ParserService_ConvertURL_Handler,
+			ServerStreams: true,
 		},
 	},
 	Metadata: "parser.proto",
