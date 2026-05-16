@@ -1,0 +1,99 @@
+package templates
+
+import (
+	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/templui/templui/components/button"
+	"github.com/templui/templui/components/card"
+	"github.com/templui/templui/components/form"
+	"github.com/templui/templui/components/input"
+	"github.com/templui/templui/components/tagsinput"
+)
+
+templ EditDocument(j domain.Job, errMsg string) {
+	@Layout("Edit Document") {
+		@ErrorBanner(errMsg)
+		<div class="flex flex-col gap-6 max-w-lg">
+			<div class="flex items-center gap-2">
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeSm,
+					Href:    "/",
+				}) {
+					← Back
+				}
+				<h1 class="text-2xl font-semibold">Edit Document</h1>
+			</div>
+			@card.Card() {
+				@card.Content(card.ContentProps{Class: "flex flex-col gap-4"}) {
+					<form method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/edit") } enctype="multipart/form-data" class="flex flex-col gap-4">
+						@form.Item() {
+							@form.Label(form.LabelProps{For: "title"}) {
+								Title
+							}
+							@input.Input(input.Props{
+								ID:    "title",
+								Name:  "title",
+								Type:  input.TypeText,
+								Value: j.Title,
+							})
+						}
+						@form.Item() {
+							@form.Label(form.LabelProps{For: "author"}) {
+								Author
+							}
+							@input.Input(input.Props{
+								ID:    "author",
+								Name:  "author",
+								Type:  input.TypeText,
+								Value: j.Author,
+							})
+						}
+						@form.Item() {
+							@form.Label(form.LabelProps{For: "tags"}) {
+								Tags
+							}
+							@tagsinput.TagsInput(tagsinput.Props{
+								ID:          "tags",
+								Name:        "tags",
+								Value:       j.Tags,
+								Placeholder: "Add a tag…",
+							})
+							@tagsinput.Script()
+						}
+						@form.Item() {
+							@form.Label(form.LabelProps{For: "cover"}) {
+								Cover
+							}
+							if len(j.Cover) > 0 {
+								<img
+									src={ "data:image/png;base64," + coverBase64(j) }
+									alt="current cover"
+									class="w-24 rounded object-cover aspect-[3/4] bg-muted mb-2"
+								/>
+							}
+							@input.Input(input.Props{
+								ID:         "cover",
+								Name:       "cover",
+								Type:       input.TypeFile,
+								FileAccept: "image/*",
+							})
+						}
+						<div class="flex items-center gap-2 pt-2">
+							@button.Button(button.Props{
+								Type: button.TypeSubmit,
+							}) {
+								Save
+							}
+							@button.Button(button.Props{
+								Variant: button.VariantOutline,
+								Href:    "/",
+							}) {
+								Cancel
+							}
+						</div>
+					</form>
+				}
+			}
+		</div>
+	}
+}

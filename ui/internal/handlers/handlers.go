@@ -72,6 +72,8 @@ func Register(store repository.Store, h *hub.Hub, pc ParserClient, dataDir strin
 	mux.HandleFunc("POST /documents/{id}/cancel", hs.CancelDocument)
 	mux.HandleFunc("POST /documents/{id}/retry", hs.RetryDocument)
 	mux.HandleFunc("DELETE /documents/{id}", hs.DeleteDocument)
+	mux.HandleFunc("GET /documents/{id}/edit", hs.EditDocumentForm)
+	mux.HandleFunc("POST /documents/{id}/edit", hs.EditDocument)
 	mux.HandleFunc("GET /read/{jobID}", hs.ReadDocument)
 	mux.HandleFunc("GET /jobs/{jobID}/watch", hs.WatchJob)
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)

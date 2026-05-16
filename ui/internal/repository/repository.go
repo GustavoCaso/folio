@@ -15,6 +15,7 @@ type JobRepository interface {
 	UpdateReadingProgress(ctx context.Context, id, blockID string) error
 	RetryJob(ctx context.Context, id string) error
 	MarkJobDone(ctx context.Context, id, outputPath, title, author string, cover []byte) error
+	UpdateJob(ctx context.Context, id, title, author string, tags []string, cover []byte) error
 	DeleteJob(ctx context.Context, id string) error
 	MarkJobFailed(ctx context.Context, id, errMsg string) error
 }

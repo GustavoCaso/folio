@@ -15,6 +15,7 @@ type Job struct {
 	Title           string
 	Author          string
 	Cover           []byte
+	Tags            []string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
