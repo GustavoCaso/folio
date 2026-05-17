@@ -193,3 +193,31 @@ async def test_convert_document_no_metadata_on_failure():
 
     metadata_msgs = [r for r in results if r.HasField("metadata")]
     assert len(metadata_msgs) == 0
+
+
+@pytest.mark.asyncio
+async def test_convert_html_document_yields_processing_then_done():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+
+    stream = _make_stream("page.html", b"<html></html>")
+
+    mock_doc = MagicMock()
+    mock_doc.export_to_markdown.return_value = "# Hello"
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("My Title", "Author", b"")),
+    ):
+        results = []
+        async for result in servicer.ConvertDocument(stream, context):
+            results.append(result)
+
+    statuses = [r.status.status for r in results if r.HasField("status")]
+    assert "PROCESSING" in statuses
+    assert "DONE" in statuses
+
+    metadata_msgs = [r for r in results if r.HasField("metadata")]
+    assert len(metadata_msgs) == 1
+    assert metadata_msgs[0].metadata.title == "My Title"
+    assert metadata_msgs[0].metadata.author == "Author"

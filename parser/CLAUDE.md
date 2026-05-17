@@ -47,7 +47,9 @@ Using `uv add <dependency>` or uv add --dev <dependency>. To avoid getting unwan
 
 1. New module in `src/parser/formats/` with a `convert_<fmt>(path: Path) -> DoclingDocument` function. The servicer calls `doc.export_to_markdown(...)` on the result.
 2. Register it in `parser/converter.py::_HANDLERS` (`".ext": "parser.formats.mod:convert_fn"`).
-3. Page counting: `servicer.py` only calls `count_pdf_pages` for `.pdf`; extend if needed.
+3. Metadata: add an `extract_metadata(path, generate_cover) -> tuple[str, str, bytes]` function and register the suffix in `servicer.py::_extract_metadata`.
+4. Format settings: expose `image_mode_value: ImageRefMode` and `post_process_code_blocks: bool` in the format module and register in `servicer.py::_get_format_settings`.
+5. Page counting: `servicer.py` only calls `count_pdf_pages` for `.pdf`; extend if needed.
 
 ## Configuration (env vars)
 
@@ -66,6 +68,9 @@ Using `uv add <dependency>` or uv add --dev <dependency>. To avoid getting unwan
 | `PDF_OCR_BATCH_SIZE` | docling default | Docling OCR batch size |
 | `PDF_TABLE_BATCH_SIZE` | docling default | Docling table batch size |
 | `PDF_QUEUE_MAX_SIZE` | docling default | Docling pipeline queue depth |
+| `HTML_IMAGE_MODE` | `placeholder` | Markdown image mode for HTML: `embedded`, `placeholder`, `referenced` |
+| `HTML_FETCH_IMAGES` | `false` | Fetch remote/local images referenced in the HTML document |
+| `HTML_POST_PROCESS_CODE_BLOCKS` | `true` | Post-process code blocks with pattern-based language detection |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
 
 ## Tooling

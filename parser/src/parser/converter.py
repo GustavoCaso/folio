@@ -11,6 +11,8 @@ class UnsupportedFormatError(Exception):
 
 _HANDLERS = {
     ".pdf": "parser.formats.pdf:convert_pdf",
+    ".html": "parser.formats.html:convert_html",
+    ".htm": "parser.formats.html:convert_html",
 }
 
 

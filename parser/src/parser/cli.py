@@ -6,8 +6,7 @@ import time
 from pathlib import Path
 
 from parser.converter import convert
-from parser.formats.pdf.metadata import extract_metadata
-from parser.formats.pdf.pdf import image_mode_value, post_process_code_blocks
+from parser.formats.helpers import extract_metadata, get_format_settings
 from parser.logging_config import configure
 
 logger = logging.getLogger(__name__)
@@ -46,9 +45,11 @@ def _convert(args: argparse.Namespace) -> None:
         extra={"input_path": str(input_path), "output_path": str(output_path)},
     )
     started = time.monotonic()
+    suffix = input_path.suffix.lower() or ".pdf"
+    image_mode_value, do_post_process = get_format_settings(suffix)
     doc = convert(input_path)
     markdown = doc.export_to_markdown(image_mode=image_mode_value)
-    if post_process_code_blocks:
+    if do_post_process:
         from parser.postprocess import enrich_code_blocks
 
         markdown = enrich_code_blocks(markdown)
@@ -68,7 +69,8 @@ def _convert(args: argparse.Namespace) -> None:
 def _metadata(args: argparse.Namespace) -> None:
     input_path = Path(args.input)
     generate_cover = args.cover is not None
-    title, author, cover = extract_metadata(input_path, generate_cover=generate_cover)
+    suffix = input_path.suffix.lower() or ".pdf"
+    title, author, cover = extract_metadata(input_path, suffix, generate_cover=generate_cover)
     print(f"Title:  {title or '(none)'}")
     print(f"Author: {author or '(none)'}")
 

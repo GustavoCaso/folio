@@ -15,9 +15,8 @@ if TYPE_CHECKING:
 import grpc
 
 from parser.converter import convert
+from parser.formats.helpers import extract_metadata, get_format_settings
 from parser.formats.pdf import count_pdf_pages
-from parser.formats.pdf.metadata import extract_metadata
-from parser.formats.pdf.pdf import image_mode_value, post_process_code_blocks
 from parser.grpc import parser_pb2, parser_pb2_grpc
 from parser.postprocess import enrich_code_blocks
 from parser.progress import ProgressEvent, attach
@@ -69,7 +68,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             ctx["request_id"] = meta.request_id
         logger.info("convert received", extra=ctx)
 
-        suffix = Path(meta.filename).suffix or ".pdf"
+        suffix = Path(meta.filename).suffix.lower() or ".pdf"
 
         yield parser_pb2.ConvertResult(
             status=parser_pb2.StatusUpdate(
@@ -87,7 +86,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                 tmp_path = Path(f.name)
 
             pages_total = 0
-            if suffix.lower() == ".pdf":
+            if suffix == ".pdf":
                 try:
                     pages_total = count_pdf_pages(tmp_path)
                 except Exception:
@@ -150,10 +149,11 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                         )
                     )
 
-                doc = await convert_task  # DoclingDocument
+                doc = await convert_task
 
-            markdown = doc.export_to_markdown(image_mode=image_mode_value)
-            if post_process_code_blocks:
+            image_mode, do_post_process = get_format_settings(suffix)
+            markdown = doc.export_to_markdown(image_mode=image_mode)
+            if do_post_process:
                 markdown = enrich_code_blocks(markdown)
 
             encoded = markdown.encode("utf-8")
@@ -178,7 +178,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                 yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
                 md_chunks += 1
 
-            title, author, cover = extract_metadata(tmp_path, generate_cover=True)
+            title, author, cover = extract_metadata(tmp_path, suffix, generate_cover=True)
             yield parser_pb2.ConvertResult(
                 metadata=parser_pb2.DocumentMetadata(
                     title=title,
