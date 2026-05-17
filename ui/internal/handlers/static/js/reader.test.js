@@ -2,6 +2,8 @@ import { describe, it, expect, beforeEach } from "vitest";
 import {
   applyHighlight,
   applyHighlights,
+  buildPendingSelection,
+  calcPopoverPosition,
   computeProgress,
   findBlockAncestor,
   firstVisibleBlockID,
@@ -446,6 +448,110 @@ describe("firstVisibleBlockID", () => {
       b.getBoundingClientRect = () => ({ top: -100, bottom: -90, left: 0, right: 0, width: 0, height: 10 });
     });
     expect(firstVisibleBlockID(blocks)).toBe("p-2");
+  });
+});
+
+describe("calcPopoverPosition", () => {
+  it("places popover to the right when there is enough space", () => {
+    const rect = { top: 100, bottom: 120, left: 50, right: 200 };
+    const pos = calcPopoverPosition(rect, 280, 1200);
+    expect(pos).toEqual({ top: 100, left: 208 });
+  });
+
+  it("falls back below the selection when not enough space to the right", () => {
+    // space right = 1000 - 800 - 8 = 192, less than popoverWidth 280 → fallback
+    // left = Math.max(4, Math.min(50, 1000-280-4=716)) = 50
+    const rect = { top: 100, bottom: 120, left: 50, right: 800 };
+    const pos = calcPopoverPosition(rect, 280, 1000);
+    expect(pos).toEqual({ top: 126, left: 50 });
+  });
+
+  it("clamps left to 4px minimum when selection is near left edge and fallback triggers", () => {
+    // space right = 300 - 290 - 8 = 2, less than 280 → fallback
+    // left = Math.max(4, Math.min(0, 300-280-4=16)) = 4
+    const rect = { top: 100, bottom: 120, left: 0, right: 290 };
+    const pos = calcPopoverPosition(rect, 280, 300);
+    expect(pos.left).toBe(4);
+  });
+
+  it("clamps left so popover does not overflow right edge", () => {
+    // space right = 400 - 250 - 8 = 142, less than 280 → fallback
+    // left = Math.max(4, Math.min(200, 400-280-4=116)) = 116
+    const rect = { top: 100, bottom: 120, left: 200, right: 250 };
+    const pos = calcPopoverPosition(rect, 280, 400);
+    expect(pos.left).toBe(116);
+  });
+});
+
+describe("buildPendingSelection", () => {
+  function fakeSelection(range, text = "") {
+    return {
+      isCollapsed: false,
+      rangeCount: 1,
+      getRangeAt: () => range,
+      toString: () => text,
+    };
+  }
+
+  it("returns null for collapsed selection", () => {
+    const reader = makeReader(`<p data-block-id="p-1">hello</p>`);
+    expect(buildPendingSelection(reader, "job1", { isCollapsed: true, rangeCount: 0 })).toBeNull();
+  });
+
+  it("returns null when selection is outside reader", () => {
+    const reader = makeReader(`<p data-block-id="p-1">hello</p>`);
+    const outside = document.createElement("p");
+    outside.textContent = "outside";
+    document.body.appendChild(outside);
+    const range = document.createRange();
+    range.selectNodeContents(outside);
+    expect(buildPendingSelection(reader, "job1", fakeSelection(range, "outside"))).toBeNull();
+  });
+
+  it("returns null when selection has no block ancestor", () => {
+    const reader = makeReader(`<p>no block id here</p>`);
+    const text = reader.querySelector("p").firstChild;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 2);
+    expect(buildPendingSelection(reader, "job1", fakeSelection(range, "no"))).toBeNull();
+  });
+
+  it("builds correct result for a simple text selection", () => {
+    const reader = makeReader(`<p data-block-id="p-1">hello world</p>`);
+    const text = reader.querySelector("p").firstChild;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 5);
+    const result = buildPendingSelection(reader, "job42", fakeSelection(range, "hello"));
+    expect(result).toEqual({
+      job_id: "job42",
+      start_block_id: "p-1",
+      end_block_id: "p-1",
+      start_pos: 0,
+      end_pos: 5,
+      text: "hello",
+    });
+  });
+
+  it("builds correct result for a cross-block selection", () => {
+    const reader = makeReader(
+      `<p data-block-id="p-1">hello</p><p data-block-id="p-2">world</p>`
+    );
+    const startText = reader.querySelector("[data-block-id='p-1']").firstChild;
+    const endText = reader.querySelector("[data-block-id='p-2']").firstChild;
+    const range = document.createRange();
+    range.setStart(startText, 2);
+    range.setEnd(endText, 3);
+    const result = buildPendingSelection(reader, "job1", fakeSelection(range, "llo\nwor"));
+    expect(result).toEqual({
+      job_id: "job1",
+      start_block_id: "p-1",
+      end_block_id: "p-2",
+      start_pos: 2,
+      end_pos: 3,
+      text: "llo\nwor",
+    });
   });
 });
 

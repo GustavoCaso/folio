@@ -244,6 +244,34 @@ export function firstVisibleBlockID(blocks) {
   return blocks.length ? blocks[blocks.length - 1].dataset.blockId : "";
 }
 
+export function calcPopoverPosition(rect, popoverWidth, viewportWidth) {
+  const spaceRight = viewportWidth - rect.right - 8;
+  if (spaceRight >= popoverWidth) {
+    return { top: rect.top, left: rect.right + 8 };
+  }
+  return {
+    top: rect.bottom + 6,
+    left: Math.max(4, Math.min(rect.left, viewportWidth - popoverWidth - 4)),
+  };
+}
+
+export function buildPendingSelection(reader, jobID, sel) {
+  if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
+  const range = sel.getRangeAt(0);
+  if (!reader.contains(range.startContainer) || !reader.contains(range.endContainer)) return null;
+  const startBlock = findBlockAncestor(range.startContainer, reader);
+  const endBlock = findBlockAncestor(range.endContainer, reader);
+  if (!startBlock || !endBlock) return null;
+  return {
+    job_id: jobID,
+    start_block_id: startBlock.dataset.blockId,
+    end_block_id: endBlock.dataset.blockId,
+    start_pos: offsetWithinBlock(startBlock, range.startContainer, range.startOffset),
+    end_pos: offsetWithinBlock(endBlock, range.endContainer, range.endOffset),
+    text: sel.toString(),
+  };
+}
+
 // --- Bootstrap (browser only) ---
 
 function bootstrap() {
@@ -275,6 +303,7 @@ function bootstrap() {
 
   let pendingSelection = null;
   let popoverOpen = false;
+  let suppressNextClick = false;
   if (highlights != null && highlights.length > 0) {
     applyHighlights(reader, highlights);
     console.log('[highlight.js] Highlights applied')
@@ -311,6 +340,12 @@ function bootstrap() {
   window.addEventListener("scroll", () => {
     updateProgressBar();
     scheduleSave();
+    if (popoverOpen) {
+      const currentTop = parseFloat(popoverContent.style.top) || 0;
+      const popoverHeight = popoverContent.offsetHeight || 200;
+      const clamped = Math.max(8, Math.min(currentTop, window.innerHeight - popoverHeight - 8));
+      popoverContent.style.top = clamped + "px";
+    }
   }, { passive: true });
 
   window.addEventListener("pagehide", saveProgress);
@@ -362,9 +397,10 @@ function bootstrap() {
 
   function openPopover(rect) {
     if (popoverOpen) return;
-    popoverContent.style.top = (rect.bottom + 6) + "px";
-    popoverContent.style.left = rect.left + "px";
     popoverContent.showPopover();
+    const { top, left } = calcPopoverPosition(rect, popoverContent.offsetWidth, window.innerWidth);
+    popoverContent.style.top = top + "px";
+    popoverContent.style.left = left + "px";
     popoverContent.setAttribute("data-tui-popover-open", "true");
     popoverOpen = true;
   }
@@ -375,38 +411,29 @@ function bootstrap() {
   }
 
   document.addEventListener("click", (e) => {
+    if (suppressNextClick) {
+      suppressNextClick = false;
+      return;
+    }
     if (popoverOpen && !popoverContent.contains(e.target)) {
       closePopover();
     }
   });
 
-  document.addEventListener("mouseup", () => {
-    setTimeout(() => {
-      const sel = window.getSelection();
-      if (!sel || sel.isCollapsed || sel.rangeCount === 0) return;
+  function captureSelection(fromTouch) {
+    const sel = window.getSelection();
+    const built = buildPendingSelection(reader, jobID, sel);
+    if (!built) {
+      if (sel && !sel.isCollapsed) sel.removeAllRanges();
+      return;
+    }
+    pendingSelection = built;
+    if (fromTouch) suppressNextClick = true;
+    openPopover(sel.getRangeAt(0).getBoundingClientRect());
+  }
 
-      const range = sel.getRangeAt(0);
-      if (!reader.contains(range.startContainer) || !reader.contains(range.endContainer)) return;
-
-      const startBlock = findBlockAncestor(range.startContainer, reader);
-      const endBlock = findBlockAncestor(range.endContainer, reader);
-      if (!startBlock || !endBlock) {
-        sel.removeAllRanges();
-        return;
-      }
-
-      pendingSelection = {
-        job_id: jobID,
-        start_block_id: startBlock.dataset.blockId,
-        end_block_id: endBlock.dataset.blockId,
-        start_pos: offsetWithinBlock(startBlock, range.startContainer, range.startOffset),
-        end_pos: offsetWithinBlock(endBlock, range.endContainer, range.endOffset),
-        text: sel.toString(),
-      };
-
-      openPopover(range.getBoundingClientRect());
-    }, 0);
-  });
+  document.addEventListener("mouseup", () => setTimeout(() => captureSelection(false), 0));
+  document.addEventListener("touchend", () => setTimeout(() => captureSelection(true), 0), { passive: true });
 
   cancelBtn.addEventListener("click", () => {
     pendingSelection = null;
