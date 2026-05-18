@@ -84,6 +84,24 @@ The `compose.yaml` serves as an example way of configuring Folio.
 | `HTML_POST_PROCESS_CODE_BLOCKS` | `true` | Post-process code blocks with pattern-based language detection |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
 
+## Export
+
+Folio can push highlights to external services via a background export worker. The worker runs periodically and syncs any highlights that have not yet been exported.
+
+### Readwise
+
+Set `READWISE_API_TOKEN` to enable the Readwise backend. Highlights are sent to the [Readwise API v2](https://readwise.io/api/v2) as book highlights. Tags attached to a highlight are synced via a separate per-highlight tag endpoint after creation.
+
+| Variable | Default | Description |
+|---|---|---|
+| `READWISE_API_TOKEN` | — | Readwise API token. Export disabled when unset. |
+| `READWISE_TIMEOUT` | `30s` | HTTP timeout for Readwise API calls |
+| `EXPORT_INTERVAL` | `1m` | How often the worker checks for new highlights to export |
+
+### Adding more backends
+
+Implement the `export.Backend` interface (`ui/internal/export/backend.go`) and register it alongside the Readwise backend in `ui/cmd/server.go`.
+
 ## Code block processing
 
 Docling extracts code blocks from PDFs as plain text with no language tag. The parser offers three approaches to enrich them, ordered by speed vs. accuracy:
