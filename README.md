@@ -68,10 +68,15 @@ The `compose.yaml` serves as an example way of configuring Folio.
 |---|---|---|
 | `GRPC_PORT` | `50051` | gRPC server port |
 | `NUM_WORKERS` | `2` | Parallel Docling conversions |
+| **PDF** | | |
 | `PDF_IMAGE_MODE` | `placeholder` | Markdown image mode: `embedded`, `placeholder`, `referenced` |
-| `PDF_DO_OCR` | `true` | Run OCR on scanned pages |
-| `PDF_DO_TABLE_STRUCTURE` | `true` | Recognize table structure |
-| `PDF_GENERATE_IMAGES` | `true` | Extract picture images from PDF |
+| `PDF_DO_OCR` | `true` | Run OCR on scanned pages. Safe to disable for digital-origin PDFs (books, papers) — big CPU/memory win |
+| `PDF_DO_TABLE_STRUCTURE` | `true` | Recognize table structure. Disable if you don't need structured table output |
+| `PDF_GENERATE_IMAGES` | `true` | Extract picture/diagram images from PDF |
+| `PDF_GENERATE_PAGE_IMAGES` | `false` | Render every page as a rasterized image |
+| `PDF_IMAGES_SCALE` | `1.0` | Scale factor for rendered images (`0.5` = half resolution, less memory) |
+| `PDF_DO_FORMULA_ENRICHMENT` | `false` | VLM-based formula enrichment |
+| `PDF_FORCE_BACKEND_TEXT` | `false` | Use embedded text layer instead of OCR text |
 | `PDF_POST_PROCESS_CODE_BLOCKS` | `true` | Pattern-based language detection + Prettier formatting for code blocks (see below) |
 | `PDF_DO_CODE_ENRICHMENT` | `false` | VLM-based code enrichment — accurate but very slow on CPU (~100s/image); requires GPU for practical use |
 | `PDF_CODE_FORMULA_PRESET` | `codeformulav2` | VLM preset when `PDF_DO_CODE_ENRICHMENT=true`: `codeformulav2` or `granite_docling` (258M, faster on CPU) |
@@ -79,9 +84,18 @@ The `compose.yaml` serves as an example way of configuring Folio.
 | `PDF_OCR_BATCH_SIZE` | docling default | Docling OCR batch size |
 | `PDF_TABLE_BATCH_SIZE` | docling default | Docling table batch size |
 | `PDF_QUEUE_MAX_SIZE` | docling default | Docling pipeline queue depth |
+| `PDF_DOCUMENT_TIMEOUT` | none | Timeout in seconds for a single document conversion |
+| `PDF_NUM_THREADS` | `4` | CPU threads for Docling model inference. Reduce on low-core machines |
+| **HTML** | | |
 | `HTML_IMAGE_MODE` | `placeholder` | Markdown image mode for HTML: `embedded`, `placeholder`, `referenced` |
 | `HTML_FETCH_IMAGES` | `false` | Fetch remote/local images referenced in the HTML document |
 | `HTML_POST_PROCESS_CODE_BLOCKS` | `true` | Post-process code blocks with pattern-based language detection |
+| `HTML_RENDER_PAGE` | `false` | Render the HTML page to an image before parsing |
+| `HTML_RENDER_DPI` | `96` | DPI for HTML page rendering |
+| `HTML_RENDER_DEVICE_SCALE` | `1.0` | Device scale factor for HTML rendering |
+| `HTML_ADD_TITLE` | `true` | Include document title in output |
+| `HTML_INFER_FURNITURE` | `true` | Detect and label header/footer elements |
+| **General** | | |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
 
 ## Export
