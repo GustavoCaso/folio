@@ -21,6 +21,8 @@ services:
     environment:
       - GRPC_PORT=50051
       - NUM_WORKERS=2
+      - PDF_DO_OCR=false
+      - PDF_DO_TABLE_STRUCTURE=false
       - PDF_GENERATE_IMAGES=true
       - PDF_IMAGE_MODE=embedded
       - PDF_POST_PROCESS_CODE_BLOCKS=true

@@ -20,12 +20,19 @@ import (
 
 const chunkSize = 512 * 1024 // 512 KB per gRPC send chunk
 
+// ImageFile holds a single image extracted from the parsed document.
+type ImageFile struct {
+	Filename string
+	Data     []byte
+}
+
 // ConversionResult is returned when the stream completes successfully.
 type ConversionResult struct {
 	Markdown []byte
 	Title    string
 	Author   string
 	Cover    []byte
+	Images   []ImageFile
 }
 
 // Client wraps the gRPC ParserService connection.
@@ -157,6 +164,11 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 			result.Title = p.Metadata.Title
 			result.Author = p.Metadata.Author
 			result.Cover = p.Metadata.Cover
+		case *pb.ConvertResult_ImageChunk:
+			result.Images = append(result.Images, ImageFile{
+				Filename: p.ImageChunk.Filename,
+				Data:     p.ImageChunk.Data,
+			})
 		}
 	}
 

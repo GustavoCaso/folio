@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+import os
 import tempfile
 import time
 import uuid
@@ -13,10 +14,12 @@ if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
 
 import grpc
+from docling_core.types.doc.base import ImageRefMode
 
 from parser.converter import convert
 from parser.formats.helpers import extract_metadata, get_format_settings
 from parser.formats.pdf import count_pdf_pages
+from parser.formats.pdf.images import PLACEHOLDER, extract_images
 from parser.grpc import parser_pb2, parser_pb2_grpc
 from parser.postprocess import enrich_code_blocks
 from parser.progress import ProgressEvent, attach
@@ -151,32 +154,62 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
 
                 doc = await convert_task
 
-            image_mode, do_post_process = get_format_settings(suffix)
-            markdown = doc.export_to_markdown(image_mode=image_mode)
-            if do_post_process:
-                markdown = enrich_code_blocks(markdown)
+            do_post_process = get_format_settings(suffix)
 
-            encoded = markdown.encode("utf-8")
-            logger.info(
-                "convert exporting",
-                extra={**ctx, "md_bytes": len(encoded), "pages_total": pages_total},
-            )
+            with tempfile.TemporaryDirectory() as export_dir:
+                md_path = Path(export_dir) / "doc.md"
 
-            yield parser_pb2.ConvertResult(
-                status=parser_pb2.StatusUpdate(
-                    status="PROCESSING",
-                    stage="exporting",
-                    message="streaming markdown",
-                    pages_done=pages_total,
-                    pages_total=pages_total,
+                if suffix == ".pdf":
+                    doc.save_as_markdown(
+                        filename=md_path,
+                        image_mode=ImageRefMode.PLACEHOLDER,
+                        image_placeholder=PLACEHOLDER,
+                    )
+                    markdown = md_path.read_text(encoding="utf-8")
+                    scale_val = float(os.environ.get("PDF_IMAGES_SCALE", "0.5")) * 150 / 72
+                    image_files = []
+                    for name, data in extract_images(doc, tmp_path, scale=scale_val):
+                        markdown = markdown.replace(PLACEHOLDER, f"![Image]({name})", 1)
+                        image_files.append((name, data))
+                else:
+                    doc.save_as_markdown(filename=md_path, image_mode=ImageRefMode.REFERENCED)
+                    markdown = md_path.read_text(encoding="utf-8")
+                    artifacts_dir = md_path.with_name(md_path.stem + "_artifacts")
+                    image_files = [
+                        (p.name, p.read_bytes())
+                        for p in (
+                            sorted(artifacts_dir.glob("*.png")) if artifacts_dir.exists() else []
+                        )
+                    ]
+
+                if do_post_process:
+                    markdown = enrich_code_blocks(markdown)
+
+                encoded = markdown.encode("utf-8")
+                logger.info(
+                    "convert exporting",
+                    extra={**ctx, "md_bytes": len(encoded), "pages_total": pages_total},
                 )
-            )
 
-            # --- Stream markdown back in chunks ---
-            md_chunks = 0
-            for i in range(0, len(encoded), _CHUNK_SIZE):
-                yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
-                md_chunks += 1
+                yield parser_pb2.ConvertResult(
+                    status=parser_pb2.StatusUpdate(
+                        status="PROCESSING",
+                        stage="exporting",
+                        message="streaming markdown",
+                        pages_done=pages_total,
+                        pages_total=pages_total,
+                    )
+                )
+
+                md_chunks = 0
+                for i in range(0, len(encoded), _CHUNK_SIZE):
+                    yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
+                    md_chunks += 1
+
+                for name, data in image_files:
+                    yield parser_pb2.ConvertResult(
+                        image_chunk=parser_pb2.ImageChunk(filename=name, data=data)
+                    )
 
             title, author, cover = extract_metadata(tmp_path, suffix, generate_cover=True)
             yield parser_pb2.ConvertResult(

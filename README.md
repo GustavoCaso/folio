@@ -64,17 +64,17 @@ The `compose.yaml` serves as an example way of configuring Folio.
 
 ### Parser (`parser/`)
 
+The parser runs as a gRPC server. The following variables configure the server process and the Docling pipeline it uses for every conversion request.
+
 | Variable | Default | Description |
 |---|---|---|
 | `GRPC_PORT` | `50051` | gRPC server port |
 | `NUM_WORKERS` | `2` | Parallel Docling conversions |
 | **PDF** | | |
-| `PDF_IMAGE_MODE` | `placeholder` | Markdown image mode: `embedded`, `placeholder`, `referenced` |
 | `PDF_DO_OCR` | `true` | Run OCR on scanned pages. Safe to disable for digital-origin PDFs (books, papers) — big CPU/memory win |
 | `PDF_DO_TABLE_STRUCTURE` | `true` | Recognize table structure. Disable if you don't need structured table output |
-| `PDF_GENERATE_IMAGES` | `true` | Extract picture/diagram images from PDF |
 | `PDF_GENERATE_PAGE_IMAGES` | `false` | Render every page as a rasterized image |
-| `PDF_IMAGES_SCALE` | `1.0` | Scale factor for rendered images (`0.5` = half resolution, less memory) |
+| `PDF_IMAGES_SCALE` | `0.5` | Scale factor for rendered images (`0.5` = half resolution, less memory) |
 | `PDF_DO_FORMULA_ENRICHMENT` | `false` | VLM-based formula enrichment |
 | `PDF_FORCE_BACKEND_TEXT` | `false` | Use embedded text layer instead of OCR text |
 | `PDF_POST_PROCESS_CODE_BLOCKS` | `true` | Pattern-based language detection + Prettier formatting for code blocks (see below) |
@@ -87,7 +87,6 @@ The `compose.yaml` serves as an example way of configuring Folio.
 | `PDF_DOCUMENT_TIMEOUT` | none | Timeout in seconds for a single document conversion |
 | `PDF_NUM_THREADS` | `4` | CPU threads for Docling model inference. Reduce on low-core machines |
 | **HTML** | | |
-| `HTML_IMAGE_MODE` | `placeholder` | Markdown image mode for HTML: `embedded`, `placeholder`, `referenced` |
 | `HTML_FETCH_IMAGES` | `false` | Fetch remote/local images referenced in the HTML document |
 | `HTML_POST_PROCESS_CODE_BLOCKS` | `true` | Post-process code blocks with pattern-based language detection |
 | `HTML_RENDER_PAGE` | `false` | Render the HTML page to an image before parsing |
@@ -97,6 +96,18 @@ The `compose.yaml` serves as an example way of configuring Folio.
 | `HTML_INFER_FURNITURE` | `true` | Detect and label header/footer elements |
 | **General** | | |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+
+### Parser CLI
+
+The parser ships a one-shot CLI for testing conversion locally without running the full stack. It is **not used by the gRPC server** — it bypasses the server entirely and calls Docling directly.
+
+```bash
+cd parser
+uv run parser convert path/to/file.pdf -o output.md
+uv run parser metadata path/to/file.pdf
+```
+
+The CLI respects the same pipeline env vars as the server (`PDF_DO_OCR`, `PDF_DO_TABLE_STRUCTURE`, etc.). Images are always saved to `<output>_artifacts/` alongside the Markdown file, matching the behaviour of the gRPC server.
 
 ## Export
 
