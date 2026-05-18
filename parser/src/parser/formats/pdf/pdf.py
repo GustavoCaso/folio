@@ -2,9 +2,9 @@ import os
 from pathlib import Path
 
 import pypdfium2
+from docling.datamodel.accelerator_options import AcceleratorOptions
 from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
-    AcceleratorOptions,
     CodeFormulaVlmOptions,
     PdfPipelineOptions,
 )
@@ -37,17 +37,22 @@ def _pipeline_options() -> PdfPipelineOptions:
         "force_backend_text": bool_env("PDF_FORCE_BACKEND_TEXT", False),
         "code_formula_options": _code_formula_options(),
     }
-    for env_var, field, cast in (
-        ("PDF_LAYOUT_BATCH_SIZE", "layout_batch_size", int),
-        ("PDF_OCR_BATCH_SIZE", "ocr_batch_size", int),
-        ("PDF_TABLE_BATCH_SIZE", "table_batch_size", int),
-        ("PDF_QUEUE_MAX_SIZE", "queue_max_size", int),
-        ("PDF_IMAGES_SCALE", "images_scale", float),
-        ("PDF_DOCUMENT_TIMEOUT", "document_timeout", float),
+    for env_var, field in (
+        ("PDF_LAYOUT_BATCH_SIZE", "layout_batch_size"),
+        ("PDF_OCR_BATCH_SIZE", "ocr_batch_size"),
+        ("PDF_TABLE_BATCH_SIZE", "table_batch_size"),
+        ("PDF_QUEUE_MAX_SIZE", "queue_max_size"),
     ):
         value = os.environ.get(env_var)
         if value is not None:
-            kwargs[field] = cast(value)  # type: ignore[operator]
+            kwargs[field] = int(value)
+    for env_var, field in (
+        ("PDF_IMAGES_SCALE", "images_scale"),
+        ("PDF_DOCUMENT_TIMEOUT", "document_timeout"),
+    ):
+        value = os.environ.get(env_var)
+        if value is not None:
+            kwargs[field] = float(value)
     num_threads = os.environ.get("PDF_NUM_THREADS")
     if num_threads is not None:
         kwargs["accelerator_options"] = AcceleratorOptions(num_threads=int(num_threads))
