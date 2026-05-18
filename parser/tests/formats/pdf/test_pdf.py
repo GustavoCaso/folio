@@ -69,6 +69,66 @@ class TestPipelineOptions:
             opts = pdf_mod._pipeline_options()
             assert opts.code_formula_options.model_spec.name == "CodeFormulaV2"
 
+    def test_images_scale_default_is_1(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.images_scale == 1.0
+
+    def test_images_scale_set_from_env(self):
+        with patch.dict("os.environ", {"PDF_IMAGES_SCALE": "0.5"}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.images_scale == 0.5
+
+    def test_generate_page_images_default_false(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.generate_page_images is False
+
+    def test_generate_page_images_enabled(self):
+        with patch.dict("os.environ", {"PDF_GENERATE_PAGE_IMAGES": "true"}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.generate_page_images is True
+
+    def test_do_formula_enrichment_default_false(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.do_formula_enrichment is False
+
+    def test_do_formula_enrichment_enabled(self):
+        with patch.dict("os.environ", {"PDF_DO_FORMULA_ENRICHMENT": "true"}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.do_formula_enrichment is True
+
+    def test_force_backend_text_default_false(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.force_backend_text is False
+
+    def test_force_backend_text_enabled(self):
+        with patch.dict("os.environ", {"PDF_FORCE_BACKEND_TEXT": "true"}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.force_backend_text is True
+
+    def test_document_timeout_default_none(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.document_timeout is None
+
+    def test_document_timeout_set_from_env(self):
+        with patch.dict("os.environ", {"PDF_DOCUMENT_TIMEOUT": "120"}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.document_timeout == 120.0
+
+    def test_num_threads_default_is_docling_default(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.accelerator_options.num_threads == 4
+
+    def test_num_threads_set_from_env(self):
+        with patch.dict("os.environ", {"PDF_NUM_THREADS": "2"}, clear=True):
+            opts = pdf_mod._pipeline_options()
+            assert opts.accelerator_options.num_threads == 2
+
     def test_batch_size_vars(self):
         env = {
             "PDF_LAYOUT_BATCH_SIZE": "4",

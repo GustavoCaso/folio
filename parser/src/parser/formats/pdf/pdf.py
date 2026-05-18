@@ -2,8 +2,12 @@ import os
 from pathlib import Path
 
 import pypdfium2
+from docling.datamodel.accelerator_options import AcceleratorOptions
 from docling.datamodel.base_models import InputFormat
-from docling.datamodel.pipeline_options import CodeFormulaVlmOptions, PdfPipelineOptions
+from docling.datamodel.pipeline_options import (
+    CodeFormulaVlmOptions,
+    PdfPipelineOptions,
+)
 from docling.document_converter import DocumentConverter, PdfFormatOption
 from docling_core.types.doc.base import ImageRefMode
 from docling_core.types.doc.document import DoclingDocument
@@ -25,9 +29,12 @@ def _code_formula_options() -> CodeFormulaVlmOptions:
 def _pipeline_options() -> PdfPipelineOptions:
     kwargs: dict[str, object] = {
         "generate_picture_images": bool_env("PDF_GENERATE_IMAGES", True),
+        "generate_page_images": bool_env("PDF_GENERATE_PAGE_IMAGES", False),
         "do_ocr": bool_env("PDF_DO_OCR", True),
         "do_table_structure": bool_env("PDF_DO_TABLE_STRUCTURE", True),
         "do_code_enrichment": bool_env("PDF_DO_CODE_ENRICHMENT", False),
+        "do_formula_enrichment": bool_env("PDF_DO_FORMULA_ENRICHMENT", False),
+        "force_backend_text": bool_env("PDF_FORCE_BACKEND_TEXT", False),
         "code_formula_options": _code_formula_options(),
     }
     for env_var, field in (
@@ -39,6 +46,16 @@ def _pipeline_options() -> PdfPipelineOptions:
         value = os.environ.get(env_var)
         if value is not None:
             kwargs[field] = int(value)
+    for env_var, field in (
+        ("PDF_IMAGES_SCALE", "images_scale"),
+        ("PDF_DOCUMENT_TIMEOUT", "document_timeout"),
+    ):
+        value = os.environ.get(env_var)
+        if value is not None:
+            kwargs[field] = float(value)
+    num_threads = os.environ.get("PDF_NUM_THREADS")
+    if num_threads is not None:
+        kwargs["accelerator_options"] = AcceleratorOptions(num_threads=int(num_threads))
     return PdfPipelineOptions(**kwargs)  # type: ignore[arg-type]
 
 
