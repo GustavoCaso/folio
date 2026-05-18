@@ -261,7 +261,10 @@ export function buildPendingSelection(reader, jobID, sel) {
   if (!reader.contains(range.startContainer) || !reader.contains(range.endContainer)) return null;
   const startBlock = findBlockAncestor(range.startContainer, reader);
   const endBlock = findBlockAncestor(range.endContainer, reader);
-  if (!startBlock || !endBlock) return null;
+  if (!startBlock || !endBlock) {
+    sel.removeAllRanges();
+    return null;
+  }
   return {
     job_id: jobID,
     start_block_id: startBlock.dataset.blockId,
@@ -423,10 +426,9 @@ function bootstrap() {
   function captureSelection(fromTouch) {
     const sel = window.getSelection();
     const built = buildPendingSelection(reader, jobID, sel);
-    if (!built) {
-      if (sel && !sel.isCollapsed) sel.removeAllRanges();
-      return;
-    }
+
+    if (!built) return;
+
     pendingSelection = built;
     if (fromTouch) suppressNextClick = true;
     openPopover(sel.getRangeAt(0).getBoundingClientRect());

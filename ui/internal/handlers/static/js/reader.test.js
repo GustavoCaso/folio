@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from "vitest";
+import { describe, it, expect, beforeEach, vi } from "vitest";
 import {
   applyHighlight,
   applyHighlights,
@@ -490,6 +490,7 @@ describe("buildPendingSelection", () => {
       rangeCount: 1,
       getRangeAt: () => range,
       toString: () => text,
+      removeAllRanges: () => {},
     };
   }
 
@@ -515,6 +516,17 @@ describe("buildPendingSelection", () => {
     range.setStart(text, 0);
     range.setEnd(text, 2);
     expect(buildPendingSelection(reader, "job1", fakeSelection(range, "no"))).toBeNull();
+  });
+
+  it("clears the selection when there is no block ancestor", () => {
+    const reader = makeReader(`<p>no block id here</p>`);
+    const text = reader.querySelector("p").firstChild;
+    const range = document.createRange();
+    range.setStart(text, 0);
+    range.setEnd(text, 2);
+    const sel = { ...fakeSelection(range, "no"), removeAllRanges: vi.fn() };
+    buildPendingSelection(reader, "job1", sel);
+    expect(sel.removeAllRanges).toHaveBeenCalledOnce();
   });
 
   it("builds correct result for a simple text selection", () => {
