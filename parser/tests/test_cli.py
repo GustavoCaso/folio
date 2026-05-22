@@ -79,7 +79,7 @@ def test_convert_command_html_default_output(tmp_path):
     assert expected.exists()
 
 
-def test_convert_always_uses_save_as_markdown(tmp_path):
+def test_convert_calls_save_as_markdown(tmp_path):
     pdf = tmp_path / "doc.pdf"
     pdf.write_bytes(b"%PDF")
     out = tmp_path / "doc.md"
@@ -101,7 +101,7 @@ def test_convert_always_uses_save_as_markdown(tmp_path):
     mock_doc.export_to_markdown.assert_not_called()
 
 
-def test_convert_html_always_uses_save_as_markdown(tmp_path):
+def test_convert_html_calls_save_as_markdown(tmp_path):
     html = tmp_path / "doc.html"
     html.write_text("<html><body>hi</body></html>")
     out = tmp_path / "doc.md"

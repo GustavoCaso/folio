@@ -1,6 +1,7 @@
 from unittest.mock import MagicMock, patch
 
 import pytest
+from docling_core.types.doc.base import ImageRefMode
 
 from parser.grpc import parser_pb2
 from parser.servicer import ParserServicer
@@ -286,33 +287,8 @@ async def test_convert_document_image_chunks_arrive_after_markdown():
 
 
 @pytest.mark.asyncio
-async def test_convert_document_uses_save_as_markdown_not_export():
-    servicer = ParserServicer(num_workers=1)
-    context = MagicMock()
-    stream = _make_stream("doc.pdf", b"%PDF")
-
-    mock_doc = MagicMock()
-
-    def fake_save_as_markdown(filename, image_mode):
-        filename.write_text("# Hello", encoding="utf-8")
-
-    mock_doc.save_as_markdown.side_effect = fake_save_as_markdown
-
-    with (
-        patch("parser.servicer.convert", return_value=mock_doc),
-        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
-    ):
-        async for _ in servicer.ConvertDocument(stream, context):
-            pass
-
-    mock_doc.save_as_markdown.assert_called_once()
-    mock_doc.export_to_markdown.assert_not_called()
-
-
-@pytest.mark.asyncio
 async def test_pdf_conversion_uses_placeholder_mode_and_extract_images():
     """Servicer must use PLACEHOLDER image mode and extract images via pypdfium2."""
-    from docling_core.types.doc.base import ImageRefMode
 
     servicer = ParserServicer(num_workers=1)
     context = MagicMock()
@@ -388,6 +364,9 @@ async def test_convert_html_document_yields_processing_then_done():
         results = []
         async for result in servicer.ConvertDocument(stream, context):
             results.append(result)
+
+    call_kwargs = mock_doc.save_as_markdown.call_args
+    assert call_kwargs.kwargs["image_mode"] == ImageRefMode.REFERENCED
 
     statuses = [r.status.status for r in results if r.HasField("status")]
     assert "PROCESSING" in statuses

@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pypdfium2 as pdfium
 from docling_core.types.doc.base import BoundingBox, CoordOrigin
+from PIL import Image
 
 from parser.formats.pdf.images import _bbox_to_crop, extract_images, rewrite_image_placeholders
 
@@ -94,7 +95,6 @@ def test_extract_images_skips_picture_with_no_prov(tmp_path):
 
 
 def test_bbox_to_crop_clamps_negative_margins():
-
     # bbox extends 5 pts outside left and top of page
     bbox = BoundingBox(l=-5, t=205, r=90, b=50, coord_origin=CoordOrigin.BOTTOMLEFT)
     crop = _bbox_to_crop(bbox, page_width=100, page_height=200)
@@ -105,7 +105,6 @@ def test_bbox_to_crop_clamps_negative_margins():
 
 
 def test_bbox_to_crop_handles_topleft_origin():
-
     # TOPLEFT: l=10, t=50 (from top), r=90, b=150 (from top) on 200-tall page
     # After converting to BOTTOMLEFT: b = 200-150=50, t = 200-50=150
     # crop = (10, 50, 10, 50)
@@ -135,9 +134,6 @@ def test_extract_images_skips_zero_size_bitmap(tmp_path):
     mock_doc = MagicMock()
     mock_doc.pictures = [mock_pic]
     mock_doc.pages = {1: MagicMock(size=mock_page_size)}
-
-    # Patch bitmap.to_pil() to return a zero-size image
-    from PIL import Image
 
     zero_img = Image.new("RGB", (0, 0))
 
