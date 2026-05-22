@@ -9,11 +9,9 @@ from docling.datamodel.pipeline_options import (
     PdfPipelineOptions,
 )
 from docling.document_converter import DocumentConverter, PdfFormatOption
-from docling_core.types.doc.base import ImageRefMode
 from docling_core.types.doc.document import DoclingDocument
 
 from parser.formats.helpers import bool_env
-from parser.formats.helpers import image_mode as _image_mode_from_env
 
 _VALID_CODE_FORMULA_PRESETS = {"codeformulav2", "granite_docling"}
 
@@ -28,7 +26,7 @@ def _code_formula_options() -> CodeFormulaVlmOptions:
 
 def _pipeline_options() -> PdfPipelineOptions:
     kwargs: dict[str, object] = {
-        "generate_picture_images": bool_env("PDF_GENERATE_IMAGES", True),
+        "generate_picture_images": False,
         "generate_page_images": bool_env("PDF_GENERATE_PAGE_IMAGES", False),
         "do_ocr": bool_env("PDF_DO_OCR", True),
         "do_table_structure": bool_env("PDF_DO_TABLE_STRUCTURE", True),
@@ -64,8 +62,6 @@ _converter: DocumentConverter = DocumentConverter(
         InputFormat.PDF: PdfFormatOption(pipeline_options=_pipeline_options()),
     }
 )
-
-image_mode_value: ImageRefMode = _image_mode_from_env("PDF_IMAGE_MODE")
 
 post_process_code_blocks: bool = bool_env("PDF_POST_PROCESS_CODE_BLOCKS", True)
 

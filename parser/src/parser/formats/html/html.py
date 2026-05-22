@@ -4,11 +4,9 @@ from pathlib import Path
 from docling.datamodel.backend_options import HTMLBackendOptions
 from docling.datamodel.base_models import InputFormat
 from docling.document_converter import DocumentConverter, HTMLFormatOption
-from docling_core.types.doc.base import ImageRefMode
 from docling_core.types.doc.document import DoclingDocument
 
 from parser.formats.helpers import bool_env
-from parser.formats.helpers import image_mode as _image_mode_from_env
 
 
 def _backend_options() -> HTMLBackendOptions:
@@ -32,8 +30,6 @@ _converter: DocumentConverter = DocumentConverter(
         InputFormat.HTML: HTMLFormatOption(backend_options=_backend_options()),
     }
 )
-
-image_mode_value: ImageRefMode = _image_mode_from_env("HTML_IMAGE_MODE")
 
 post_process_code_blocks: bool = bool_env("HTML_POST_PROCESS_CODE_BLOCKS", True)
 

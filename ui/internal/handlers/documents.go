@@ -9,6 +9,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -262,6 +263,20 @@ func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []b
 		}
 		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: errMsg})
 		return
+	}
+
+	// Rewrite image refs → base64 data URIs so the .md is self-contained.
+	// Docling emits absolute temp paths like /tmp/.../doc_artifacts/image_000.png,
+	// so we match ](any/path/filename.png) by the basename alone.
+	if len(result.Images) > 0 {
+		md := string(result.Markdown)
+		for _, img := range result.Images {
+			dataURI := "data:image/png;base64," + base64.StdEncoding.EncodeToString(img.Data)
+			// Match ]( followed by any path ending with /filename or just filename, then ).
+			pat := regexp.MustCompile(`\]\([^)]*` + regexp.QuoteMeta(img.Filename) + `\)`)
+			md = pat.ReplaceAllString(md, "]("+dataURI+")")
+		}
+		result.Markdown = []byte(md)
 	}
 
 	// Write Markdown to disk

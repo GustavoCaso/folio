@@ -32,7 +32,13 @@ message ConvertResult {
     StatusUpdate     status         = 1;
     bytes            markdown_chunk = 2;
     DocumentMetadata metadata       = 3;
+    ImageChunk       image_chunk    = 4;
   }
+}
+
+message ImageChunk {
+  string filename = 1;  // e.g. "image_000000_abc123.png"
+  bytes  data     = 2;  // raw PNG bytes
 }
 
 message DocumentMetadata {

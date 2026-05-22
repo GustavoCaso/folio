@@ -57,7 +57,6 @@ Using `uv add <dependency>` or uv add --dev <dependency>. To avoid getting unwan
 |---|---|---|
 | `GRPC_PORT` | `50051` | gRPC server port |
 | `NUM_WORKERS` | `2` | `ThreadPoolExecutor` size (parallel Docling conversions) |
-| `PDF_GENERATE_IMAGES` | `true` | Extract picture images from PDF |
 | `PDF_GENERATE_PAGE_IMAGES` | `false` | Render every page as a rasterized image |
 | `PDF_DO_OCR` | `true` | Run OCR on scanned pages |
 | `PDF_DO_TABLE_STRUCTURE` | `true` | Recognize table structure |
@@ -66,15 +65,13 @@ Using `uv add <dependency>` or uv add --dev <dependency>. To avoid getting unwan
 | `PDF_FORCE_BACKEND_TEXT` | `false` | Force use of backend text instead of OCR text |
 | `PDF_CODE_FORMULA_PRESET` | `codeformulav2` | VLM preset when `PDF_DO_CODE_ENRICHMENT=true`: `codeformulav2` (accurate, larger) or `granite_docling` (258M params, faster on CPU). Note: MLX variant of granite_docling requires native Apple Silicon access — not available inside Docker |
 | `PDF_POST_PROCESS_CODE_BLOCKS` | `true` | Post-process code blocks with pattern-based language detection (fast, CPU-only, no extra models); mutually exclusive with `PDF_DO_CODE_ENRICHMENT` |
-| `PDF_IMAGE_MODE` | `placeholder` | Markdown image mode: `embedded`, `placeholder`, `referenced` |
-| `PDF_IMAGES_SCALE` | `1.0` | Scale factor for rendered images (e.g. `0.5` halves resolution, reducing memory) |
+| `PDF_IMAGES_SCALE` | `0.5` | Scale factor for rendered images (e.g. `0.5` halves resolution, reducing memory) |
 | `PDF_LAYOUT_BATCH_SIZE` | docling default | Docling layout batch size |
 | `PDF_OCR_BATCH_SIZE` | docling default | Docling OCR batch size |
 | `PDF_TABLE_BATCH_SIZE` | docling default | Docling table batch size |
 | `PDF_QUEUE_MAX_SIZE` | docling default | Docling pipeline queue depth |
 | `PDF_DOCUMENT_TIMEOUT` | none | Timeout in seconds for a single document conversion |
 | `PDF_NUM_THREADS` | `4` | Number of CPU threads for Docling model inference |
-| `HTML_IMAGE_MODE` | `placeholder` | Markdown image mode for HTML: `embedded`, `placeholder`, `referenced` |
 | `HTML_FETCH_IMAGES` | `false` | Fetch remote/local images referenced in the HTML document |
 | `HTML_POST_PROCESS_CODE_BLOCKS` | `true` | Post-process code blocks with pattern-based language detection |
 | `HTML_RENDER_PAGE` | `false` | Render HTML page to image before parsing |

@@ -135,6 +135,65 @@ func TestConvert_DoesNotPublishDONEEvent(t *testing.T) {
 	}
 }
 
+func TestConvert_CollectsImageChunks(t *testing.T) {
+	pngBytes := []byte{0x89, 'P', 'N', 'G'}
+	responses := []*pb.ConvertResult{
+		{Payload: &pb.ConvertResult_MarkdownChunk{MarkdownChunk: []byte("![img](image_000000_abc.png)")}},
+		{Payload: &pb.ConvertResult_ImageChunk{ImageChunk: &pb.ImageChunk{
+			Filename: "image_000000_abc.png",
+			Data:     pngBytes,
+		}}},
+		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{}}},
+		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE", Stage: "done"}}},
+	}
+
+	addr := startFakeParser(t, responses)
+	c := newClient(t, addr)
+	h := newHub(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := c.Convert(ctx, "job-img", "req-img", "test.pdf", []byte("%PDF"), h)
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	if len(result.Images) != 1 {
+		t.Fatalf("Images len = %d, want 1", len(result.Images))
+	}
+	if result.Images[0].Filename != "image_000000_abc.png" {
+		t.Errorf("Filename = %q, want image_000000_abc.png", result.Images[0].Filename)
+	}
+	if string(result.Images[0].Data) != string(pngBytes) {
+		t.Errorf("image data mismatch")
+	}
+}
+
+func TestConvert_NoImagesWhenNoneStreamed(t *testing.T) {
+	responses := []*pb.ConvertResult{
+		{Payload: &pb.ConvertResult_MarkdownChunk{MarkdownChunk: []byte("# Hello")}},
+		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{}}},
+		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE", Stage: "done"}}},
+	}
+
+	addr := startFakeParser(t, responses)
+	c := newClient(t, addr)
+	h := newHub(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := c.Convert(ctx, "job-no-img", "req-no-img", "test.pdf", []byte("%PDF"), h)
+	if err != nil {
+		t.Fatalf("Convert failed: %v", err)
+	}
+
+	if len(result.Images) != 0 {
+		t.Errorf("Images len = %d, want 0", len(result.Images))
+	}
+}
+
 func TestConvert_PublishesFAILEDEvent(t *testing.T) {
 	responses := []*pb.ConvertResult{
 		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{

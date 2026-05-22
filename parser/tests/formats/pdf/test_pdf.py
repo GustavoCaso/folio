@@ -6,16 +6,6 @@ import parser.formats.pdf.pdf as pdf_mod
 
 
 class TestPipelineOptions:
-    def test_generate_images_default_true(self):
-        with patch.dict("os.environ", {}, clear=True):
-            opts = pdf_mod._pipeline_options()
-            assert opts.generate_picture_images is True
-
-    def test_generate_images_true(self):
-        with patch.dict("os.environ", {"PDF_GENERATE_IMAGES": "true"}, clear=True):
-            opts = pdf_mod._pipeline_options()
-            assert opts.generate_picture_images is True
-
     def test_do_ocr_default_true(self):
         with patch.dict("os.environ", {}, clear=True):
             opts = pdf_mod._pipeline_options()

@@ -1,8 +1,6 @@
 import os
 from pathlib import Path
 
-from docling_core.types.doc.base import ImageRefMode
-
 _HTML_SUFFIXES = frozenset({".html", ".htm"})
 
 
@@ -13,22 +11,15 @@ def bool_env(var: str, default: bool) -> bool:
     return val.lower() in ("1", "true", "yes")
 
 
-def image_mode(env_var: str) -> ImageRefMode:
-    val = os.environ.get(env_var, "placeholder").lower()
-    return {"embedded": ImageRefMode.EMBEDDED, "referenced": ImageRefMode.REFERENCED}.get(
-        val, ImageRefMode.PLACEHOLDER
-    )
-
-
-def get_format_settings(suffix: str) -> tuple[ImageRefMode, bool]:
-    """Return (image_mode, post_process_code_blocks) for the given file extension."""
+def get_format_settings(suffix: str) -> bool:
+    """Return post_process_code_blocks for the given file extension."""
     if suffix in _HTML_SUFFIXES:
-        from parser.formats.html.html import image_mode_value, post_process_code_blocks
+        from parser.formats.html.html import post_process_code_blocks
 
-        return image_mode_value, post_process_code_blocks
-    from parser.formats.pdf.pdf import image_mode_value, post_process_code_blocks
+        return post_process_code_blocks
+    from parser.formats.pdf.pdf import post_process_code_blocks
 
-    return image_mode_value, post_process_code_blocks
+    return post_process_code_blocks
 
 
 def extract_metadata(path: Path, suffix: str, generate_cover: bool) -> tuple[str, str, bytes]:
