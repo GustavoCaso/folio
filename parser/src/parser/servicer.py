@@ -13,13 +13,15 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
 
+    from docling_core.types.doc.document import DoclingDocument
+
 import grpc
 from docling_core.types.doc.base import ImageRefMode
 
 from parser.formats.converter import convert
 from parser.formats.helpers import extract_metadata, get_format_settings
-from parser.formats.pdf import count_pdf_pages
 from parser.formats.pdf.images import PLACEHOLDER, extract_images
+from parser.formats.pdf.pdf import count_pdf_pages
 from parser.grpc import parser_pb2, parser_pb2_grpc
 from parser.postprocess import enrich_code_blocks
 from parser.progress import ProgressEvent, attach
@@ -41,12 +43,9 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
         request_iterator: AsyncIterator[parser_pb2.ConvertChunk],
         context: grpc.aio.ServicerContext[parser_pb2.ConvertChunk, parser_pb2.ConvertResult],
     ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
-        # Per-RPC correlation id so every log line for a single conversion
-        # shares the same job_id field.
         job_id = uuid.uuid4().hex[:8]
         started = time.monotonic()
 
-        # --- Receive all chunks from the caller ---
         meta = None
         buf = bytearray()
 
@@ -62,41 +61,33 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             await context.abort(grpc.StatusCode.INVALID_ARGUMENT, "Missing ConvertMeta")
             return
 
-        ctx: dict[str, object] = {
-            "job_id": job_id,
-            "file": meta.filename,
-            "bytes": len(buf),
-        }
+        suffix = Path(meta.filename).suffix.lower() or ".pdf"
+        ctx: dict[str, object] = {"job_id": job_id, "file": meta.filename, "bytes": len(buf)}
         if meta.request_id:
             ctx["request_id"] = meta.request_id
+
         logger.info("convert received", extra=ctx)
 
-        suffix = Path(meta.filename).suffix.lower() or ".pdf"
-
-        yield parser_pb2.ConvertResult(
-            status=parser_pb2.StatusUpdate(
-                status="PROCESSING",
-                stage="received",
-                message=f"received {len(buf)} bytes",
-            )
-        )
-
-        # --- Write to temp file and convert (blocking Docling call in executor) ---
         tmp_path: Path | None = None
         try:
             with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
                 f.write(buf)
                 tmp_path = Path(f.name)
 
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(
+                    status="PROCESSING",
+                    stage="received",
+                    message=f"received {len(buf)} bytes",
+                )
+            )
+
             pages_total = 0
             if suffix == ".pdf":
                 try:
                     pages_total = count_pdf_pages(tmp_path)
                 except Exception:
-                    logger.exception(
-                        "count pages failed",
-                        extra={**ctx, "tmp_path": str(tmp_path)},
-                    )
+                    logger.exception("count pages failed", extra={**ctx, "tmp_path": str(tmp_path)})
 
             logger.info("convert loading", extra={**ctx, "pages_total": pages_total})
 
@@ -139,7 +130,6 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                         )
                     )
 
-                # Drain any events queued just before completion
                 while not progress_q.empty():
                     evt = progress_q.get_nowait()
                     yield parser_pb2.ConvertResult(
@@ -154,102 +144,179 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
 
                 doc = await convert_task
 
-            do_post_process = get_format_settings(suffix)
-
-            with tempfile.TemporaryDirectory() as export_dir:
-                md_path = Path(export_dir) / "doc.md"
-
-                if suffix == ".pdf":
-                    doc.save_as_markdown(
-                        filename=md_path,
-                        image_mode=ImageRefMode.PLACEHOLDER,
-                        image_placeholder=PLACEHOLDER,
-                    )
-                    markdown = md_path.read_text(encoding="utf-8")
-                    scale_val = float(os.environ.get("PDF_IMAGES_SCALE", "0.5")) * 150 / 72
-                    image_files = []
-                    for name, data in extract_images(doc, tmp_path, scale=scale_val):
-                        markdown = markdown.replace(PLACEHOLDER, f"![Image]({name})", 1)
-                        image_files.append((name, data))
-                else:
-                    doc.save_as_markdown(filename=md_path, image_mode=ImageRefMode.REFERENCED)
-                    markdown = md_path.read_text(encoding="utf-8")
-                    artifacts_dir = md_path.with_name(md_path.stem + "_artifacts")
-                    image_files = [
-                        (p.name, p.read_bytes())
-                        for p in (
-                            sorted(artifacts_dir.glob("*.png")) if artifacts_dir.exists() else []
-                        )
-                    ]
-
-                if do_post_process:
-                    markdown = enrich_code_blocks(markdown)
-
-                encoded = markdown.encode("utf-8")
-                logger.info(
-                    "convert exporting",
-                    extra={**ctx, "md_bytes": len(encoded), "pages_total": pages_total},
-                )
-
-                yield parser_pb2.ConvertResult(
-                    status=parser_pb2.StatusUpdate(
-                        status="PROCESSING",
-                        stage="exporting",
-                        message="streaming markdown",
-                        pages_done=pages_total,
-                        pages_total=pages_total,
-                    )
-                )
-
-                md_chunks = 0
-                for i in range(0, len(encoded), _CHUNK_SIZE):
-                    yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
-                    md_chunks += 1
-
-                for name, data in image_files:
-                    yield parser_pb2.ConvertResult(
-                        image_chunk=parser_pb2.ImageChunk(filename=name, data=data)
-                    )
-
-            title, author, cover = extract_metadata(tmp_path, suffix, generate_cover=True)
-            yield parser_pb2.ConvertResult(
-                metadata=parser_pb2.DocumentMetadata(
-                    title=title,
-                    author=author,
-                    cover=cover,
-                )
-            )
-
-            yield parser_pb2.ConvertResult(
-                status=parser_pb2.StatusUpdate(
-                    status="DONE",
-                    stage="done",
-                    pages_done=pages_total,
-                    pages_total=pages_total,
-                )
-            )
-            logger.info(
-                "convert done",
-                extra={
-                    **ctx,
-                    "pages_total": pages_total,
-                    "md_bytes": len(encoded),
-                    "md_chunks": md_chunks,
-                    "dur_ms": int((time.monotonic() - started) * 1000),
-                },
-            )
+            async for result in self._export_doc(ctx, doc, suffix, tmp_path, pages_total, started):
+                yield result
 
         except Exception as exc:
             logger.exception("convert failed", extra=ctx)
             yield parser_pb2.ConvertResult(
-                status=parser_pb2.StatusUpdate(
-                    status="FAILED",
-                    error=str(exc),
-                )
+                status=parser_pb2.StatusUpdate(status="FAILED", error=str(exc))
             )
         finally:
             if tmp_path is not None:
                 tmp_path.unlink(missing_ok=True)
+
+    async def ConvertURL(  # noqa: N802
+        self,
+        request: parser_pb2.ConvertURLRequest,
+        context: grpc.aio.ServicerContext[parser_pb2.ConvertURLRequest, parser_pb2.ConvertResult],
+    ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
+        job_id = uuid.uuid4().hex[:8]
+        started = time.monotonic()
+
+        suffix = Path(request.url).suffix.lower() or ".html"
+        ctx: dict[str, object] = {"job_id": job_id, "url": request.url}
+        if request.request_id:
+            ctx["request_id"] = request.request_id
+
+        # Defense-in-depth: validate scheme even though the Go caller does it too.
+        if not request.url.startswith(("http://", "https://")):
+            await context.abort(
+                grpc.StatusCode.INVALID_ARGUMENT, "URL must use http or https scheme"
+            )
+            return
+
+        logger.info("convert url received", extra=ctx)
+
+        tmp_path: Path | None = None
+        try:
+            with tempfile.NamedTemporaryFile(suffix=suffix, delete=False) as f:
+                tmp_path = Path(f.name)
+
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(
+                    status="PROCESSING",
+                    stage="received",
+                    message=f"received url: {request.url}",
+                )
+            )
+
+            logger.info("convert loading", extra={**ctx, "pages_total": 0})
+
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(
+                    status="PROCESSING",
+                    stage="loading",
+                    message="fetching and loading document",
+                )
+            )
+
+            loop = asyncio.get_running_loop()
+            convert_task = loop.run_in_executor(self._executor, convert, request.url)
+            doc = await convert_task
+
+            async for result in self._export_doc(
+                ctx, doc, suffix, tmp_path, 0, started, is_url=True
+            ):
+                yield result
+
+        except Exception as exc:
+            logger.exception("convert url failed", extra=ctx)
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(status="FAILED", error=str(exc))
+            )
+        finally:
+            if tmp_path is not None:
+                tmp_path.unlink(missing_ok=True)
+
+    async def _export_doc(
+        self,
+        ctx: dict[str, object],
+        doc: DoclingDocument,
+        suffix: str,
+        tmp_path: Path,
+        pages_total: int,
+        started: float,
+        is_url: bool = False,
+    ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
+        do_post_process = get_format_settings(suffix)
+
+        with tempfile.TemporaryDirectory() as export_dir:
+            md_path = Path(export_dir) / "doc.md"
+
+            if suffix == ".pdf":
+                doc.save_as_markdown(
+                    filename=md_path,
+                    image_mode=ImageRefMode.PLACEHOLDER,
+                    image_placeholder=PLACEHOLDER,
+                )
+                markdown = md_path.read_text(encoding="utf-8")
+                image_files = []
+                if not is_url:
+                    scale_val = float(os.environ.get("PDF_IMAGES_SCALE", "0.5")) * 150 / 72
+                    for name, data in extract_images(doc, tmp_path, scale=scale_val):
+                        markdown = markdown.replace(PLACEHOLDER, f"![Image]({name})", 1)
+                        image_files.append((name, data))
+            else:
+                doc.save_as_markdown(filename=md_path, image_mode=ImageRefMode.REFERENCED)
+                markdown = md_path.read_text(encoding="utf-8")
+                artifacts_dir = md_path.with_name(md_path.stem + "_artifacts")
+                image_files = [
+                    (p.name, p.read_bytes())
+                    for p in (sorted(artifacts_dir.glob("*.png")) if artifacts_dir.exists() else [])
+                ]
+
+            logger.debug(
+                "images collected",
+                extra={**ctx, "count": len(image_files), "names": [n for n, _ in image_files]},
+            )
+
+            if do_post_process:
+                markdown = enrich_code_blocks(markdown)
+
+            encoded = markdown.encode("utf-8")
+            logger.info(
+                "convert exporting",
+                extra={**ctx, "md_bytes": len(encoded), "pages_total": pages_total},
+            )
+
+            yield parser_pb2.ConvertResult(
+                status=parser_pb2.StatusUpdate(
+                    status="PROCESSING",
+                    stage="exporting",
+                    message="streaming markdown",
+                    pages_done=pages_total,
+                    pages_total=pages_total,
+                )
+            )
+
+            md_chunks = 0
+            for i in range(0, len(encoded), _CHUNK_SIZE):
+                yield parser_pb2.ConvertResult(markdown_chunk=encoded[i : i + _CHUNK_SIZE])
+                md_chunks += 1
+
+            for name, data in image_files:
+                yield parser_pb2.ConvertResult(
+                    image_chunk=parser_pb2.ImageChunk(filename=name, data=data)
+                )
+
+        title, author, cover = extract_metadata(tmp_path, suffix, generate_cover=True)
+        yield parser_pb2.ConvertResult(
+            metadata=parser_pb2.DocumentMetadata(
+                title=title,
+                author=author,
+                cover=cover,
+            )
+        )
+
+        yield parser_pb2.ConvertResult(
+            status=parser_pb2.StatusUpdate(
+                status="DONE",
+                stage="done",
+                pages_done=pages_total,
+                pages_total=pages_total,
+            )
+        )
+        logger.info(
+            "convert done",
+            extra={
+                **ctx,
+                "pages_total": pages_total,
+                "md_bytes": len(encoded),
+                "md_chunks": md_chunks,
+                "dur_ms": int((time.monotonic() - started) * 1000),
+            },
+        )
 
     def shutdown(self) -> None:
         self._executor.shutdown(wait=False)

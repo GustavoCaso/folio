@@ -24,6 +24,7 @@ var staticFS embed.FS
 // ParserClient is the interface satisfied by *parserclient.Client (and fakes in tests).
 type ParserClient interface {
 	Convert(ctx context.Context, jobID, requestID, filename string, pdfBytes []byte, h *hub.Hub) (parserclient.ConversionResult, error)
+	ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL string, h *hub.Hub) (parserclient.ConversionResult, error)
 	Health(ctx context.Context) bool
 }
 
@@ -69,6 +70,7 @@ func Register(store repository.Store, h *hub.Hub, pc ParserClient, dataDir strin
 	mux.HandleFunc("GET /", hs.ListDocuments)
 	mux.HandleFunc("GET /health/parser", hs.ParserHealth)
 	mux.HandleFunc("POST /documents", hs.UploadDocument)
+	mux.HandleFunc("POST /documents/import", hs.ImportDocument)
 	mux.HandleFunc("POST /documents/{id}/cancel", hs.CancelDocument)
 	mux.HandleFunc("POST /documents/{id}/retry", hs.RetryDocument)
 	mux.HandleFunc("DELETE /documents/{id}", hs.DeleteDocument)

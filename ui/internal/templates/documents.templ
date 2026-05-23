@@ -150,6 +150,28 @@ templ Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) {
 					}
 				}
 			</div>
+			<div>
+				<h2 class="text-lg font-semibold mb-3">Import from URL</h2>
+				@card.Card() {
+					@card.Content() {
+						<form method="POST" action="/documents/import" class="flex items-center gap-3">
+							<input
+								type="url"
+								name="url"
+								placeholder="https://example.com/article or https://example.com/doc.pdf"
+								required
+								class="flex-1 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+							/>
+							@button.Button(button.Props{
+								ID:   "import-btn",
+								Type: button.TypeSubmit,
+							}) {
+								Import
+							}
+						</form>
+					}
+				}
+			</div>
 			@DocumentList(jobs)
 		</div>
 		if len(watchJobIDs) > 0 {

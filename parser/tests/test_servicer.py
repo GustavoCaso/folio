@@ -8,7 +8,7 @@ from parser.servicer import ParserServicer
 
 
 def _make_stream(filename: str, data: bytes, request_id: str = ""):
-    """Build an async iterator simulating a gRPC request stream."""
+    """Build an async iterator simulating a gRPC ConvertDocument request stream."""
     chunks = [
         parser_pb2.ConvertChunk(
             meta=parser_pb2.ConvertMeta(filename=filename, request_id=request_id)
@@ -23,17 +23,21 @@ def _make_stream(filename: str, data: bytes, request_id: str = ""):
     return _iter()
 
 
+def _make_url_request(url: str, request_id: str = "") -> parser_pb2.ConvertURLRequest:
+    """Build a ConvertURLRequest for ConvertURL RPC."""
+    return parser_pb2.ConvertURLRequest(url=url, request_id=request_id)
+
+
 def _fake_save_as_markdown(markdown: str = "# Hello"):
     """Return a side_effect for mock_doc.save_as_markdown that writes the markdown file."""
 
-    def _impl(
-        filename,
-        image_mode,
-        image_placeholder: str = "<!-- image -->",
-    ):
+    def _impl(filename, image_mode, image_placeholder: str = "<!-- image -->"):
         filename.write_text(markdown, encoding="utf-8")
 
     return _impl
+
+
+# --- ConvertDocument (file upload) tests ---
 
 
 @pytest.mark.asyncio
@@ -186,7 +190,6 @@ async def test_convert_document_yields_metadata_on_success():
     assert meta.author == "Jane"
     assert meta.cover == b"\x89PNG"
 
-    # metadata must arrive before DONE
     metadata_idx = next(i for i, r in enumerate(results) if r.HasField("metadata"))
     done_idx = next(
         i for i, r in enumerate(results) if r.HasField("status") and r.status.status == "DONE"
@@ -288,8 +291,6 @@ async def test_convert_document_image_chunks_arrive_after_markdown():
 
 @pytest.mark.asyncio
 async def test_pdf_conversion_uses_placeholder_mode_and_extract_images():
-    """Servicer must use PLACEHOLDER image mode and extract images via pypdfium2."""
-
     servicer = ParserServicer(num_workers=1)
     context = MagicMock()
     stream = _make_stream("doc.pdf", b"%PDF")
@@ -321,7 +322,6 @@ async def test_pdf_conversion_uses_placeholder_mode_and_extract_images():
 
 @pytest.mark.asyncio
 async def test_pdf_markdown_has_image_refs_not_placeholders():
-    """After rewrite, streamed markdown must contain filename refs, not <!-- image -->."""
     servicer = ParserServicer(num_workers=1)
     context = MagicMock()
     stream = _make_stream("doc.pdf", b"%PDF")
@@ -376,3 +376,142 @@ async def test_convert_html_document_yields_processing_then_done():
     assert len(metadata_msgs) == 1
     assert metadata_msgs[0].metadata.title == "My Title"
     assert metadata_msgs[0].metadata.author == "Author"
+
+
+# --- ConvertURL tests ---
+
+
+@pytest.mark.asyncio
+async def test_convert_url_yields_processing_then_done():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+
+    request = _make_url_request("https://example.com/doc.pdf")
+
+    mock_doc = MagicMock()
+    mock_doc.save_as_markdown.side_effect = _fake_save_as_markdown("# From URL")
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer.extract_images", return_value=iter([])),
+    ):
+        results = []
+        async for result in servicer.ConvertURL(request, context):
+            results.append(result)
+
+    statuses = [r.status.status for r in results if r.HasField("status")]
+    assert "PROCESSING" in statuses
+    assert "DONE" in statuses
+
+
+@pytest.mark.asyncio
+async def test_convert_url_passes_url_to_convert():
+    """convert must be called with the URL string, not a file path."""
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+
+    url = "https://example.com/paper.pdf"
+    request = _make_url_request(url)
+
+    mock_doc = MagicMock()
+    mock_doc.save_as_markdown.side_effect = _fake_save_as_markdown("# URL doc")
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc) as mock_convert,
+        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer.extract_images", return_value=iter([])),
+    ):
+        async for _ in servicer.ConvertURL(request, context):
+            pass
+
+    mock_convert.assert_called_once_with(url)
+
+
+@pytest.mark.asyncio
+async def test_convert_url_uses_placeholder_mode_for_pdf():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+
+    request = _make_url_request("https://example.com/paper.pdf")
+
+    mock_doc = MagicMock()
+    mock_doc.save_as_markdown.side_effect = _fake_save_as_markdown("# Hi\n\n<!-- image -->\n")
+
+    fake_images = [("image_000000_aabb.png", b"\x89PNG")]
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer.extract_images", return_value=iter(fake_images)),
+    ):
+        results = []
+        async for result in servicer.ConvertURL(request, context):
+            results.append(result)
+
+    call_kwargs = mock_doc.save_as_markdown.call_args
+    assert call_kwargs.kwargs["image_mode"] == ImageRefMode.PLACEHOLDER
+
+
+@pytest.mark.asyncio
+async def test_convert_url_html_uses_referenced_mode():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+
+    request = _make_url_request("https://example.com/page.html")
+
+    mock_doc = MagicMock()
+    mock_doc.save_as_markdown.side_effect = _fake_save_as_markdown("# HTML from URL")
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+    ):
+        results = []
+        async for result in servicer.ConvertURL(request, context):
+            results.append(result)
+
+    call_kwargs = mock_doc.save_as_markdown.call_args
+    assert call_kwargs.kwargs["image_mode"] == ImageRefMode.REFERENCED
+
+
+@pytest.mark.asyncio
+async def test_convert_url_yields_failed_on_error():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+
+    request = _make_url_request("https://example.com/doc.pdf")
+
+    with patch("parser.servicer.convert", side_effect=RuntimeError("network error")):
+        results = []
+        async for result in servicer.ConvertURL(request, context):
+            results.append(result)
+
+    statuses = {r.status.status for r in results if r.HasField("status")}
+    assert "FAILED" in statuses
+
+
+@pytest.mark.asyncio
+async def test_convert_url_no_page_count_in_loading_status():
+    """URL conversions skip page counting — pages_total stays 0 in loading status."""
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+
+    request = _make_url_request("https://example.com/doc.pdf")
+
+    mock_doc = MagicMock()
+    mock_doc.save_as_markdown.side_effect = _fake_save_as_markdown("# Hi")
+
+    with (
+        patch("parser.servicer.convert", return_value=mock_doc),
+        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer.extract_images", return_value=iter([])),
+    ):
+        results = []
+        async for result in servicer.ConvertURL(request, context):
+            results.append(result)
+
+    loading = next(
+        r.status for r in results if r.HasField("status") and r.status.stage == "loading"
+    )
+    assert loading.pages_total == 0

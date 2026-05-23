@@ -17,7 +17,8 @@ import (
 // fakeParserServer implements pb.ParserServiceServer for testing.
 type fakeParserServer struct {
 	pb.UnimplementedParserServiceServer
-	responses []*pb.ConvertResult
+	responses    []*pb.ConvertResult
+	urlResponses []*pb.ConvertResult
 }
 
 func (s *fakeParserServer) ConvertDocument(stream grpc.BidiStreamingServer[pb.ConvertChunk, pb.ConvertResult]) error {
@@ -38,6 +39,15 @@ func (s *fakeParserServer) ConvertDocument(stream grpc.BidiStreamingServer[pb.Co
 	return nil
 }
 
+func (s *fakeParserServer) ConvertURL(_ *pb.ConvertURLRequest, stream grpc.ServerStreamingServer[pb.ConvertResult]) error {
+	for _, r := range s.urlResponses {
+		if err := stream.Send(r); err != nil {
+			return err
+		}
+	}
+	return nil
+}
+
 func startFakeParser(t *testing.T, responses []*pb.ConvertResult) string {
 	t.Helper()
 	lis, err := net.Listen("tcp", "127.0.0.1:0")
@@ -46,6 +56,19 @@ func startFakeParser(t *testing.T, responses []*pb.ConvertResult) string {
 	}
 	srv := grpc.NewServer()
 	pb.RegisterParserServiceServer(srv, &fakeParserServer{responses: responses})
+	go srv.Serve(lis) //nolint:errcheck
+	t.Cleanup(srv.Stop)
+	return lis.Addr().String()
+}
+
+func startFakeParserURL(t *testing.T, urlResponses []*pb.ConvertResult) string {
+	t.Helper()
+	lis, err := net.Listen("tcp", "127.0.0.1:0")
+	if err != nil {
+		t.Fatal(err)
+	}
+	srv := grpc.NewServer()
+	pb.RegisterParserServiceServer(srv, &fakeParserServer{urlResponses: urlResponses})
 	go srv.Serve(lis) //nolint:errcheck
 	t.Cleanup(srv.Stop)
 	return lis.Addr().String()
@@ -187,6 +210,65 @@ func TestConvert_NoImagesWhenNoneStreamed(t *testing.T) {
 	result, err := c.Convert(ctx, "job-no-img", "req-no-img", "test.pdf", []byte("%PDF"), h)
 	if err != nil {
 		t.Fatalf("Convert failed: %v", err)
+	}
+
+	if len(result.Images) != 0 {
+		t.Errorf("Images len = %d, want 0", len(result.Images))
+	}
+}
+
+func TestConvertFromURL_CollectsImageChunks(t *testing.T) {
+	pngBytes := []byte{0x89, 'P', 'N', 'G'}
+	responses := []*pb.ConvertResult{
+		{Payload: &pb.ConvertResult_MarkdownChunk{MarkdownChunk: []byte("![img](/tmp/doc_artifacts/image_000000_abc.png)")}},
+		{Payload: &pb.ConvertResult_ImageChunk{ImageChunk: &pb.ImageChunk{
+			Filename: "image_000000_abc.png",
+			Data:     pngBytes,
+		}}},
+		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{}}},
+		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE", Stage: "done"}}},
+	}
+
+	addr := startFakeParserURL(t, responses)
+	c := newClient(t, addr)
+	h := newHub(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := c.ConvertFromURL(ctx, "job-url-img", "req-url-img", "https://example.com/page", h)
+	if err != nil {
+		t.Fatalf("ConvertFromURL failed: %v", err)
+	}
+
+	if len(result.Images) != 1 {
+		t.Fatalf("Images len = %d, want 1", len(result.Images))
+	}
+	if result.Images[0].Filename != "image_000000_abc.png" {
+		t.Errorf("Filename = %q, want image_000000_abc.png", result.Images[0].Filename)
+	}
+	if string(result.Images[0].Data) != string(pngBytes) {
+		t.Errorf("image data mismatch")
+	}
+}
+
+func TestConvertFromURL_NoImagesWhenNoneStreamed(t *testing.T) {
+	responses := []*pb.ConvertResult{
+		{Payload: &pb.ConvertResult_MarkdownChunk{MarkdownChunk: []byte("# Hello")}},
+		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{}}},
+		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE", Stage: "done"}}},
+	}
+
+	addr := startFakeParserURL(t, responses)
+	c := newClient(t, addr)
+	h := newHub(t)
+
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
+	defer cancel()
+
+	result, err := c.ConvertFromURL(ctx, "job-url-no-img", "req-url-no-img", "https://example.com/page", h)
+	if err != nil {
+		t.Fatalf("ConvertFromURL failed: %v", err)
 	}
 
 	if len(result.Images) != 0 {

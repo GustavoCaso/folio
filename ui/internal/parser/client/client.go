@@ -181,7 +181,83 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 	return result, nil
 }
 
-// Health returns true if the parser reports SERVING via grpc health protocol.
+// ConvertFromURL sends a source URL to the parser, publishes StatusEvents to h
+// for jobID, and returns the assembled Markdown when the stream completes.
+// Blocking: returns only when conversion is done or has failed.
+func (c *Client) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL string, h *hub.Hub) (ConversionResult, error) {
+	log := c.logger.With("job_id", jobID, "request_id", requestID, "source_url", sourceURL)
+	start := time.Now()
+
+	stream, err := c.client.ConvertURL(ctx, &pb.ConvertURLRequest{
+		Url:       sourceURL,
+		RequestId: requestID,
+	})
+	if err != nil {
+		log.Error("open stream failed", "err", err.Error())
+		if status.Code(err) == codes.Canceled {
+			return ConversionResult{}, context.Canceled
+		}
+		return ConversionResult{}, fmt.Errorf("stream: %w", err)
+	}
+	log.Info("url stream opened")
+
+	// Receive status updates, markdown chunks, and document metadata
+	var mdBuf bytes.Buffer
+	var result ConversionResult
+	mdChunks := 0
+	for {
+		msg, err := stream.Recv()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			if status.Code(err) == codes.Canceled {
+				return ConversionResult{}, fmt.Errorf("recv: %w", context.Canceled)
+			}
+			log.Error("recv failed", "err", err.Error())
+			h.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: err.Error()})
+			return ConversionResult{}, fmt.Errorf("recv: %w", err)
+		}
+
+		switch p := msg.Payload.(type) {
+		case *pb.ConvertResult_Status:
+			log.Debug("status",
+				"status", p.Status.Status,
+				"stage", p.Status.Stage,
+			)
+			if p.Status.Status != "DONE" {
+				h.Publish(jobID, hub.StatusEvent{
+					Status:     p.Status.Status,
+					PagesDone:  int(p.Status.PagesDone),
+					PagesTotal: int(p.Status.PagesTotal),
+					Error:      p.Status.Error,
+					Stage:      p.Status.Stage,
+					Message:    p.Status.Message,
+				})
+			}
+		case *pb.ConvertResult_MarkdownChunk:
+			mdBuf.Write(p.MarkdownChunk)
+			mdChunks++
+		case *pb.ConvertResult_Metadata:
+			result.Title = p.Metadata.Title
+			result.Author = p.Metadata.Author
+			result.Cover = p.Metadata.Cover
+		case *pb.ConvertResult_ImageChunk:
+			result.Images = append(result.Images, ImageFile{
+				Filename: p.ImageChunk.Filename,
+				Data:     p.ImageChunk.Data,
+			})
+		}
+	}
+
+	log.Info("url stream done",
+		"dur_ms", time.Since(start).Milliseconds(),
+		"md_bytes", mdBuf.Len(),
+		"md_chunks", mdChunks,
+	)
+	result.Markdown = mdBuf.Bytes()
+	return result, nil
+}
 func (c *Client) Health(ctx context.Context) bool {
 	hc := grpc_health_v1.NewHealthClient(c.conn)
 	resp, err := hc.Check(ctx, &grpc_health_v1.HealthCheckRequest{})

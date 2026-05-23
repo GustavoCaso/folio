@@ -1,5 +1,7 @@
+import logging
 import os
 from pathlib import Path
+from urllib.parse import urlparse
 
 from docling.datamodel.accelerator_options import AcceleratorOptions
 from docling.datamodel.backend_options import HTMLBackendOptions
@@ -12,6 +14,8 @@ from docling.document_converter import DocumentConverter, HTMLFormatOption, PdfF
 from docling_core.types.doc.document import DoclingDocument
 
 from parser.formats.helpers import bool_env
+
+logger = logging.getLogger(__name__)
 
 _VALID_CODE_FORMULA_PRESETS = {"codeformulav2", "granite_docling"}
 
@@ -57,12 +61,14 @@ def pdf_pipeline_options() -> PdfPipelineOptions:
     return PdfPipelineOptions(**kwargs)  # type: ignore[arg-type]
 
 
-def html_backend_options() -> HTMLBackendOptions:
+def html_backend_options(source_uri: str = "") -> HTMLBackendOptions:
     opts = HTMLBackendOptions(  # type: ignore[call-arg]
         fetch_images=bool_env("HTML_FETCH_IMAGES", False),
         render_page=bool_env("HTML_RENDER_PAGE", False),
         add_title=bool_env("HTML_ADD_TITLE", True),
         infer_furniture=bool_env("HTML_INFER_FURNITURE", True),
+        enable_remote_fetch=bool_env("HTML_FETCH_IMAGES", False),
+        source_uri=source_uri or None,  # type: ignore[arg-type]
     )
     render_dpi = os.environ.get("HTML_RENDER_DPI")
     if render_dpi is not None:
@@ -73,19 +79,45 @@ def html_backend_options() -> HTMLBackendOptions:
     return opts
 
 
-_converter: DocumentConverter = DocumentConverter(
+# PDF converter: single singleton — PDF pipeline construction is expensive
+# (OCR, table structure, and layout models load on first use).
+_pdf_converter: DocumentConverter = DocumentConverter(
     format_options={
         InputFormat.PDF: PdfFormatOption(pipeline_options=pdf_pipeline_options()),
-        InputFormat.HTML: HTMLFormatOption(backend_options=html_backend_options()),
     }
 )
 
 
+def _url_origin(url: str) -> str:
+    parsed = urlparse(url)
+    return f"{parsed.scheme}://{parsed.netloc}"
+
+
+def _make_html_converter(source_uri: str) -> DocumentConverter:
+    return DocumentConverter(
+        format_options={
+            InputFormat.HTML: HTMLFormatOption(
+                backend_options=html_backend_options(source_uri)
+            ),
+        }
+    )
+
+
 def convert(source: Path | str) -> DoclingDocument:
-    result = _converter.convert(source=source)
+    if isinstance(source, str):
+        if Path(source).suffix.lower() == ".pdf":
+            logger.debug("converting pdf url", extra={"url": source})
+            converter = _pdf_converter
+        else:
+            origin = _url_origin(source)
+            logger.debug("converting html url", extra={"url": source, "origin": origin})
+            converter = _make_html_converter(origin)
+    else:
+        converter = _pdf_converter
+    result = converter.convert(source=source)
     return result.document
 
 
 def warmup() -> None:
     """Force Docling model initialization. Blocks until all models are loaded."""
-    _converter.initialize_pipeline(InputFormat.PDF)
+    _pdf_converter.initialize_pipeline(InputFormat.PDF)
