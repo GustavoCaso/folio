@@ -1,6 +1,7 @@
 package templates
 
 import "github.com/templui/templui/components/badge"
+import "github.com/templui/templui/components/collapsible"
 import "github.com/templui/templui/components/sheet"
 import "github.com/templui/templui/components/toast"
 
@@ -16,6 +17,7 @@ templ Layout(title string) {
 			<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
 			<link rel="stylesheet" href="/static/tailwind/output.css"/>
 			<link rel="stylesheet" href="/static/css/reader.css"/>
+			@collapsible.Script()
 			@sheet.Script()
 			@toast.Script()
 		</head>

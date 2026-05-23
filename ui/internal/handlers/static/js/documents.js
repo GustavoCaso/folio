@@ -93,7 +93,48 @@ export function watchJob(jobID) {
   });
 }
 
+function initDropZone() {
+  const zone = document.getElementById("drop-zone");
+  const fileInput = document.getElementById("file-input");
+  const actions = document.getElementById("upload-actions");
+  const label = document.getElementById("drop-label");
+  const filenameSpan = document.getElementById("selected-filename");
+  if (!zone || !fileInput) return;
+
+  function selectFile(file) {
+    if (!file || file.type !== "application/pdf") return;
+    const dt = new DataTransfer();
+    dt.items.add(file);
+    fileInput.files = dt.files;
+    label.textContent = "PDF ready";
+    filenameSpan.textContent = file.name;
+    actions.classList.remove("hidden");
+    actions.classList.add("flex");
+    zone.classList.add("border-foreground/40", "bg-accent/30");
+  }
+
+  zone.addEventListener("click", () => fileInput.click());
+  zone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+
+  fileInput.addEventListener("change", () => {
+    if (fileInput.files[0]) selectFile(fileInput.files[0]);
+  });
+
+  zone.addEventListener("dragover", (e) => {
+    e.preventDefault();
+    zone.classList.add("border-foreground/40", "bg-accent/30");
+  });
+  zone.addEventListener("dragleave", () => {
+    if (!fileInput.files[0]) zone.classList.remove("border-foreground/40", "bg-accent/30");
+  });
+  zone.addEventListener("drop", (e) => {
+    e.preventDefault();
+    selectFile(e.dataTransfer.files[0]);
+  });
+}
+
 function bootstrap() {
+  initDropZone();
   const cfg = document.getElementById("watch-config");
   if (cfg) cfg.dataset.jobIds.split(",").forEach(watchJob);
 
