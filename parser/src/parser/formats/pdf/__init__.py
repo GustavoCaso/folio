@@ -1,3 +1,3 @@
-from parser.formats.pdf.pdf import convert_pdf, count_pdf_pages, warmup
+from parser.formats.pdf.pdf import count_pdf_pages
 
-__all__ = ["convert_pdf", "count_pdf_pages", "warmup"]
+__all__ = ["count_pdf_pages"]

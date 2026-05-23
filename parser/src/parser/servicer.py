@@ -16,7 +16,7 @@ if TYPE_CHECKING:
 import grpc
 from docling_core.types.doc.base import ImageRefMode
 
-from parser.converter import convert
+from parser.formats.converter import convert
 from parser.formats.helpers import extract_metadata, get_format_settings
 from parser.formats.pdf import count_pdf_pages
 from parser.formats.pdf.images import PLACEHOLDER, extract_images
