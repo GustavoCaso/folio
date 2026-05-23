@@ -5,7 +5,7 @@ import os
 import grpc
 from grpc_health.v1 import health, health_pb2, health_pb2_grpc
 
-from parser.formats.pdf import warmup
+from parser.formats.converter import warmup
 from parser.grpc import parser_pb2_grpc
 from parser.logging_config import configure
 from parser.servicer import ParserServicer
