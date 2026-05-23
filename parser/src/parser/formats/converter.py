@@ -96,9 +96,7 @@ def _url_origin(url: str) -> str:
 def _make_html_converter(source_uri: str) -> DocumentConverter:
     return DocumentConverter(
         format_options={
-            InputFormat.HTML: HTMLFormatOption(
-                backend_options=html_backend_options(source_uri)
-            ),
+            InputFormat.HTML: HTMLFormatOption(backend_options=html_backend_options(source_uri)),
         }
     )
 

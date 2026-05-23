@@ -207,7 +207,9 @@ class TestConvert:
         mock_html_converter = MagicMock()
         mock_html_converter.convert.return_value = mock_result
 
-        with patch.object(converter_mod, "_make_html_converter", return_value=mock_html_converter) as mock_make:
+        with patch.object(
+            converter_mod, "_make_html_converter", return_value=mock_html_converter
+        ) as mock_make:
             result = convert("https://example.com/page")
 
         assert result is mock_document
@@ -217,7 +219,9 @@ class TestConvert:
         mock_result = MagicMock()
         path = Path("/tmp/doc.pdf")
 
-        with patch.object(converter_mod._pdf_converter, "convert", return_value=mock_result) as mock_convert:
+        with patch.object(
+            converter_mod._pdf_converter, "convert", return_value=mock_result
+        ) as mock_convert:
             convert(path)
 
         mock_convert.assert_called_once_with(source=path)
@@ -226,8 +230,12 @@ class TestConvert:
         mock_result = MagicMock()
         mock_result.document = MagicMock()
 
-        with patch.object(converter_mod._pdf_converter, "convert", return_value=mock_result) as mock_convert, \
-             patch.object(converter_mod, "_make_html_converter") as mock_make:
+        with (
+            patch.object(
+                converter_mod._pdf_converter, "convert", return_value=mock_result
+            ) as mock_convert,
+            patch.object(converter_mod, "_make_html_converter") as mock_make,
+        ):
             convert("https://example.com/paper.pdf")
 
         mock_convert.assert_called_once_with(source="https://example.com/paper.pdf")
