@@ -206,7 +206,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             doc = await convert_task
 
             async for result in self._export_doc(
-                ctx, doc, suffix, tmp_path, 0, started, is_url=True
+                ctx, doc, suffix, tmp_path, 0, started, is_url=True, source_url=request.url
             ):
                 yield result
 
@@ -228,6 +228,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
         pages_total: int,
         started: float,
         is_url: bool = False,
+        source_url: str = "",
     ) -> AsyncGenerator[parser_pb2.ConvertResult, None]:
         do_post_process = get_format_settings(suffix)
 
@@ -290,7 +291,8 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                     image_chunk=parser_pb2.ImageChunk(filename=name, data=data)
                 )
 
-        title, author, cover = extract_metadata(tmp_path, suffix, generate_cover=True)
+        source: Path | str = source_url if source_url else tmp_path
+        title, author, cover = extract_metadata(source, suffix, generate_cover=True)
         yield parser_pb2.ConvertResult(
             metadata=parser_pb2.DocumentMetadata(
                 title=title,
