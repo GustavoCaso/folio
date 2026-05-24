@@ -8,13 +8,14 @@ import (
 // When export is successful the Export function must update the ExternalID
 // otherwise must populate the Err
 type ExportRecord struct {
-	ExportID     string // ID of the highlight_exports row
+	ExportID      string // ID of the highlight_exports row
 	HighlightText string
-	Title        string
-	Note         string
-	Tag          string
-	ExternalID   string // ID assigned by the external service; "" on failure
-	Err          error
+	Title         string
+	Note          string
+	Tag           string   // highlight-level tag
+	JobTags       []string // document-level tags
+	ExternalID    string   // ID assigned by the external service; "" on failure
+	Err           error
 }
 
 // Backend is an external service that can receive and delete highlights.

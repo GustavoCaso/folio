@@ -41,6 +41,7 @@ type ExportRecord struct {
 	HighlightNote string
 	HighlightTag  string
 	JobFilename   string
+	JobTags       []string
 	BackendName   string
 	ExternalID    string
 	Status        string

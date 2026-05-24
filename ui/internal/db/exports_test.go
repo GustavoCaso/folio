@@ -321,6 +321,60 @@ func TestListAllExports_ReturnsAllRecords(t *testing.T) {
 	}
 }
 
+func TestListUnexportedHighlights_DecodesJobTagsFromJSON(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+
+	job, _ := seedJobAndHighlightForExport(t, database, "readwise")
+	if err := database.UpdateJob(context.Background(), job.ID, "Title", "", []string{"science", "research"}, nil); err != nil {
+		t.Fatal(err)
+	}
+
+	records, err := database.ListUnexportedHighlights(context.Background(), "readwise")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) == 0 {
+		t.Fatal("expected at least one record")
+	}
+	got := records[0].JobTags
+	if len(got) != 2 || got[0] != "science" || got[1] != "research" {
+		t.Errorf("expected JobTags [science research], got %v", got)
+	}
+}
+
+func TestListAllExports_DecodesJobTagsFromJSON(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+
+	job, _ := seedJobAndHighlightForExport(t, database, "readwise")
+	if err := database.UpdateJob(context.Background(), job.ID, "Title", "", []string{"fiction", "novel"}, nil); err != nil {
+		t.Fatal(err)
+	}
+	exportID := pendingExportID(t, database, "readwise")
+	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
+		t.Fatal(err)
+	}
+
+	records, err := database.ListAllExports(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) == 0 {
+		t.Fatal("expected at least one record")
+	}
+	got := records[0].JobTags
+	if len(got) != 2 || got[0] != "fiction" || got[1] != "novel" {
+		t.Errorf("expected JobTags [fiction novel], got %v", got)
+	}
+}
+
 func TestExportRecord_CascadesOnHighlightDelete(t *testing.T) {
 	database, err := db.New(":memory:")
 	if err != nil {

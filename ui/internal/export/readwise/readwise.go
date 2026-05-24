@@ -107,8 +107,19 @@ func (r *ReadwiseBackend) Export(ctx context.Context, exports []*export.ExportRe
 
 	// Add tags via a separate per-highlight endpoint (Readwise has no tag field on creation).
 	for i, rec := range exports {
-		if rec.Tag != "" && exports[i].ExternalID != "" {
-			r.addTag(ctx, exports[i].ExternalID, rec.Tag)
+		if exports[i].ExternalID == "" {
+			continue
+		}
+		seen := make(map[string]struct{})
+		for _, tag := range append([]string{rec.Tag}, rec.JobTags...) {
+			if tag == "" {
+				continue
+			}
+			if _, dup := seen[tag]; dup {
+				continue
+			}
+			seen[tag] = struct{}{}
+			r.addTag(ctx, exports[i].ExternalID, tag)
 		}
 	}
 

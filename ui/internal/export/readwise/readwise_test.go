@@ -193,6 +193,96 @@ func TestReadwiseExport_BatchPreservesOrder(t *testing.T) {
 	}
 }
 
+func TestReadwiseExport_NoDuplicateTags_HighlightTagMatchesJobTag(t *testing.T) {
+	tagsSent := []string{}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/v2/highlights/" && r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]readwise.ReadwiseHighlightResponse{{ModifiedHighlights: []int64{5}}}) //nolint:errcheck
+		case r.URL.Path == "/api/v2/highlights/5/tags/" && r.Method == http.MethodPost:
+			var body struct {
+				Name string `json:"name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode tag request: %v", err)
+			}
+			tagsSent = append(tagsSent, body.Name)
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	b, _ := newTestReadwise(t, handler)
+
+	// "science" appears as both the highlight tag and a job tag — should be sent once.
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlightText: "text", Title: "book.pdf", Tag: "science", JobTags: []string{"science", "physics"}},
+	}
+	if err := b.Export(context.Background(), records); err != nil {
+		t.Fatal(err)
+	}
+	if len(tagsSent) != 2 {
+		t.Errorf("expected 2 unique tags sent, got %d: %v", len(tagsSent), tagsSent)
+	}
+	seen := map[string]int{}
+	for _, tag := range tagsSent {
+		seen[tag]++
+	}
+	for tag, count := range seen {
+		if count > 1 {
+			t.Errorf("tag %q sent %d times, expected once", tag, count)
+		}
+	}
+}
+
+func TestReadwiseExport_NoDuplicateTags_DuplicateJobTags(t *testing.T) {
+	tagsSent := []string{}
+
+	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch {
+		case r.URL.Path == "/api/v2/highlights/" && r.Method == http.MethodPost:
+			w.Header().Set("Content-Type", "application/json")
+			json.NewEncoder(w).Encode([]readwise.ReadwiseHighlightResponse{{ModifiedHighlights: []int64{6}}}) //nolint:errcheck
+		case r.URL.Path == "/api/v2/highlights/6/tags/" && r.Method == http.MethodPost:
+			var body struct {
+				Name string `json:"name"`
+			}
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil {
+				t.Fatalf("decode tag request: %v", err)
+			}
+			tagsSent = append(tagsSent, body.Name)
+			w.WriteHeader(http.StatusOK)
+		default:
+			t.Errorf("unexpected: %s %s", r.Method, r.URL.Path)
+		}
+	})
+
+	b, _ := newTestReadwise(t, handler)
+
+	// "fiction" appears twice in JobTags — should be sent once.
+	records := []*export.ExportRecord{
+		{ExportID: "exp-1", HighlightText: "text", Title: "book.pdf", JobTags: []string{"fiction", "fiction", "novel"}},
+	}
+	if err := b.Export(context.Background(), records); err != nil {
+		t.Fatal(err)
+	}
+	if len(tagsSent) != 2 {
+		t.Errorf("expected 2 unique tags sent, got %d: %v", len(tagsSent), tagsSent)
+	}
+	seen := map[string]int{}
+	for _, tag := range tagsSent {
+		seen[tag]++
+	}
+	for tag, count := range seen {
+		if count > 1 {
+			t.Errorf("tag %q sent %d times, expected once", tag, count)
+		}
+	}
+}
+
 func TestReadwiseDelete_HappyPath(t *testing.T) {
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/api/v2/highlights/99/" || r.Method != http.MethodDelete {
