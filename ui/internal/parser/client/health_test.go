@@ -29,7 +29,7 @@ func startHealthServer(t *testing.T, status grpc_health_v1.HealthCheckResponse_S
 	return lis.Addr().String()
 }
 
-func newClient(t *testing.T, addr string) *parserclient.Client {
+func newClient(t *testing.T, addr string) parserclient.Client {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	c, err := parserclient.New(addr, logger)

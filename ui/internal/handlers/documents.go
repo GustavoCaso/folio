@@ -2,17 +2,13 @@ package handlers
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
-	"log/slog"
 	"net"
 	"net/http"
 	"net/url"
 	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -97,9 +93,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		"bytes", len(pdfBytes),
 	)
 
-	// Start conversion in background — does not block the HTTP response.
-	// Snapshot the request_id so parser logs link back to the originating upload.
-	go h.runConversion(job.ID, reqID, header.Filename, pdfBytes)
+	go h.converter.Run(job.ID, reqID, header.Filename, pdfBytes)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -134,12 +128,10 @@ func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start conversion in background — does not block the HTTP response.
-	// Snapshot the request_id so parser logs link back to the originating upload.
 	if job.SourceURL != "" {
-		go h.runConversionFromURL(job.ID, job.RequestID, job.SourceURL)
+		go h.converter.RunFromURL(job.ID, job.RequestID, job.SourceURL)
 	} else {
-		go h.runConversion(job.ID, job.RequestID, job.Filename, job.Content)
+		go h.converter.Run(job.ID, job.RequestID, job.Filename, job.Content)
 	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -227,8 +219,7 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	val, ok := h.cancels.Load(id)
-	if !ok {
+	if h.converter == nil || !h.converter.HasCancel(id) {
 		if markErr := h.store.MarkJobFailed(context.Background(), id, "cancelled by user"); markErr != nil {
 			log.Error("mark job failed errored", logging.Err(markErr))
 		}
@@ -239,164 +230,9 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 		renderErr(http.StatusConflict, "could not cancel safely. Mark job as failed, reload and try again")
 		return
 	}
-	cancel, ok := val.(context.CancelFunc)
-	if ok {
-		cancel()
-	}
+	h.converter.Cancel(id)
 
 	w.WriteHeader(http.StatusOK)
-}
-
-func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []byte) {
-	log := h.logger.With("job_id", jobID, "request_id", requestID, "filename", filename)
-	start := time.Now()
-
-	log.Info("conversion start", "bytes", len(pdfBytes))
-
-	convertCtx, convertCancel := context.WithCancel(context.Background())
-	h.cancels.Store(jobID, convertCancel)
-	result, err := h.parser.Convert(convertCtx, jobID, requestID, filename, pdfBytes, h.hub)
-	h.cancels.Delete(jobID)
-	convertCancel()
-
-	if err != nil {
-		log.Error("conversion failed", logging.Err(err), "dur_ms", time.Since(start).Milliseconds())
-		errMsg := err.Error()
-		if errors.Is(err, context.Canceled) {
-			errMsg = "cancelled by user"
-		}
-		if markErr := h.store.MarkJobFailed(context.Background(), jobID, errMsg); markErr != nil {
-			log.Error("mark job failed errored", logging.Err(markErr))
-		}
-		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: errMsg})
-		return
-	}
-
-	// Rewrite image refs → base64 data URIs so the .md is self-contained.
-	// Docling emits absolute temp paths like /tmp/.../doc_artifacts/image_000.png,
-	// so we match ](any/path/filename.png) by the basename alone.
-	log.Debug("rewriting images", "image_count", len(result.Images))
-	if len(result.Images) > 0 {
-		md := string(result.Markdown)
-		for _, img := range result.Images {
-			dataURI := "data:image/png;base64," + base64.StdEncoding.EncodeToString(img.Data)
-			// Match ]( followed by any path ending with /filename or just filename, then ).
-			pat := regexp.MustCompile(`\]\([^)]*` + regexp.QuoteMeta(img.Filename) + `\)`)
-			before := md
-			md = pat.ReplaceAllString(md, "]("+dataURI+")")
-			if md == before {
-				log.Warn("image ref not found in markdown", "filename", img.Filename)
-			} else {
-				log.Debug("image rewritten", "filename", img.Filename, "data_uri_bytes", len(dataURI))
-			}
-		}
-		result.Markdown = []byte(md)
-	}
-
-	// Write Markdown to disk
-	safe := strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-			return r
-		}
-		return '-'
-	}, strings.TrimSuffix(filename, filepath.Ext(filename)))
-	h.writeAndComplete(jobID, safe, log, result.Markdown, result.Title, result.Author, result.Cover, start)
-}
-
-func (h *Handlers) runConversionFromURL(jobID, requestID, sourceURL string) {
-	log := h.logger.With("job_id", jobID, "request_id", requestID, "source_url", sourceURL)
-	start := time.Now()
-
-	log.Info("url conversion start")
-
-	convertCtx, convertCancel := context.WithCancel(context.Background())
-	h.cancels.Store(jobID, convertCancel)
-	result, err := h.parser.ConvertFromURL(convertCtx, jobID, requestID, sourceURL, h.hub)
-	h.cancels.Delete(jobID)
-	convertCancel()
-
-	if err != nil {
-		log.Error("url conversion failed", logging.Err(err), "dur_ms", time.Since(start).Milliseconds())
-		errMsg := err.Error()
-		if errors.Is(err, context.Canceled) {
-			errMsg = "cancelled by user"
-		}
-		if markErr := h.store.MarkJobFailed(context.Background(), jobID, errMsg); markErr != nil {
-			log.Error("mark job failed errored", logging.Err(markErr))
-		}
-		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: errMsg})
-		return
-	}
-
-	// Rewrite image refs → base64 data URIs so the .md is self-contained.
-	// Docling emits absolute temp paths like /tmp/.../doc_artifacts/image_000.png,
-	// so we match ](any/path/filename.png) by the basename alone.
-	log.Debug("rewriting images", "image_count", len(result.Images))
-	if len(result.Images) > 0 {
-		md := string(result.Markdown)
-		for _, img := range result.Images {
-			dataURI := "data:image/png;base64," + base64.StdEncoding.EncodeToString(img.Data)
-			// Match ]( followed by any path ending with /filename or just filename, then ).
-			pat := regexp.MustCompile(`\]\([^)]*` + regexp.QuoteMeta(img.Filename) + `\)`)
-			before := md
-			md = pat.ReplaceAllString(md, "]("+dataURI+")")
-			if md == before {
-				log.Warn("image ref not found in markdown", "filename", img.Filename)
-			} else {
-				log.Debug("image rewritten", "filename", img.Filename, "data_uri_bytes", len(dataURI))
-			}
-		}
-		result.Markdown = []byte(md)
-	}
-
-	// Derive a safe slug from the URL for the output filename.
-	// strings.Map below restricts to [a-zA-Z0-9\-_] so the result cannot
-	// traverse above h.dataDir inside writeAndComplete.
-	parsed, _ := url.Parse(sourceURL) // sourceURL was validated by validateImportURL before job creation
-	urlSlug := parsed.Host + parsed.Path
-	safe := strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-			return r
-		}
-		return '-'
-	}, urlSlug)
-	if len(safe) > 64 {
-		safe = safe[:64]
-	}
-	h.writeAndComplete(jobID, safe, log, result.Markdown, result.Title, result.Author, result.Cover, start)
-}
-
-// writeAndComplete writes the markdown to disk and marks the job done (or failed on error).
-// nameSlug must already be sanitized to [a-zA-Z0-9\-_] so that filepath.Join cannot
-// produce a path outside h.dataDir.
-func (h *Handlers) writeAndComplete(jobID, nameSlug string, log *slog.Logger, markdown []byte, title, author string, cover []byte, start time.Time) {
-	outputPath := filepath.Join(h.dataDir, fmt.Sprintf("%s-%s.md", nameSlug, jobID[:8]))
-
-	if err := os.WriteFile(outputPath, markdown, 0644); err != nil {
-		log.Error("write markdown failed", logging.Err(err), "output_path", outputPath)
-		if markErr := h.store.MarkJobFailed(context.Background(), jobID, err.Error()); markErr != nil {
-			log.Error("mark job failed errored", logging.Err(markErr))
-		}
-		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: err.Error()})
-		return
-	}
-
-	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath, title, author, cover); err != nil {
-		log.Error("mark job done failed", logging.Err(err))
-		return
-	}
-
-	log.Info("conversion done",
-		"output_path", outputPath,
-		"md_bytes", len(markdown),
-		"dur_ms", time.Since(start).Milliseconds(),
-	)
-	h.hub.Publish(jobID, hub.StatusEvent{
-		Status: "DONE",
-		Title:  title,
-		Author: author,
-		Cover:  base64.StdEncoding.EncodeToString(cover),
-	})
 }
 
 // ImportDocument handles POST /documents/import and starts a URL-based conversion.
@@ -449,7 +285,7 @@ func (h *Handlers) ImportDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("url import accepted", "job_id", job.ID, "url", rawURL)
-	go h.runConversionFromURL(job.ID, reqID, rawURL)
+	go h.converter.RunFromURL(job.ID, reqID, rawURL)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -517,3 +353,4 @@ func validateHostNotPrivate(host string) error {
 	}
 	return nil
 }
+

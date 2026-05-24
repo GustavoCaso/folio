@@ -20,7 +20,7 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
-	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
+	"github.com/GustavoCaso/folio/ui/internal/parser/client"
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
@@ -48,7 +48,7 @@ func newTestMux(t *testing.T, store repository.Store) (http.Handler, *hub.Hub) {
 	return mux, h
 }
 
-func newTestMuxWithParser(t *testing.T, store repository.Store, parser handlers.ParserClient) http.Handler {
+func newTestMuxWithParser(t *testing.T, store repository.Store, parser client.Client) http.Handler {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
 	h, err := hub.New(logger)
@@ -64,13 +64,16 @@ func newTestMuxWithParser(t *testing.T, store repository.Store, parser handlers.
 
 type errorParser struct{}
 
-func (errorParser) Convert(_ context.Context, _, _, _ string, _ []byte, _ *hub.Hub) (parserclient.ConversionResult, error) {
-	return parserclient.ConversionResult{}, errors.New("stubbed")
+func (errorParser) Convert(_ context.Context, _, _, _ string, _ []byte, _ *hub.Hub) (client.ConversionResult, error) {
+	return client.ConversionResult{}, errors.New("stubbed")
 }
-func (errorParser) ConvertFromURL(_ context.Context, _, _, _ string, _ *hub.Hub) (parserclient.ConversionResult, error) {
-	return parserclient.ConversionResult{}, errors.New("stubbed")
+func (errorParser) ConvertFromURL(_ context.Context, _, _, _ string, _ *hub.Hub) (client.ConversionResult, error) {
+	return client.ConversionResult{}, errors.New("stubbed")
 }
 func (errorParser) Health(_ context.Context) bool { return false }
+func (errorParser) Close() error {
+	return nil
+}
 
 // emptyMultipartRequest builds a POST /documents request with a valid
 // multipart body but no "document" field.
@@ -339,15 +342,18 @@ type blockingParser struct {
 	started chan struct{}
 }
 
-func (p *blockingParser) Convert(ctx context.Context, _, _, _ string, _ []byte, _ *hub.Hub) (parserclient.ConversionResult, error) {
+func (p *blockingParser) Convert(ctx context.Context, _, _, _ string, _ []byte, _ *hub.Hub) (client.ConversionResult, error) {
 	close(p.started)
 	<-ctx.Done()
-	return parserclient.ConversionResult{}, ctx.Err()
+	return client.ConversionResult{}, ctx.Err()
 }
-func (p *blockingParser) ConvertFromURL(_ context.Context, _, _, _ string, _ *hub.Hub) (parserclient.ConversionResult, error) {
-	return parserclient.ConversionResult{}, errors.New("not implemented in test stub")
+func (p *blockingParser) ConvertFromURL(_ context.Context, _, _, _ string, _ *hub.Hub) (client.ConversionResult, error) {
+	return client.ConversionResult{}, errors.New("not implemented in test stub")
 }
 func (p *blockingParser) Health(_ context.Context) bool { return true }
+func (p *blockingParser) Close() error {
+	return nil
+}
 
 func TestCancelDocument_OK(t *testing.T) {
 	store := newTestStore(t)
@@ -447,84 +453,5 @@ func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
 	}
 	if strings.Contains(body, `class="error-banner"`) {
 		t.Errorf("unexpected error-banner on successful list, got:\n%s", body)
-	}
-}
-
-// imageParser is a fake parser that returns markdown with an image reference
-// using an absolute path (as Docling emits), and a matching ImageFile.
-type imageParser struct {
-	done chan struct{}
-}
-
-func (p *imageParser) Convert(_ context.Context, _, _, _ string, _ []byte, _ *hub.Hub) (parserclient.ConversionResult, error) {
-	defer close(p.done)
-	return parserclient.ConversionResult{
-		Markdown: []byte("# Doc\n\n![fig](/tmp/tmpXXXXXX/doc_artifacts/image_000000_abc.png)\n"),
-		Images: []parserclient.ImageFile{
-			{Filename: "image_000000_abc.png", Data: []byte{0x89, 'P', 'N', 'G'}},
-		},
-	}, nil
-}
-func (p *imageParser) ConvertFromURL(_ context.Context, _, _, _ string, _ *hub.Hub) (parserclient.ConversionResult, error) {
-	return parserclient.ConversionResult{}, errors.New("not implemented in test stub")
-}
-func (p *imageParser) Health(_ context.Context) bool { return true }
-
-func TestRunConversion_RewritesImageRefsToBase64(t *testing.T) {
-	store := newTestStore(t)
-	parser := &imageParser{done: make(chan struct{})}
-
-	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
-	h, _ := hub.New(logger)
-	dir := t.TempDir()
-	mux, _ := handlers.Register(store, h, parser, dir, logger, []export.Backend{})
-
-	body := &bytes.Buffer{}
-	mw := multipart.NewWriter(body)
-	fw, _ := mw.CreateFormFile("document", "test.pdf")
-	fw.Write([]byte("%PDF")) //nolint:errcheck
-	mw.Close()               //nolint:errcheck
-
-	req := httptest.NewRequest(http.MethodPost, "/documents", body)
-	req.Header.Set("Content-Type", mw.FormDataContentType())
-	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusSeeOther {
-		t.Fatalf("upload: expected 303, got %d", rec.Code)
-	}
-
-	select {
-	case <-parser.done:
-	case <-time.After(5 * time.Second):
-		t.Fatal("parser goroutine never finished")
-	}
-
-	// Poll for the job to be DONE.
-	var mdPath string
-	deadline := time.Now().Add(3 * time.Second)
-	for time.Now().Before(deadline) {
-		jobs, _ := store.ListJobs(context.Background())
-		if len(jobs) > 0 && jobs[0].Status == "DONE" {
-			mdPath = jobs[0].OutputPath
-			break
-		}
-		time.Sleep(10 * time.Millisecond)
-	}
-	if mdPath == "" {
-		t.Fatal("job never reached DONE")
-	}
-
-	content, err := os.ReadFile(mdPath)
-	if err != nil {
-		t.Fatalf("read markdown: %v", err)
-	}
-	md := string(content)
-
-	if strings.Contains(md, "image_000000_abc.png") {
-		t.Error("markdown still contains raw filename — image ref was not rewritten")
-	}
-	if !strings.Contains(md, "data:image/png;base64,") {
-		t.Errorf("expected base64 data URI in markdown, got:\n%s", md)
 	}
 }

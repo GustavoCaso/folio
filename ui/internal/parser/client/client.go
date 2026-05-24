@@ -35,14 +35,21 @@ type ConversionResult struct {
 	Images   []ImageFile
 }
 
+type Client interface {
+	Convert(ctx context.Context, jobID, requestID, filename string, pdfBytes []byte, h *hub.Hub) (ConversionResult, error)
+	ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL string, h *hub.Hub) (ConversionResult, error)
+	Health(ctx context.Context) bool
+	Close() error
+}
+
 // Client wraps the gRPC ParserService connection.
-type Client struct {
+type client struct {
 	conn   *grpc.ClientConn
 	client pb.ParserServiceClient
 	logger *slog.Logger
 }
 
-func New(addr string, logger *slog.Logger) (*Client, error) {
+func New(addr string, logger *slog.Logger) (Client, error) {
 	if logger == nil {
 		return nil, fmt.Errorf("client.New: logger is required")
 	}
@@ -51,17 +58,13 @@ func New(addr string, logger *slog.Logger) (*Client, error) {
 		return nil, fmt.Errorf("grpc dial %s: %w", addr, err)
 	}
 	logger.Info("grpc client ready", "addr", addr)
-	return &Client{conn: conn, client: pb.NewParserServiceClient(conn), logger: logger}, nil
-}
-
-func (c *Client) Close() error {
-	return c.conn.Close()
+	return &client{conn: conn, client: pb.NewParserServiceClient(conn), logger: logger}, nil
 }
 
 // Convert sends pdfBytes to the parser, publishes StatusEvents to h for jobID,
 // and returns the assembled Markdown when the stream completes.
 // Blocking: returns only when conversion is done or has failed.
-func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string, pdfBytes []byte, h *hub.Hub) (ConversionResult, error) {
+func (c *client) Convert(ctx context.Context, jobID, requestID, filename string, pdfBytes []byte, h *hub.Hub) (ConversionResult, error) {
 	log := c.logger.With("job_id", jobID, "request_id", requestID, "filename", filename)
 	start := time.Now()
 
@@ -119,72 +122,15 @@ func (c *Client) Convert(ctx context.Context, jobID, requestID, filename string,
 		return ConversionResult{}, fmt.Errorf("close send: %w", err)
 	}
 
-	// Receive status updates, markdown chunks, and document metadata
-	var mdBuf bytes.Buffer
-	var result ConversionResult
-	mdChunks := 0
-	for {
-		msg, err := stream.Recv()
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			if status.Code(err) == codes.Canceled {
-				return ConversionResult{}, fmt.Errorf("recv: %w", context.Canceled)
-			}
-			log.Error("recv failed", "err", err.Error())
-			h.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: err.Error()})
-			return ConversionResult{}, fmt.Errorf("recv: %w", err)
-		}
+	result, err := c.extractResult(log, start, jobID, stream, h)
 
-		switch p := msg.Payload.(type) {
-		case *pb.ConvertResult_Status:
-			log.Debug("status",
-				"status", p.Status.Status,
-				"stage", p.Status.Stage,
-				"pages_done", p.Status.PagesDone,
-				"pages_total", p.Status.PagesTotal,
-			)
-			// DONE is published by runConversion after metadata is attached.
-			// FAILED is terminal and must be published here since runConversion won't see it.
-			if p.Status.Status != "DONE" {
-				h.Publish(jobID, hub.StatusEvent{
-					Status:     p.Status.Status,
-					PagesDone:  int(p.Status.PagesDone),
-					PagesTotal: int(p.Status.PagesTotal),
-					Error:      p.Status.Error,
-					Stage:      p.Status.Stage,
-					Message:    p.Status.Message,
-				})
-			}
-		case *pb.ConvertResult_MarkdownChunk:
-			mdBuf.Write(p.MarkdownChunk)
-			mdChunks++
-		case *pb.ConvertResult_Metadata:
-			result.Title = p.Metadata.Title
-			result.Author = p.Metadata.Author
-			result.Cover = p.Metadata.Cover
-		case *pb.ConvertResult_ImageChunk:
-			result.Images = append(result.Images, ImageFile{
-				Filename: p.ImageChunk.Filename,
-				Data:     p.ImageChunk.Data,
-			})
-		}
-	}
-
-	log.Info("stream done",
-		"dur_ms", time.Since(start).Milliseconds(),
-		"md_bytes", mdBuf.Len(),
-		"md_chunks", mdChunks,
-	)
-	result.Markdown = mdBuf.Bytes()
-	return result, nil
+	return result, err
 }
 
 // ConvertFromURL sends a source URL to the parser, publishes StatusEvents to h
 // for jobID, and returns the assembled Markdown when the stream completes.
 // Blocking: returns only when conversion is done or has failed.
-func (c *Client) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL string, h *hub.Hub) (ConversionResult, error) {
+func (c *client) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL string, h *hub.Hub) (ConversionResult, error) {
 	log := c.logger.With("job_id", jobID, "request_id", requestID, "source_url", sourceURL)
 	start := time.Now()
 
@@ -201,6 +147,25 @@ func (c *Client) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL
 	}
 	log.Info("url stream opened")
 
+	result, err := c.extractResult(log, start, jobID, stream, h)
+
+	return result, err
+}
+
+func (c *client) Health(ctx context.Context) bool {
+	hc := grpc_health_v1.NewHealthClient(c.conn)
+	resp, err := hc.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
+	if err != nil {
+		return false
+	}
+	return resp.GetStatus() == grpc_health_v1.HealthCheckResponse_SERVING
+}
+
+func (c *client) Close() error {
+	return c.conn.Close()
+}
+
+func (c *client) extractResult(log *slog.Logger, start time.Time, jobID string, stream grpc.ServerStreamingClient[pb.ConvertResult], h *hub.Hub) (ConversionResult, error) {
 	// Receive status updates, markdown chunks, and document metadata
 	var mdBuf bytes.Buffer
 	var result ConversionResult
@@ -250,19 +215,13 @@ func (c *Client) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL
 		}
 	}
 
-	log.Info("url stream done",
+	log.Info("done",
 		"dur_ms", time.Since(start).Milliseconds(),
 		"md_bytes", mdBuf.Len(),
 		"md_chunks", mdChunks,
 	)
+
 	result.Markdown = mdBuf.Bytes()
+
 	return result, nil
-}
-func (c *Client) Health(ctx context.Context) bool {
-	hc := grpc_health_v1.NewHealthClient(c.conn)
-	resp, err := hc.Check(ctx, &grpc_health_v1.HealthCheckRequest{})
-	if err != nil {
-		return false
-	}
-	return resp.GetStatus() == grpc_health_v1.HealthCheckResponse_SERVING
 }

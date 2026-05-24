@@ -27,6 +27,10 @@ func (f *fakeParserClient) ConvertFromURL(_ context.Context, _, _, _ string, _ *
 	return parserclient.ConversionResult{}, nil
 }
 
+func (f *fakeParserClient) Close() error {
+	return nil
+}
+
 func newHealthMux(t *testing.T, healthy bool) http.Handler {
 	t.Helper()
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
