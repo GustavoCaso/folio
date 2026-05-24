@@ -8,6 +8,8 @@ import (
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
+	"github.com/templui/templui/components/collapsible"
+	"github.com/templui/templui/components/icon"
 )
 
 func coverBase64(j domain.Job) string {
@@ -125,28 +127,90 @@ templ Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) {
 	@Layout("Documents") {
 		@ErrorBanner(errMsg)
 		<div class="flex flex-col gap-8">
-			<div>
-				<h1 class="text-2xl font-semibold mb-4">Documents</h1>
-				@card.Card() {
-					@card.Content() {
-						<form method="POST" action="/documents" enctype="multipart/form-data" class="flex items-center gap-3">
-							<input
-								type="file"
-								name="document"
-								accept=".pdf"
-								required
-								class="flex-1 text-sm text-muted-foreground file:mr-3 file:rounded-md file:border file:border-input file:bg-transparent file:px-3 file:py-1.5 file:text-sm file:font-medium file:text-foreground hover:file:bg-accent cursor-pointer"
-							/>
+			<div class="flex flex-col gap-4">
+				<!-- Title row with toggle -->
+				@collapsible.Collapsible(collapsible.Props{ID: "add-document"}) {
+					<div class="flex items-center justify-between">
+						<h1 class="text-2xl font-semibold" style="font-family:'Lora',Georgia,serif;">Documents</h1>
+						@collapsible.Trigger() {
 							@button.Button(button.Props{
-								ID:   "upload-btn",
-								Type: button.TypeSubmit,
+								Variant: button.VariantOutline,
+								Size:    button.SizeSm,
 							}) {
-								Upload
+								<span class="flex items-center gap-1.5">
+									@icon.Plus(icon.Props{Class: "w-3.5 h-3.5"})
+									Add document
+								</span>
 							}
-						</form>
-						<noscript>
-							<p class="mt-2 text-xs text-muted-foreground">JavaScript is disabled. Parser availability checks are unavailable. You can still upload; the server will report errors.</p>
-						</noscript>
+						}
+					</div>
+					<!-- Full-width collapsible form -->
+					@collapsible.Content() {
+						<div class="mt-4">
+							@card.Card() {
+								@card.Content() {
+									<!-- Drop zone (upload) -->
+									<form id="upload-form" method="POST" action="/documents" enctype="multipart/form-data">
+										<input
+											id="file-input"
+											type="file"
+											name="document"
+											accept=".pdf"
+											required
+											class="sr-only"
+										/>
+										<div
+											id="drop-zone"
+											role="button"
+											tabindex="0"
+											aria-label="Drop a PDF here or click to browse"
+											class="relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-6 py-8 text-center transition-all duration-200 cursor-pointer hover:border-foreground/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+										>
+											<span class="text-muted-foreground/60 mb-1 pointer-events-none">
+												@icon.FileUp(icon.Props{Class: "w-8 h-8"})
+											</span>
+											<p id="drop-label" class="text-sm font-medium text-foreground pointer-events-none" style="font-family:'DM Sans',sans-serif;">Drop a PDF here</p>
+											<p class="text-xs text-muted-foreground pointer-events-none">or click to browse</p>
+										</div>
+										<div id="upload-actions" class="hidden mt-3 flex items-center justify-between gap-3 px-1">
+											<span id="selected-filename" class="text-sm text-muted-foreground truncate flex-1"></span>
+											@button.Button(button.Props{
+												ID:   "upload-btn",
+												Type: button.TypeSubmit,
+												Size: button.SizeSm,
+											}) {
+												Upload
+											}
+										</div>
+									</form>
+									<noscript>
+										<p class="mt-2 text-xs text-muted-foreground">JavaScript is disabled — use the file input above directly.</p>
+									</noscript>
+									<!-- Divider -->
+									<div class="relative my-5">
+										<div class="absolute inset-0 flex items-center"><span class="w-full border-t border-border"></span></div>
+										<div class="relative flex justify-center"><span class="bg-card px-3 text-xs text-muted-foreground" style="font-family:'DM Sans',sans-serif;">or import from URL</span></div>
+									</div>
+									<!-- URL import -->
+									<form method="POST" action="/documents/import" class="flex items-center gap-3">
+										<input
+											type="url"
+											name="url"
+											placeholder="https://example.com/paper.pdf"
+											required
+											class="flex-1 rounded-md border border-input bg-transparent px-3 py-1.5 text-sm shadow-sm placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring"
+										/>
+										@button.Button(button.Props{
+											ID:   "import-btn",
+											Type: button.TypeSubmit,
+											Size: button.SizeSm,
+										}) {
+											Import
+										}
+									</form>
+								}
+							}
+						</div>
 					}
 				}
 			</div>

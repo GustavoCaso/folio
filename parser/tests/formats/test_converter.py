@@ -1,7 +1,8 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
-from parser.formats.converter import _converter, convert, html_backend_options, pdf_pipeline_options
+import parser.formats.converter as converter_mod
+from parser.formats.converter import convert, html_backend_options, pdf_pipeline_options
 
 
 class TestPDFPipelineOptions:
@@ -196,25 +197,64 @@ class TestHTMLPipelineOptions:
 
 
 class TestConvert:
-    def test_returns_docling_document(self):
-        from unittest.mock import MagicMock
-
+    def test_returns_docling_document_for_url(self):
         from docling_core.types.doc.document import DoclingDocument
 
         mock_document = MagicMock(spec=DoclingDocument)
         mock_result = MagicMock()
         mock_result.document = mock_document
 
-        with patch.object(_converter, "convert", return_value=mock_result):
-            result = convert("https://example.com/doc.pdf")
+        mock_html_converter = MagicMock()
+        mock_html_converter.convert.return_value = mock_result
+
+        with patch.object(
+            converter_mod, "_make_html_converter", return_value=mock_html_converter
+        ) as mock_make:
+            result = convert("https://example.com/page")
 
         assert result is mock_document
+        mock_make.assert_called_once_with("https://example.com")
 
-    def test_calls_converter_with_source(self):
+    def test_calls_pdf_converter_for_path(self):
         mock_result = MagicMock()
         path = Path("/tmp/doc.pdf")
 
-        with patch.object(_converter, "convert", return_value=mock_result) as mock_convert:
+        with patch.object(
+            converter_mod._pdf_converter, "convert", return_value=mock_result
+        ) as mock_convert:
             convert(path)
 
         mock_convert.assert_called_once_with(source=path)
+
+    def test_calls_pdf_converter_for_pdf_url(self):
+        mock_result = MagicMock()
+        mock_result.document = MagicMock()
+
+        with (
+            patch.object(
+                converter_mod._pdf_converter, "convert", return_value=mock_result
+            ) as mock_convert,
+            patch.object(converter_mod, "_make_html_converter") as mock_make,
+        ):
+            convert("https://example.com/paper.pdf")
+
+        mock_convert.assert_called_once_with(source="https://example.com/paper.pdf")
+        mock_make.assert_not_called()
+
+    def test_make_html_converter_creates_fresh_instance_each_call(self):
+        with patch("parser.formats.converter.DocumentConverter") as mock_cls:
+            mock_cls.return_value = MagicMock()
+            converter_mod._make_html_converter("https://example.com")
+            converter_mod._make_html_converter("https://example.com")
+        assert mock_cls.call_count == 2
+
+    def test_source_uri_set_to_origin(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = html_backend_options("https://example.com")
+        # Pydantic normalises URLs by appending a trailing slash
+        assert str(opts.source_uri).rstrip("/") == "https://example.com"
+
+    def test_source_uri_none_when_empty(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = html_backend_options("")
+        assert opts.source_uri is None

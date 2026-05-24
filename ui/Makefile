@@ -9,7 +9,7 @@ test:
 
 test-js:
 	@echo "running ui js tests"
-	@mise exec -- npm test
+	@mise exec -- pnpm test
 
 test-race:
 	go test ./... -race

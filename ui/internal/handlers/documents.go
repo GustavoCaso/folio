@@ -2,14 +2,13 @@ package handlers
 
 import (
 	"context"
-	"encoding/base64"
 	"errors"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
+	"net/url"
 	"os"
-	"path/filepath"
-	"regexp"
 	"strings"
 	"time"
 
@@ -94,9 +93,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		"bytes", len(pdfBytes),
 	)
 
-	// Start conversion in background — does not block the HTTP response.
-	// Snapshot the request_id so parser logs link back to the originating upload.
-	go h.runConversion(job.ID, reqID, header.Filename, pdfBytes)
+	go h.converter.Run(job.ID, reqID, header.Filename, pdfBytes)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -131,9 +128,11 @@ func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Start conversion in background — does not block the HTTP response.
-	// Snapshot the request_id so parser logs link back to the originating upload.
-	go h.runConversion(job.ID, job.RequestID, job.Filename, job.Content)
+	if job.SourceURL != "" {
+		go h.converter.RunFromURL(job.ID, job.RequestID, job.SourceURL)
+	} else {
+		go h.converter.Run(job.ID, job.RequestID, job.Filename, job.Content)
+	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -220,8 +219,7 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	val, ok := h.cancels.Load(id)
-	if !ok {
+	if h.converter == nil || !h.converter.HasCancel(id) {
 		if markErr := h.store.MarkJobFailed(context.Background(), id, "cancelled by user"); markErr != nil {
 			log.Error("mark job failed errored", logging.Err(markErr))
 		}
@@ -232,88 +230,127 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 		renderErr(http.StatusConflict, "could not cancel safely. Mark job as failed, reload and try again")
 		return
 	}
-	cancel, ok := val.(context.CancelFunc)
-	if ok {
-		cancel()
-	}
+	h.converter.Cancel(id)
 
 	w.WriteHeader(http.StatusOK)
 }
 
-func (h *Handlers) runConversion(jobID, requestID, filename string, pdfBytes []byte) {
-	log := h.logger.With("job_id", jobID, "request_id", requestID, "filename", filename)
-	start := time.Now()
+// ImportDocument handles POST /documents/import and starts a URL-based conversion.
+func (h *Handlers) ImportDocument(w http.ResponseWriter, r *http.Request) {
+	log := logging.LoggerFrom(r.Context())
 
-	log.Info("conversion start", "bytes", len(pdfBytes))
+	renderErr := func(status int, msg string) {
+		jobs, listErr := h.store.ListJobs(r.Context())
+		if listErr != nil {
+			log.Error("list jobs failed during error render", logging.Err(listErr))
+		}
+		w.WriteHeader(status)
+		if err := templates.Documents(jobs, nil, msg).Render(r.Context(), w); err != nil {
+			log.Error("render error page failed", logging.Err(err))
+		}
+	}
 
-	convertCtx, convertCancel := context.WithCancel(context.Background())
-	h.cancels.Store(jobID, convertCancel)
-	result, err := h.parser.Convert(convertCtx, jobID, requestID, filename, pdfBytes, h.hub)
-	h.cancels.Delete(jobID)
-	convertCancel()
+	if err := r.ParseForm(); err != nil {
+		renderErr(http.StatusBadRequest, "Invalid form data.")
+		return
+	}
 
+	rawURL := strings.TrimSpace(r.FormValue("url"))
+	if rawURL == "" {
+		renderErr(http.StatusBadRequest, "URL is required.")
+		return
+	}
+
+	if err := validateImportURL(rawURL); err != nil {
+		renderErr(http.StatusBadRequest, err.Error())
+		return
+	}
+
+	parsed, err := url.Parse(rawURL)
 	if err != nil {
-		log.Error("conversion failed", logging.Err(err), "dur_ms", time.Since(start).Milliseconds())
-		errMsg := err.Error()
-		if errors.Is(err, context.Canceled) {
-			errMsg = "cancelled by user"
-		}
-		if markErr := h.store.MarkJobFailed(context.Background(), jobID, errMsg); markErr != nil {
-			log.Error("mark job failed errored", logging.Err(markErr))
-		}
-		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: errMsg})
+		renderErr(http.StatusBadRequest, "Invalid URL.")
+		return
+	}
+	filename := parsed.Host + parsed.Path
+	if filename == "" {
+		filename = rawURL
+	}
+
+	reqID := logging.RequestIDFrom(r.Context())
+	job, err := h.store.CreateJobFromURL(r.Context(), rawURL, filename, reqID)
+	if err != nil {
+		log.Error("create url job failed", logging.Err(err), "url", rawURL)
+		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store job. %v", err))
 		return
 	}
 
-	// Rewrite image refs → base64 data URIs so the .md is self-contained.
-	// Docling emits absolute temp paths like /tmp/.../doc_artifacts/image_000.png,
-	// so we match ](any/path/filename.png) by the basename alone.
-	if len(result.Images) > 0 {
-		md := string(result.Markdown)
-		for _, img := range result.Images {
-			dataURI := "data:image/png;base64," + base64.StdEncoding.EncodeToString(img.Data)
-			// Match ]( followed by any path ending with /filename or just filename, then ).
-			pat := regexp.MustCompile(`\]\([^)]*` + regexp.QuoteMeta(img.Filename) + `\)`)
-			md = pat.ReplaceAllString(md, "]("+dataURI+")")
-		}
-		result.Markdown = []byte(md)
-	}
+	log.Info("url import accepted", "job_id", job.ID, "url", rawURL)
+	go h.converter.RunFromURL(job.ID, reqID, rawURL)
 
-	// Write Markdown to disk
-	safe := strings.Map(func(r rune) rune {
-		if (r >= 'a' && r <= 'z') || (r >= 'A' && r <= 'Z') || (r >= '0' && r <= '9') || r == '-' || r == '_' {
-			return r
-		}
-		return '-'
-	}, strings.TrimSuffix(filename, filepath.Ext(filename)))
-	outputPath := filepath.Join(h.dataDir, fmt.Sprintf("%s-%s.md", safe, jobID[:8]))
-
-	if err := os.WriteFile(outputPath, result.Markdown, 0644); err != nil {
-		log.Error("write markdown failed", logging.Err(err), "output_path", outputPath)
-		if markErr := h.store.MarkJobFailed(context.Background(), jobID, err.Error()); markErr != nil {
-			log.Error("mark job failed errored", logging.Err(markErr))
-		}
-		h.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: err.Error()})
-		return
-	}
-
-	title := result.Title
-	author := result.Author
-
-	if err := h.store.MarkJobDone(context.Background(), jobID, outputPath, title, author, result.Cover); err != nil {
-		log.Error("mark job done failed", logging.Err(err))
-		return
-	}
-
-	log.Info("conversion done",
-		"output_path", outputPath,
-		"md_bytes", len(result.Markdown),
-		"dur_ms", time.Since(start).Milliseconds(),
-	)
-	h.hub.Publish(jobID, hub.StatusEvent{
-		Status: "DONE",
-		Title:  title,
-		Author: author,
-		Cover:  base64.StdEncoding.EncodeToString(result.Cover),
-	})
+	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
+
+// validateImportURL checks that rawURL is reachable and its content type is HTML or PDF.
+// It blocks requests to private/internal addresses as a basic SSRF mitigation.
+func validateImportURL(rawURL string) error {
+	u, err := url.Parse(rawURL)
+	if err != nil || (u.Scheme != "http" && u.Scheme != "https") {
+		return fmt.Errorf("URL must use http or https scheme")
+	}
+
+	if err := validateHostNotPrivate(u.Hostname()); err != nil {
+		return err
+	}
+
+	client := &http.Client{
+		Timeout: 10 * time.Second,
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			if len(via) >= 10 {
+				return fmt.Errorf("too many redirects")
+			}
+			return validateHostNotPrivate(req.URL.Hostname())
+		},
+	}
+
+	resp, err := client.Head(rawURL)
+	if err == nil && resp.StatusCode == http.StatusMethodNotAllowed {
+		_ = resp.Body.Close()
+		req, newErr := http.NewRequest(http.MethodGet, rawURL, nil)
+		if newErr != nil {
+			return fmt.Errorf("could not reach URL: %v", rawURL)
+		}
+		resp, err = client.Do(req)
+	}
+	if err != nil {
+		return fmt.Errorf("could not reach URL: %v", rawURL)
+	}
+	defer func() { _ = resp.Body.Close() }()
+
+	ct := resp.Header.Get("Content-Type")
+	if !strings.HasPrefix(ct, "text/html") &&
+		!strings.HasPrefix(ct, "application/xhtml+xml") &&
+		!strings.HasPrefix(ct, "application/pdf") {
+		return fmt.Errorf("unsupported content type %q — only HTML pages and PDFs are supported", ct)
+	}
+	return nil
+}
+
+// validateHostNotPrivate resolves host and returns an error if any resolved IP
+// is a loopback, link-local, or private address (basic SSRF mitigation).
+func validateHostNotPrivate(host string) error {
+	addrs, err := net.LookupHost(host)
+	if err != nil {
+		return fmt.Errorf("could not resolve host %q: %v", host, err)
+	}
+	for _, addr := range addrs {
+		ip := net.ParseIP(addr)
+		if ip == nil {
+			continue
+		}
+		if ip.IsLoopback() || ip.IsLinkLocalUnicast() || ip.IsPrivate() {
+			return fmt.Errorf("URL resolves to a private or internal address")
+		}
+	}
+	return nil
+}
+

@@ -4,11 +4,12 @@ package parser;
 
 option go_package = "github.com/GustavoCaso/folio/ui/internal/parser/proto";
 
-// ParserService is stateless. The caller sends PDF bytes in chunks and receives
-// status updates and markdown bytes back on the same stream. No state is retained
-// after the stream closes.
+// ParserService is stateless. No state is retained after a stream closes.
 service ParserService {
+  // ConvertDocument streams file bytes from the caller and streams results back.
   rpc ConvertDocument(stream ConvertChunk) returns (stream ConvertResult);
+  // ConvertURL fetches a document from a URL and streams results back.
+  rpc ConvertURL(ConvertURLRequest) returns (stream ConvertResult);
 }
 
 // ConvertChunk is sent by the caller (Go UI) to the parser.
@@ -22,6 +23,12 @@ message ConvertChunk {
 
 message ConvertMeta {
   string filename   = 1;  // original filename, used to infer format
+  string request_id = 2;  // caller-assigned correlation id; surfaced in parser logs
+}
+
+// ConvertURLRequest is sent for URL-based conversions; no data chunks follow.
+message ConvertURLRequest {
+  string url        = 1;  // source URL (http/https); fetched by the parser
   string request_id = 2;  // caller-assigned correlation id; surfaced in parser logs
 }
 

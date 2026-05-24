@@ -8,12 +8,13 @@ import (
 	"log/slog"
 	"net/http"
 	"os"
-	"sync"
 	"time"
 
+	"github.com/GustavoCaso/folio/ui/internal/converter"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
-	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
+	"github.com/GustavoCaso/folio/ui/internal/logging"
+	"github.com/GustavoCaso/folio/ui/internal/parser/client"
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/templui/templui/utils"
 )
@@ -21,24 +22,13 @@ import (
 //go:embed static/js/reader.js static/js/documents.js static/tailwind/output.css static/css/reader.css
 var staticFS embed.FS
 
-// ParserClient is the interface satisfied by *parserclient.Client (and fakes in tests).
-type ParserClient interface {
-	Convert(ctx context.Context, jobID, requestID, filename string, pdfBytes []byte, h *hub.Hub) (parserclient.ConversionResult, error)
-	Health(ctx context.Context) bool
-}
-
 type Handlers struct {
-	store   repository.Store
-	hub     *hub.Hub
-	parser  ParserClient
-	dataDir string
-	// logger is used only by background goroutines (e.g. runConversion) that
-	// outlive the originating request and therefore can't use
-	// logging.LoggerFrom. Request-scoped code should pull the logger — with
-	// request_id attached by middleware — from r.Context() instead.
-	logger   *slog.Logger
-	cancels  sync.Map // jobID → context.CancelFunc
-	backends []export.Backend
+	store     repository.Store
+	hub       *hub.Hub
+	parser    client.Client
+	converter *converter.Runner
+	dataDir   string
+	backends  []export.Backend
 }
 
 func (h *Handlers) backendByName(name string) export.Backend {
@@ -50,7 +40,7 @@ func (h *Handlers) backendByName(name string) export.Backend {
 	return nil
 }
 
-func Register(store repository.Store, h *hub.Hub, pc ParserClient, dataDir string, logger *slog.Logger, backends []export.Backend) (*http.ServeMux, error) {
+func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir string, logger *slog.Logger, backends []export.Backend) (*http.ServeMux, error) {
 	if logger == nil {
 		return nil, errors.New("handlers.Register: logger is required")
 	}
@@ -63,12 +53,18 @@ func Register(store repository.Store, h *hub.Hub, pc ParserClient, dataDir strin
 		return nil, errors.New("handlers.Register: store is required")
 	}
 
-	hs := &Handlers{store: store, hub: h, parser: pc, dataDir: dataDir, logger: logger, backends: backends}
+	var runner *converter.Runner
+	if pc != nil {
+		runner = converter.New(store, h, pc, dataDir, logger)
+	}
+
+	hs := &Handlers{store: store, hub: h, parser: pc, converter: runner, dataDir: dataDir, backends: backends}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)
 	mux.HandleFunc("GET /health/parser", hs.ParserHealth)
 	mux.HandleFunc("POST /documents", hs.UploadDocument)
+	mux.HandleFunc("POST /documents/import", hs.ImportDocument)
 	mux.HandleFunc("POST /documents/{id}/cancel", hs.CancelDocument)
 	mux.HandleFunc("POST /documents/{id}/retry", hs.RetryDocument)
 	mux.HandleFunc("DELETE /documents/{id}", hs.DeleteDocument)
@@ -87,6 +83,7 @@ func Register(store repository.Store, h *hub.Hub, pc ParserClient, dataDir strin
 }
 
 func (h *Handlers) ParserHealth(w http.ResponseWriter, r *http.Request) {
+	log := logging.LoggerFrom(r.Context())
 	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
 	defer cancel()
 
@@ -101,6 +98,6 @@ func (h *Handlers) ParserHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Expires", "0")
 
 	if err := json.NewEncoder(w).Encode(map[string]string{"status": status}); err != nil {
-		h.logger.Error("ParserHealth: encode response", "err", err)
+		log.Error("ParserHealth: encode response", "err", err)
 	}
 }

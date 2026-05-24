@@ -25,5 +25,7 @@ services:
       - PDF_DO_TABLE_STRUCTURE=false
       - PDF_IMAGE_MODE=embedded
       - PDF_POST_PROCESS_CODE_BLOCKS=true
+      - HTML_FETCH_IMAGES=true
+      - HTML_POST_PROCESS_CODE_BLOCKS=true
     env_file:
       - .env
