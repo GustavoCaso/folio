@@ -40,6 +40,13 @@ templ jobCard(j domain.Job) {
 				if j.Author != "" {
 					<p data-author class="text-xs text-muted-foreground truncate">Author: { j.Author }</p>
 				}
+				if len(j.Tags) > 0 {
+					<div class="flex flex-wrap gap-1 mt-1">
+						for _, tag := range j.Tags {
+							<span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{ tag }</span>
+						}
+					</div>
+				}
 			</div>
 			<p class="text-xs text-muted-foreground" data-error-text>
 				if j.Status == "FAILED" {
@@ -66,6 +73,13 @@ templ jobCard(j domain.Job) {
 					}) {
 						Read
 					}
+				}
+				@button.Button(button.Props{
+					Variant: button.VariantGhost,
+					Size:    button.SizeSm,
+					Href:    "/documents/" + j.ID + "/edit",
+				}) {
+					Edit
 				}
 				if j.Status == "FAILED" {
 					<form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") }>

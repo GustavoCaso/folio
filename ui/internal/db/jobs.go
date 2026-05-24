@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
@@ -38,14 +39,14 @@ func (d *db) CreateJobFromURL(ctx context.Context, sourceURL, filename, requestI
 
 func (d *db) GetJob(ctx context.Context, id string) (domain.Job, error) {
 	row := d.conn.QueryRowContext(ctx,
-		`SELECT id, filename, request_id, content, retry_count, status, reading_progress, error, output_path, title, author, cover, source_url, created_at, updated_at
+		`SELECT id, filename, request_id, content, retry_count, status, reading_progress, error, output_path, title, author, cover, source_url, tags, created_at, updated_at
 		 FROM jobs WHERE id = ?`, id)
 	return scanJob(row)
 }
 
 func (d *db) GetPendingJobs(ctx context.Context) ([]domain.Job, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, title, author, cover, source_url, created_at, updated_at
+		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, title, author, cover, source_url, tags, created_at, updated_at
 		 FROM jobs WHERE status = 'PENDING'`)
 	if err != nil {
 		return nil, err
@@ -65,7 +66,7 @@ func (d *db) GetPendingJobs(ctx context.Context) ([]domain.Job, error) {
 
 func (d *db) ListJobs(ctx context.Context) ([]domain.Job, error) {
 	rows, err := d.conn.QueryContext(ctx,
-		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, title, author, cover, source_url, created_at, updated_at
+		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, title, author, cover, source_url, tags,created_at, updated_at
 		 FROM jobs ORDER BY created_at DESC`)
 	if err != nil {
 		return nil, err
@@ -121,6 +122,21 @@ func (d *db) DeleteJob(ctx context.Context, id string) error {
 	return err
 }
 
+func (d *db) UpdateJob(ctx context.Context, id, title, author string, tags []string, cover []byte) error {
+	if tags == nil {
+		tags = []string{}
+	}
+	tagsJSON, err := json.Marshal(tags)
+	if err != nil {
+		return err
+	}
+	_, err = d.conn.ExecContext(ctx,
+		`UPDATE jobs SET title = ?, author = ?, tags = ?, cover = ?, updated_at = ? WHERE id = ?`,
+		title, author, string(tagsJSON), cover, time.Now().UTC().Format(time.RFC3339), id,
+	)
+	return err
+}
+
 func (d *db) MarkJobFailed(ctx context.Context, id, errMsg string) error {
 	_, err := d.conn.ExecContext(ctx,
 		`UPDATE jobs SET status = 'FAILED', error = ?, updated_at = ? WHERE id = ?`,
@@ -136,13 +152,20 @@ type scanner interface {
 func scanJob(s scanner) (domain.Job, error) {
 	var j domain.Job
 	var createdAt, updatedAt string
+	var tagsStr string
 	err := s.Scan(
 		&j.ID, &j.Filename, &j.RequestID, &j.Content, &j.RetryCount, &j.Status,
 		&j.ReadingProgress, &j.Error, &j.OutputPath, &j.Title, &j.Author, &j.Cover,
-		&j.SourceURL, &createdAt, &updatedAt,
+		&j.SourceURL, &tagsStr, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return domain.Job{}, err
+	}
+	j.Tags = []string{}
+	if tagsStr != "" {
+		if jsonErr := json.Unmarshal([]byte(tagsStr), &j.Tags); jsonErr != nil {
+			return domain.Job{}, jsonErr
+		}
 	}
 	j.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	j.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
