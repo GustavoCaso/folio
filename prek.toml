@@ -1,0 +1,39 @@
+#:schema https://www.schemastore.org/prek.json
+
+[[repos]]
+repo = "local"
+
+[[repos.hooks]]
+id = "lint-check"
+name = "Lint (ui + parser)"
+language = "system"
+entry = "make lint-check"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "format-check"
+name = "Format (ui + parser)"
+language = "system"
+entry = "make format-check"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "proto-check"
+name = "Proto generated files up to date"
+language = "system"
+entry = "make proto-check"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "templ-check"
+name = "Templ generated files up to date"
+language = "system"
+entry = "make templ-check"
+pass_filenames = false
+
+[[repos.hooks]]
+id = "css-check"
+name = "Tailwind output up to date"
+language = "system"
+entry = "make css-check"
+pass_filenames = false
