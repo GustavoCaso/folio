@@ -46,22 +46,28 @@ templ Exports(records []domain.ExportRecord) {
 					@table.Header() {
 						@table.Row() {
 							@table.Head() {
-								Highlight 
+								Highlight
 							}
 							@table.Head() {
-								Document 
+								Note
 							}
 							@table.Head() {
-								Backend 
+								Tags
 							}
 							@table.Head() {
-								Status 
+								Document
 							}
 							@table.Head() {
-								Exported At 
+								Backend
 							}
 							@table.Head() {
-								Error 
+								Status
+							}
+							@table.Head() {
+								Exported At
+							}
+							@table.Head() {
+								Error
 							}
 						}
 					}
@@ -70,6 +76,30 @@ templ Exports(records []domain.ExportRecord) {
 							@table.Row() {
 								@table.Cell() {
 									<p class="line-clamp-2 font-medium">{ truncate(rec.HighlightText, 80) }</p>
+								}
+								@table.Cell() {
+									if rec.HighlightNote != "" {
+										<p class="text-xs text-muted-foreground line-clamp-2">{ rec.HighlightNote }</p>
+									} else {
+										<span class="text-muted-foreground">--</span>
+									}
+								}
+								@table.Cell() {
+									<div class="flex flex-wrap gap-1">
+										if rec.HighlightTag != "" {
+											@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-xs"}) {
+												{ rec.HighlightTag }
+											}
+										}
+										for _, tag := range rec.JobTags {
+											@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-xs"}) {
+												{ tag }
+											}
+										}
+										if rec.HighlightTag == "" && len(rec.JobTags) == 0 {
+											<span class="text-muted-foreground">--</span>
+										}
+									</div>
 								}
 								@table.Cell() {
 									<span class="text-muted-foreground truncate max-w-xs block">{ rec.JobFilename }</span>

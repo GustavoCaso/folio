@@ -73,6 +73,7 @@ func (w *Worker) RunOnce(ctx context.Context) {
 				HighlightText: record.HighlightText,
 				Note:          record.HighlightNote,
 				Tag:           record.HighlightTag,
+				JobTags:       record.JobTags,
 			})
 		}
 

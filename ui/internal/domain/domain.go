@@ -16,6 +16,7 @@ type Job struct {
 	Author          string
 	Cover           []byte
 	SourceURL       string
+	Tags            []string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
 }
@@ -40,6 +41,7 @@ type ExportRecord struct {
 	HighlightNote string
 	HighlightTag  string
 	JobFilename   string
+	JobTags       []string
 	BackendName   string
 	ExternalID    string
 	Status        string

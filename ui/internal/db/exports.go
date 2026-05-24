@@ -2,6 +2,7 @@ package db
 
 import (
 	"context"
+	"encoding/json"
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
@@ -11,7 +12,7 @@ import (
 func (d *db) ListUnexportedHighlights(ctx context.Context, backendName string) ([]domain.ExportRecord, error) {
 	rows, err := d.conn.QueryContext(ctx, `
 		SELECT he.id, he.highlight_id, he.backend_name, COALESCE(he.external_id, ''), he.status, COALESCE(he.error, ''), COALESCE(he.exported_at, ''),
-		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename
+		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename, COALESCE(j.tags, '')
 		FROM highlight_exports he
 		JOIN highlights h ON he.highlight_id = h.id
 		JOIN jobs j ON h.job_id = j.id
@@ -25,15 +26,18 @@ func (d *db) ListUnexportedHighlights(ctx context.Context, backendName string) (
 	var out []domain.ExportRecord
 	for rows.Next() {
 		var rec domain.ExportRecord
-		var exportedAt string
+		var exportedAt, tagsStr string
 		if err := rows.Scan(
 			&rec.ID, &rec.HighlightID, &rec.BackendName, &rec.ExternalID,
 			&rec.Status, &rec.Error, &exportedAt,
-			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.JobFilename,
+			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.JobFilename, &tagsStr,
 		); err != nil {
 			return nil, err
 		}
 		rec.ExportedAt, _ = time.Parse(time.RFC3339, exportedAt)
+		if tagsStr != "" {
+			_ = json.Unmarshal([]byte(tagsStr), &rec.JobTags)
+		}
 		out = append(out, rec)
 	}
 	return out, rows.Err()
@@ -100,7 +104,7 @@ func (d *db) ListExportsByHighlight(ctx context.Context, highlightID string) ([]
 func (d *db) ListAllExports(ctx context.Context) ([]domain.ExportRecord, error) {
 	rows, err := d.conn.QueryContext(ctx, `
 		SELECT he.id, he.highlight_id, he.backend_name, COALESCE(he.external_id, ''), he.status, COALESCE(he.error, ''), COALESCE(he.exported_at, ''),
-		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename
+		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename, COALESCE(j.tags, '')
 		FROM highlight_exports he
 		JOIN highlights h ON he.highlight_id = h.id
 		JOIN jobs j ON h.job_id = j.id
@@ -113,15 +117,18 @@ func (d *db) ListAllExports(ctx context.Context) ([]domain.ExportRecord, error) 
 	var out []domain.ExportRecord
 	for rows.Next() {
 		var rec domain.ExportRecord
-		var exportedAt string
+		var exportedAt, tagsStr string
 		if err := rows.Scan(
 			&rec.ID, &rec.HighlightID, &rec.BackendName, &rec.ExternalID,
 			&rec.Status, &rec.Error, &exportedAt,
-			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.JobFilename,
+			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.JobFilename, &tagsStr,
 		); err != nil {
 			return nil, err
 		}
 		rec.ExportedAt, _ = time.Parse(time.RFC3339, exportedAt)
+		if tagsStr != "" {
+			_ = json.Unmarshal([]byte(tagsStr), &rec.JobTags)
+		}
 		out = append(out, rec)
 	}
 	return out, rows.Err()
