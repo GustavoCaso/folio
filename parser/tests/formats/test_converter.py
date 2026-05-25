@@ -1,5 +1,5 @@
 from pathlib import Path
-from unittest.mock import MagicMock, call, patch
+from unittest.mock import MagicMock, patch
 
 from docling.datamodel.pipeline_options import TableFormerMode
 from docling_core.types.doc.document import DoclingDocument
@@ -7,7 +7,6 @@ from docling_core.types.doc.document import DoclingDocument
 import parser.formats.converter as converter_mod
 from parser.formats.converter import (
     convert,
-    convert_pdf_batched,
     convert_pdf_page_range,
     html_backend_options,
     pdf_page_batches,
@@ -252,51 +251,6 @@ class TestConvertPdfPageRange:
 
         mock_convert.assert_called_once_with(source=path, page_range=(1, 50))
         assert result is mock_result.document
-
-
-class TestConvertPdfBatched:
-    def _make_mock_doc(self, name: str) -> MagicMock:
-        doc = MagicMock(spec=DoclingDocument)
-        doc.name = name
-        return doc
-
-    def test_concatenates_all_batch_docs(self):
-        path = Path("/tmp/doc.pdf")
-        d1, d2 = self._make_mock_doc("d1"), self._make_mock_doc("d2")
-        merged = MagicMock()
-
-        with (
-            patch.object(converter_mod, "convert_pdf_page_range", side_effect=[d1, d2]),
-            patch.object(
-                converter_mod.DoclingDocument, "concatenate", return_value=merged
-            ) as mock_concat,
-            patch.dict("os.environ", {"PDF_BATCH_SIZE": "100"}, clear=True),
-        ):
-            result = convert_pdf_batched(path, page_count=150)
-
-        mock_concat.assert_called_once_with([d1, d2])
-        assert result is merged
-
-    def test_uses_pdf_page_batches_for_ranges(self):
-        path = Path("/tmp/doc.pdf")
-        d1, d2, d3 = (self._make_mock_doc(f"d{i}") for i in range(3))
-
-        with (
-            patch.object(
-                converter_mod, "convert_pdf_page_range", side_effect=[d1, d2, d3]
-            ) as mock_range,
-            patch.object(converter_mod.DoclingDocument, "concatenate", return_value=MagicMock()),
-            patch.dict("os.environ", {"PDF_BATCH_SIZE": "100"}, clear=True),
-        ):
-            convert_pdf_batched(path, page_count=250)
-
-        mock_range.assert_has_calls(
-            [
-                call(path, 1, 100),
-                call(path, 101, 200),
-                call(path, 201, 250),
-            ]
-        )
 
 
 class TestConvert:

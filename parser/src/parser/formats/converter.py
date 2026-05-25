@@ -144,18 +144,6 @@ def pdf_page_batches(page_count: int) -> list[tuple[int, int]]:
     ]
 
 
-def convert_pdf_batched(path: Path, page_count: int) -> DoclingDocument:
-    """Convert a PDF in page batches of PDF_BATCH_SIZE, concatenating results."""
-    docs: list[DoclingDocument] = []
-    for start, end in pdf_page_batches(page_count):
-        logger.debug(
-            "convert pdf batch",
-            extra={"path": str(path), "start": start, "end": end, "total": page_count},
-        )
-        docs.append(convert_pdf_page_range(path, start, end))
-    return DoclingDocument.concatenate(docs)
-
-
 def warmup() -> None:
     """Force Docling model initialization. Blocks until all models are loaded."""
     _pdf_converter.initialize_pipeline(InputFormat.PDF)
