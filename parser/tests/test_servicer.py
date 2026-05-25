@@ -2,6 +2,7 @@ from unittest.mock import MagicMock, patch
 
 import pytest
 from docling_core.types.doc.base import ImageRefMode
+from docling_core.types.doc.document import DoclingDocument
 
 from parser.grpc import parser_pb2
 from parser.servicer import ParserServicer
@@ -376,6 +377,94 @@ async def test_convert_html_document_yields_processing_then_done():
     assert len(metadata_msgs) == 1
     assert metadata_msgs[0].metadata.title == "My Title"
     assert metadata_msgs[0].metadata.author == "Author"
+
+
+# --- Batched conversion tests ---
+
+
+@pytest.mark.asyncio
+async def test_batched_path_used_when_pages_exceed_batch_size():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+    stream = _make_stream("doc.pdf", b"%PDF")
+
+    mock_doc = MagicMock(spec=DoclingDocument)
+    mock_doc.save_as_markdown.side_effect = _fake_save_as_markdown("# Batched")
+
+    with (
+        patch("parser.servicer.count_pdf_pages", return_value=150),
+        patch("parser.servicer.PDF_BATCH_SIZE", 100),
+        patch(
+            "parser.servicer.pdf_page_batches", return_value=[(1, 100), (101, 150)]
+        ) as mock_batches,
+        patch("parser.servicer.convert_pdf_page_range", return_value=mock_doc) as mock_range,
+        patch("parser.servicer.DoclingDocument") as mock_cls,
+        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer.extract_images", return_value=iter([])),
+    ):
+        mock_cls.concatenate.return_value = mock_doc
+        results = []
+        async for result in servicer.ConvertDocument(stream, context):
+            results.append(result)
+
+    mock_batches.assert_called_once_with(150)
+    assert mock_range.call_count == 2
+
+
+@pytest.mark.asyncio
+async def test_batched_path_yields_progress_per_batch():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+    stream = _make_stream("doc.pdf", b"%PDF")
+
+    mock_doc = MagicMock(spec=DoclingDocument)
+    mock_doc.save_as_markdown.side_effect = _fake_save_as_markdown("# Batched")
+
+    with (
+        patch("parser.servicer.count_pdf_pages", return_value=150),
+        patch("parser.servicer.PDF_BATCH_SIZE", 100),
+        patch("parser.servicer.pdf_page_batches", return_value=[(1, 100), (101, 150)]),
+        patch("parser.servicer.convert_pdf_page_range", return_value=mock_doc),
+        patch("parser.servicer.DoclingDocument") as mock_cls,
+        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+        patch("parser.servicer.extract_images", return_value=iter([])),
+    ):
+        mock_cls.concatenate.return_value = mock_doc
+        results = []
+        async for result in servicer.ConvertDocument(stream, context):
+            results.append(result)
+
+    converting = [
+        r.status for r in results if r.HasField("status") and r.status.stage == "converting"
+    ]
+    assert len(converting) == 2
+    assert converting[0].pages_done == 100
+    assert converting[0].pages_total == 150
+    assert converting[1].pages_done == 150
+    assert converting[1].pages_total == 150
+
+
+@pytest.mark.asyncio
+async def test_single_path_used_when_pages_within_batch_size():
+    servicer = ParserServicer(num_workers=1)
+    context = MagicMock()
+    stream = _make_stream("doc.pdf", b"%PDF")
+
+    mock_doc = MagicMock()
+    mock_doc.save_as_markdown.side_effect = _fake_save_as_markdown("# Small")
+
+    with (
+        patch("parser.servicer.count_pdf_pages", return_value=50),
+        patch("parser.servicer.PDF_BATCH_SIZE", 100),
+        patch("parser.servicer.convert", return_value=mock_doc) as mock_convert,
+        patch("parser.servicer.convert_pdf_page_range") as mock_range,
+        patch("parser.servicer.extract_metadata", return_value=("", "", b"")),
+    ):
+        async for _ in servicer.ConvertDocument(stream, context):
+            pass
+
+    mock_convert.assert_called_once()
+    mock_range.assert_not_called()
 
 
 # --- ConvertURL tests ---

@@ -69,6 +69,8 @@ Using `uv add <dependency>` or uv add --dev <dependency>. To avoid getting unwan
 | `PDF_LAYOUT_BATCH_SIZE` | docling default | Docling layout batch size |
 | `PDF_OCR_BATCH_SIZE` | docling default | Docling OCR batch size |
 | `PDF_TABLE_BATCH_SIZE` | docling default | Docling table batch size |
+| `PDF_TABLE_STRUCTURE_MODE` | `accurate` | TableFormer mode: `accurate` (higher quality, slower) or `fast` (lower quality, faster) |
+| `PDF_BATCH_SIZE` | `100` | Page threshold above which PDF conversion is split into page-range batches; each batch emits a progress update |
 | `PDF_QUEUE_MAX_SIZE` | docling default | Docling pipeline queue depth |
 | `PDF_DOCUMENT_TIMEOUT` | none | Timeout in seconds for a single document conversion |
 | `PDF_NUM_THREADS` | `4` | Number of CPU threads for Docling model inference |
@@ -87,6 +89,7 @@ Using `uv add <dependency>` or uv add --dev <dependency>. To avoid getting unwan
 - `ruff` for lint + format; excludes `src/parser/grpc/` (generated).
 - `mypy --strict` on `src/`.
 - `pytest` with `asyncio_mode = "auto"`; `integration` marker opts into fixture-dependent tests.
+- **Imports must be at the top of each file** — no inline imports inside functions or methods. The only exceptions are lazy imports in `formats/helpers.py` (circular import avoidance) and `cli.py` (optional heavy dep). Tests must import from the top level, not inside test methods.
 
 ## Regenerating gRPC bindings
 

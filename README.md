@@ -86,6 +86,8 @@ The parser runs as a gRPC server. The following variables configure the server p
 | `PDF_QUEUE_MAX_SIZE` | docling default | Docling pipeline queue depth |
 | `PDF_DOCUMENT_TIMEOUT` | none | Timeout in seconds for a single document conversion |
 | `PDF_NUM_THREADS` | `4` | CPU threads for Docling model inference. Reduce on low-core machines |
+| `PDF_TABLE_STRUCTURE_MODE` | `accurate` | TableFormer mode: `accurate` (higher quality, slower) or `fast` (lower quality, faster) |
+| `PDF_BATCH_SIZE` | `100` | PDFs with more pages than this are converted in page-range batches; each batch emits a progress update |
 | **HTML** | | |
 | `HTML_FETCH_IMAGES` | `false` | Fetch remote/local images referenced in the HTML document |
 | `HTML_POST_PROCESS_CODE_BLOCKS` | `true` | Post-process code blocks with pattern-based language detection |
