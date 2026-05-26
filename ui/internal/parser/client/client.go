@@ -186,18 +186,12 @@ func (c *client) extractResult(log *slog.Logger, start time.Time, jobID string, 
 
 		switch p := msg.Payload.(type) {
 		case *pb.ConvertResult_Status:
-			log.Debug("status",
-				"status", p.Status.Status,
-				"stage", p.Status.Stage,
-			)
+			log.Debug("status", "status", p.Status.Status)
 			if p.Status.Status != "DONE" {
 				h.Publish(jobID, hub.StatusEvent{
-					Status:     p.Status.Status,
-					PagesDone:  int(p.Status.PagesDone),
-					PagesTotal: int(p.Status.PagesTotal),
-					Error:      p.Status.Error,
-					Stage:      p.Status.Stage,
-					Message:    p.Status.Message,
+					Status:  p.Status.Status,
+					Error:   p.Status.Error,
+					Message: p.Status.Message,
 				})
 			}
 		case *pb.ConvertResult_MarkdownChunk:

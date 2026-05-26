@@ -10,7 +10,7 @@ function makeJobCard(id, { filename = "test.pdf", status = "PENDING", error = ""
 			<p data-filename>${filename}</p>
 			<span data-status-badge><span>${status}</span></span>
 		</div>
-		<p data-error-text>${error}</p>
+		<p data-status-text>${error}</p>
 		<div data-actions></div>
 	`;
 
@@ -84,7 +84,7 @@ describe("watchJob", () => {
     es.fire({ Status: "FAILED", Error: "timeout" });
 
     expect(card.querySelector("[data-status-badge]").textContent).toContain("Failed");
-    expect(card.querySelector("[data-error-text]").textContent).toBe("timeout");
+    expect(card.querySelector("[data-status-text]").textContent).toBe("timeout");
     expect(card.querySelector("form.retry-form")).not.toBeNull();
     expect(card.querySelector("[data-delete-job]")).not.toBeNull();
     expect(es.close).toHaveBeenCalled();
@@ -101,14 +101,14 @@ describe("watchJob", () => {
     expect(card.querySelectorAll("form.retry-form").length).toBe(1);
   });
 
-  it("stage update: sets error-text to stage info", () => {
+  it("PROCESSING: sets error-text to message", () => {
     const card = makeJobCard("w4");
     const es = makeEventSource();
     watchJob("w4");
 
-    es.fire({ Status: "PROCESSING", Stage: "OCR", Message: "page 1", PagesDone: 1, PagesTotal: 10 });
+    es.fire({ Status: "PROCESSING", Message: "converted page 1/10" });
 
-    expect(card.querySelector("[data-error-text]").textContent).toBe("OCR — page 1 (1/10)");
+    expect(card.querySelector("[data-status-text]").textContent).toBe("converted page 1/10");
   });
 
   it("delete confirm cancel: does not call fetch", async () => {

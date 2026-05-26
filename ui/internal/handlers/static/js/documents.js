@@ -36,7 +36,7 @@ export function watchJob(jobID) {
     const d = JSON.parse(e.data);
 
     const statusBadge = card.querySelector("[data-status-badge]");
-    const errorText = card.querySelector("[data-error-text]");
+    const statusText = card.querySelector("[data-status-text]");
     const actions = card.querySelector("[data-actions]");
     const filename = card.querySelector("[data-filename]")?.textContent || "";
 
@@ -45,7 +45,7 @@ export function watchJob(jobID) {
     }
 
     if (d.Status === "DONE") {
-      if (errorText) errorText.textContent = "";
+      if (statusText) statusText.textContent = "";
       if (actions && !actions.querySelector("a[href]")) {
         actions.innerHTML = readButtonHTML(jobID) + deleteFormButton(jobID, filename);
       }
@@ -76,17 +76,14 @@ export function watchJob(jobID) {
       }
       es.close();
     } else if (d.Status === "FAILED") {
-      if (errorText) errorText.textContent = d.Error || "";
+      if (statusText) statusText.textContent = d.Error || "";
       if (actions && !actions.querySelector("form.retry-form")) {
         actions.innerHTML = retryFormHTML(jobID) + deleteFormButton(jobID, filename);
       }
       es.close();
-    } else if (d.Stage && errorText) {
-      let text = d.Stage;
-      if (d.Message) text += " — " + d.Message;
-      if (d.PagesTotal) text += " (" + d.PagesDone + "/" + d.PagesTotal + ")";
-      errorText.textContent = text;
-      if ((actions) && !actions.querySelector("[data-cancel-job]")) {
+    } else if (d.Message && statusText) {
+      statusText.textContent = d.Message;
+      if (actions && !actions.querySelector("[data-cancel-job]")) {
         actions.innerHTML = cancelButtonHTML(jobID);
       }
     }

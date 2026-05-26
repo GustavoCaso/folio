@@ -441,11 +441,8 @@ func (x *DocumentMetadata) GetCover() []byte {
 type StatusUpdate struct {
 	state         protoimpl.MessageState `protogen:"open.v1"`
 	Status        string                 `protobuf:"bytes,1,opt,name=status,proto3" json:"status,omitempty"` // PROCESSING | DONE | FAILED
-	PagesDone     int32                  `protobuf:"varint,2,opt,name=pages_done,json=pagesDone,proto3" json:"pages_done,omitempty"`
-	PagesTotal    int32                  `protobuf:"varint,3,opt,name=pages_total,json=pagesTotal,proto3" json:"pages_total,omitempty"`
-	Error         string                 `protobuf:"bytes,4,opt,name=error,proto3" json:"error,omitempty"`
-	Stage         string                 `protobuf:"bytes,5,opt,name=stage,proto3" json:"stage,omitempty"`     // received | loading | processing | exporting
-	Message       string                 `protobuf:"bytes,6,opt,name=message,proto3" json:"message,omitempty"` // human-readable detail
+	Error         string                 `protobuf:"bytes,2,opt,name=error,proto3" json:"error,omitempty"`
+	Message       string                 `protobuf:"bytes,3,opt,name=message,proto3" json:"message,omitempty"` // human-readable detail
 	unknownFields protoimpl.UnknownFields
 	sizeCache     protoimpl.SizeCache
 }
@@ -487,30 +484,9 @@ func (x *StatusUpdate) GetStatus() string {
 	return ""
 }
 
-func (x *StatusUpdate) GetPagesDone() int32 {
-	if x != nil {
-		return x.PagesDone
-	}
-	return 0
-}
-
-func (x *StatusUpdate) GetPagesTotal() int32 {
-	if x != nil {
-		return x.PagesTotal
-	}
-	return 0
-}
-
 func (x *StatusUpdate) GetError() string {
 	if x != nil {
 		return x.Error
-	}
-	return ""
-}
-
-func (x *StatusUpdate) GetStage() string {
-	if x != nil {
-		return x.Stage
 	}
 	return ""
 }
@@ -553,16 +529,11 @@ const file_parser_proto_rawDesc = "" +
 	"\x10DocumentMetadata\x12\x14\n" +
 	"\x05title\x18\x01 \x01(\tR\x05title\x12\x16\n" +
 	"\x06author\x18\x02 \x01(\tR\x06author\x12\x14\n" +
-	"\x05cover\x18\x03 \x01(\fR\x05cover\"\xac\x01\n" +
+	"\x05cover\x18\x03 \x01(\fR\x05cover\"V\n" +
 	"\fStatusUpdate\x12\x16\n" +
-	"\x06status\x18\x01 \x01(\tR\x06status\x12\x1d\n" +
-	"\n" +
-	"pages_done\x18\x02 \x01(\x05R\tpagesDone\x12\x1f\n" +
-	"\vpages_total\x18\x03 \x01(\x05R\n" +
-	"pagesTotal\x12\x14\n" +
-	"\x05error\x18\x04 \x01(\tR\x05error\x12\x14\n" +
-	"\x05stage\x18\x05 \x01(\tR\x05stage\x12\x18\n" +
-	"\amessage\x18\x06 \x01(\tR\amessage2\x95\x01\n" +
+	"\x06status\x18\x01 \x01(\tR\x06status\x12\x14\n" +
+	"\x05error\x18\x02 \x01(\tR\x05error\x12\x18\n" +
+	"\amessage\x18\x03 \x01(\tR\amessage2\x95\x01\n" +
 	"\rParserService\x12B\n" +
 	"\x0fConvertDocument\x12\x14.parser.ConvertChunk\x1a\x15.parser.ConvertResult(\x010\x01\x12@\n" +
 	"\n" +

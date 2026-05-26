@@ -18,29 +18,29 @@ def _record(name: str, msg: str, level: int = logging.DEBUG) -> logging.LogRecor
     )
 
 
+def _handler(pages_total: int = 10) -> progress._ProgressLogHandler:
+    loop = asyncio.new_event_loop()
+    queue: asyncio.Queue[progress.ProgressEvent] = asyncio.Queue()
+    return progress._ProgressLogHandler(pages_total, queue, loop)
+
+
 def test_parse_finished_pages():
-    evt = progress._parse(
+    h = _handler(pages_total=10)
+    evt = h._parse(
         _record("docling.pipeline.base_pipeline", "Stage assemble: run_id=1 pages=[3] time=1.234")
     )
     assert evt is not None
-    assert evt.stage == "processing"
-    assert evt.pages_done == 3
-
-
-def test_parse_initializing_pipeline():
-    evt = progress._parse(
-        _record("docling.document_converter", "Initializing pipeline for StandardPdfPipeline")
-    )
-    assert evt is not None
-    assert evt.stage == "loading"
+    assert evt.message == "converted page 3/10"
 
 
 def test_parse_unrelated_logger_returns_none():
-    assert progress._parse(_record("urllib3.connectionpool", "anything")) is None
+    h = _handler()
+    assert h._parse(_record("urllib3.connectionpool", "anything")) is None
 
 
 def test_parse_docling_unmatched_returns_none():
-    assert progress._parse(_record("docling.foo", "some random message")) is None
+    h = _handler()
+    assert h._parse(_record("docling.foo", "some random message")) is None
 
 
 @pytest.mark.asyncio
@@ -48,13 +48,13 @@ async def test_attach_emits_events_to_queue():
     loop = asyncio.get_running_loop()
     queue: asyncio.Queue[progress.ProgressEvent] = asyncio.Queue()
 
-    with progress.attach(queue, loop):
+    with progress.attach(10, queue, loop):
         logging.getLogger("docling.pipeline.base_pipeline").debug(
             "Stage assemble: run_id=1 pages=[5] time=2.0"
         )
         evt = await asyncio.wait_for(queue.get(), timeout=1.0)
 
-    assert evt.pages_done == 5
+    assert evt.message == "converted page 5/10"
 
 
 @pytest.mark.asyncio
@@ -64,7 +64,7 @@ async def test_attach_removes_handler_on_exit():
     docling_logger = logging.getLogger("docling")
     handlers_before = list(docling_logger.handlers)
 
-    with progress.attach(queue, loop):
+    with progress.attach(0, queue, loop):
         assert len(docling_logger.handlers) == len(handlers_before) + 1
 
     assert docling_logger.handlers == handlers_before

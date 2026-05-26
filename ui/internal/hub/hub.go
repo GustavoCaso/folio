@@ -8,12 +8,9 @@ import (
 
 // StatusEvent carries a parser status update for a single job.
 type StatusEvent struct {
-	Status     string
-	PagesDone  int
-	PagesTotal int
-	Error      string
-	Stage      string
-	Message    string
+	Status  string
+	Error   string
+	Message string
 	// populated only when Status == "DONE"
 	Title  string
 	Author string
@@ -75,7 +72,6 @@ func (h *Hub) Publish(jobID string, event StatusEvent) {
 			h.logger.Warn("dropping event, slow subscriber",
 				"job_id", jobID,
 				"status", event.Status,
-				"stage", event.Stage,
 			)
 		}
 	}

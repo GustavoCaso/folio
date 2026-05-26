@@ -81,7 +81,6 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
                     status="PROCESSING",
-                    stage="received",
                     message=f"received {len(buf)} bytes",
                 )
             )
@@ -98,9 +97,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
                     status="PROCESSING",
-                    stage="loading",
                     message=f"loading document ({pages_total} pages)",
-                    pages_total=pages_total,
                 )
             )
 
@@ -114,22 +111,19 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                         "convert batch",
                         extra={**ctx, "start": start, "end": end, "pages_total": pages_total},
                     )
+                    yield parser_pb2.ConvertResult(
+                        status=parser_pb2.StatusUpdate(
+                            status="PROCESSING",
+                            message=f"converting batch pages ({start}, {end})",
+                        )
+                    )
                     batch_doc = await loop.run_in_executor(
                         self._executor, convert_pdf_page_range, tmp_path, start, end
                     )
                     docs.append(batch_doc)
-                    yield parser_pb2.ConvertResult(
-                        status=parser_pb2.StatusUpdate(
-                            status="PROCESSING",
-                            stage="converting",
-                            message=f"converted pages {end}/{pages_total}",
-                            pages_done=end,
-                            pages_total=pages_total,
-                        )
-                    )
                 doc = DoclingDocument.concatenate(docs)
             else:
-                with attach(progress_q, loop):
+                with attach(pages_total, progress_q, loop):
                     convert_task = loop.run_in_executor(self._executor, convert, tmp_path)
 
                     while not convert_task.done():
@@ -139,22 +133,11 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                             )
                         except TimeoutError:
                             continue
-                        logger.debug(
-                            "convert progress",
-                            extra={
-                                **ctx,
-                                "stage": evt.stage,
-                                "pages_done": evt.pages_done,
-                                "pages_total": pages_total,
-                            },
-                        )
+                        logger.debug("convert progress", extra={**ctx, "message": evt.message})
                         yield parser_pb2.ConvertResult(
                             status=parser_pb2.StatusUpdate(
                                 status="PROCESSING",
-                                stage=evt.stage,
                                 message=evt.message,
-                                pages_done=evt.pages_done,
-                                pages_total=pages_total,
                             )
                         )
 
@@ -163,10 +146,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
                         yield parser_pb2.ConvertResult(
                             status=parser_pb2.StatusUpdate(
                                 status="PROCESSING",
-                                stage=evt.stage,
                                 message=evt.message,
-                                pages_done=evt.pages_done,
-                                pages_total=pages_total,
                             )
                         )
 
@@ -214,17 +194,15 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
                     status="PROCESSING",
-                    stage="received",
                     message=f"received url: {request.url}",
                 )
             )
 
-            logger.info("convert loading", extra={**ctx, "pages_total": 0})
+            logger.info("convert loading", extra=ctx)
 
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
                     status="PROCESSING",
-                    stage="loading",
                     message="fetching and loading document",
                 )
             )
@@ -302,10 +280,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             yield parser_pb2.ConvertResult(
                 status=parser_pb2.StatusUpdate(
                     status="PROCESSING",
-                    stage="exporting",
                     message="streaming markdown",
-                    pages_done=pages_total,
-                    pages_total=pages_total,
                 )
             )
 
@@ -329,14 +304,7 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             )
         )
 
-        yield parser_pb2.ConvertResult(
-            status=parser_pb2.StatusUpdate(
-                status="DONE",
-                stage="done",
-                pages_done=pages_total,
-                pages_total=pages_total,
-            )
-        )
+        yield parser_pb2.ConvertResult(status=parser_pb2.StatusUpdate(status="DONE"))
         logger.info(
             "convert done",
             extra={
