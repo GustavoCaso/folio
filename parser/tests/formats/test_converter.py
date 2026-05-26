@@ -1,8 +1,17 @@
 from pathlib import Path
 from unittest.mock import MagicMock, patch
 
+from docling.datamodel.pipeline_options import TableFormerMode
+from docling_core.types.doc.document import DoclingDocument
+
 import parser.formats.converter as converter_mod
-from parser.formats.converter import convert, html_backend_options, pdf_pipeline_options
+from parser.formats.converter import (
+    convert,
+    convert_pdf_page_range,
+    html_backend_options,
+    pdf_page_batches,
+    pdf_pipeline_options,
+)
 
 
 class TestPDFPipelineOptions:
@@ -133,6 +142,21 @@ class TestPDFPipelineOptions:
             assert opts.table_batch_size == 3
             assert opts.queue_max_size == 8
 
+    def test_table_structure_mode_default_accurate(self):
+        with patch.dict("os.environ", {}, clear=True):
+            opts = pdf_pipeline_options()
+            assert opts.table_structure_options.mode == TableFormerMode.ACCURATE
+
+    def test_table_structure_mode_fast(self):
+        with patch.dict("os.environ", {"PDF_TABLE_STRUCTURE_MODE": "fast"}, clear=True):
+            opts = pdf_pipeline_options()
+            assert opts.table_structure_options.mode == TableFormerMode.FAST
+
+    def test_table_structure_mode_unknown_falls_back_to_accurate(self):
+        with patch.dict("os.environ", {"PDF_TABLE_STRUCTURE_MODE": "bogus"}, clear=True):
+            opts = pdf_pipeline_options()
+            assert opts.table_structure_options.mode == TableFormerMode.ACCURATE
+
 
 class TestHTMLPipelineOptions:
     def test_fetch_images_default_false(self):
@@ -196,10 +220,41 @@ class TestHTMLPipelineOptions:
             assert opts.infer_furniture is False
 
 
+class TestPdfPageBatches:
+    def test_single_batch_when_pages_fit(self):
+        with patch.dict("os.environ", {"PDF_BATCH_SIZE": "100"}, clear=True):
+            assert pdf_page_batches(50) == [(1, 50)]
+
+    def test_exact_multiple(self):
+        with patch.dict("os.environ", {"PDF_BATCH_SIZE": "100"}, clear=True):
+            assert pdf_page_batches(200) == [(1, 100), (101, 200)]
+
+    def test_splits_into_correct_ranges(self):
+        with patch.dict("os.environ", {"PDF_BATCH_SIZE": "100"}, clear=True):
+            assert pdf_page_batches(250) == [(1, 100), (101, 200), (201, 250)]
+
+    def test_last_batch_clamped_to_page_count(self):
+        with patch.dict("os.environ", {"PDF_BATCH_SIZE": "100"}, clear=True):
+            batches = pdf_page_batches(110)
+            assert batches[-1] == (101, 110)
+
+
+class TestConvertPdfPageRange:
+    def test_calls_converter_with_page_range(self):
+        path = Path("/tmp/doc.pdf")
+        mock_result = MagicMock()
+
+        with patch.object(
+            converter_mod._pdf_converter, "convert", return_value=mock_result
+        ) as mock_convert:
+            result = convert_pdf_page_range(path, 1, 50)
+
+        mock_convert.assert_called_once_with(source=path, page_range=(1, 50))
+        assert result is mock_result.document
+
+
 class TestConvert:
     def test_returns_docling_document_for_url(self):
-        from docling_core.types.doc.document import DoclingDocument
-
         mock_document = MagicMock(spec=DoclingDocument)
         mock_result = MagicMock()
         mock_result.document = mock_document

@@ -45,15 +45,7 @@ ENV PYTHONPATH=/app/src:$PYTHONPATH
 ENV PATH=/app/node_modules/.bin:$PATH
 
 ENV PATH="/app/.venv/bin:$PATH" \
-    DOCLING_ARTIFACTS_PATH=/app/models \
-    GRPC_PORT=50051 \
-    NUM_WORKERS=2 \
-    PDF_DO_OCR=true \
-    PDF_DO_TABLE_STRUCTURE=true \
-    PDF_DO_CODE_ENRICHMENT=false \
-    PDF_POST_PROCESS_CODE_BLOCKS=true \
-    PDF_IMAGE_MODE=placeholder \
-    LOG_LEVEL=info
+    DOCLING_ARTIFACTS_PATH=/app/models
 
 EXPOSE 50051
 ENTRYPOINT ["./entrypoint.sh"]

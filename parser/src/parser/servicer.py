@@ -13,12 +13,16 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     from collections.abc import AsyncGenerator, AsyncIterator
 
-    from docling_core.types.doc.document import DoclingDocument
-
 import grpc
 from docling_core.types.doc.base import ImageRefMode
+from docling_core.types.doc.document import DoclingDocument
 
-from parser.formats.converter import convert
+from parser.formats.converter import (
+    PDF_BATCH_SIZE,
+    convert,
+    convert_pdf_page_range,
+    pdf_page_batches,
+)
 from parser.formats.helpers import extract_metadata, get_format_settings
 from parser.formats.pdf.images import PLACEHOLDER, extract_images
 from parser.formats.pdf.pdf import count_pdf_pages
@@ -103,46 +107,70 @@ class ParserServicer(parser_pb2_grpc.ParserServiceServicer):  # type: ignore[mis
             loop = asyncio.get_running_loop()
             progress_q: asyncio.Queue[ProgressEvent] = asyncio.Queue()
 
-            with attach(progress_q, loop):
-                convert_task = loop.run_in_executor(self._executor, convert, tmp_path)
-
-                while not convert_task.done():
-                    try:
-                        evt = await asyncio.wait_for(progress_q.get(), timeout=_DRAIN_POLL_INTERVAL)
-                    except TimeoutError:
-                        continue
+            if suffix == ".pdf" and pages_total > PDF_BATCH_SIZE:
+                docs = []
+                for start, end in pdf_page_batches(pages_total):
                     logger.debug(
-                        "convert progress",
-                        extra={
-                            **ctx,
-                            "stage": evt.stage,
-                            "pages_done": evt.pages_done,
-                            "pages_total": pages_total,
-                        },
+                        "convert batch",
+                        extra={**ctx, "start": start, "end": end, "pages_total": pages_total},
                     )
+                    batch_doc = await loop.run_in_executor(
+                        self._executor, convert_pdf_page_range, tmp_path, start, end
+                    )
+                    docs.append(batch_doc)
                     yield parser_pb2.ConvertResult(
                         status=parser_pb2.StatusUpdate(
                             status="PROCESSING",
-                            stage=evt.stage,
-                            message=evt.message,
-                            pages_done=evt.pages_done,
+                            stage="converting",
+                            message=f"converted pages {end}/{pages_total}",
+                            pages_done=end,
                             pages_total=pages_total,
                         )
                     )
+                doc = DoclingDocument.concatenate(docs)
+            else:
+                with attach(progress_q, loop):
+                    convert_task = loop.run_in_executor(self._executor, convert, tmp_path)
 
-                while not progress_q.empty():
-                    evt = progress_q.get_nowait()
-                    yield parser_pb2.ConvertResult(
-                        status=parser_pb2.StatusUpdate(
-                            status="PROCESSING",
-                            stage=evt.stage,
-                            message=evt.message,
-                            pages_done=evt.pages_done,
-                            pages_total=pages_total,
+                    while not convert_task.done():
+                        try:
+                            evt = await asyncio.wait_for(
+                                progress_q.get(), timeout=_DRAIN_POLL_INTERVAL
+                            )
+                        except TimeoutError:
+                            continue
+                        logger.debug(
+                            "convert progress",
+                            extra={
+                                **ctx,
+                                "stage": evt.stage,
+                                "pages_done": evt.pages_done,
+                                "pages_total": pages_total,
+                            },
                         )
-                    )
+                        yield parser_pb2.ConvertResult(
+                            status=parser_pb2.StatusUpdate(
+                                status="PROCESSING",
+                                stage=evt.stage,
+                                message=evt.message,
+                                pages_done=evt.pages_done,
+                                pages_total=pages_total,
+                            )
+                        )
 
-                doc = await convert_task
+                    while not progress_q.empty():
+                        evt = progress_q.get_nowait()
+                        yield parser_pb2.ConvertResult(
+                            status=parser_pb2.StatusUpdate(
+                                status="PROCESSING",
+                                stage=evt.stage,
+                                message=evt.message,
+                                pages_done=evt.pages_done,
+                                pages_total=pages_total,
+                            )
+                        )
+
+                    doc = await convert_task
 
             async for result in self._export_doc(ctx, doc, suffix, tmp_path, pages_total, started):
                 yield result

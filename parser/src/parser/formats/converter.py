@@ -9,6 +9,8 @@ from docling.datamodel.base_models import InputFormat
 from docling.datamodel.pipeline_options import (
     CodeFormulaVlmOptions,
     PdfPipelineOptions,
+    TableFormerMode,
+    TableStructureOptions,
 )
 from docling.document_converter import DocumentConverter, HTMLFormatOption, PdfFormatOption
 from docling_core.types.doc.document import DoclingDocument
@@ -18,6 +20,9 @@ from parser.formats.helpers import bool_env
 logger = logging.getLogger(__name__)
 
 _VALID_CODE_FORMULA_PRESETS = {"codeformulav2", "granite_docling"}
+_VALID_TABLE_STRUCTURE_MODES = {"accurate", "fast"}
+
+PDF_BATCH_SIZE: int = int(os.environ.get("PDF_BATCH_SIZE", "100"))
 
 
 def _code_formula_options() -> CodeFormulaVlmOptions:
@@ -26,6 +31,14 @@ def _code_formula_options() -> CodeFormulaVlmOptions:
         preset = "codeformulav2"
     result: CodeFormulaVlmOptions = CodeFormulaVlmOptions.from_preset(preset)
     return result
+
+
+def _table_structure_options() -> TableStructureOptions:
+    mode_str = os.environ.get("PDF_TABLE_STRUCTURE_MODE", "accurate").lower()
+    if mode_str not in _VALID_TABLE_STRUCTURE_MODES:
+        mode_str = "accurate"
+    mode = TableFormerMode.FAST if mode_str == "fast" else TableFormerMode.ACCURATE
+    return TableStructureOptions(mode=mode)
 
 
 def pdf_pipeline_options() -> PdfPipelineOptions:
@@ -38,6 +51,7 @@ def pdf_pipeline_options() -> PdfPipelineOptions:
         "do_formula_enrichment": bool_env("PDF_DO_FORMULA_ENRICHMENT", False),
         "force_backend_text": bool_env("PDF_FORCE_BACKEND_TEXT", False),
         "code_formula_options": _code_formula_options(),
+        "table_structure_options": _table_structure_options(),
     }
     for env_var, field in (
         ("PDF_LAYOUT_BATCH_SIZE", "layout_batch_size"),
@@ -114,6 +128,20 @@ def convert(source: Path | str) -> DoclingDocument:
         converter = _pdf_converter
     result = converter.convert(source=source)
     return result.document
+
+
+def convert_pdf_page_range(path: Path, start: int, end: int) -> DoclingDocument:
+    """Convert a single page range of a PDF."""
+    result = _pdf_converter.convert(source=path, page_range=(start, end))
+    return result.document
+
+
+def pdf_page_batches(page_count: int) -> list[tuple[int, int]]:
+    """Return (start, end) page ranges for batching a document of page_count pages."""
+    return [
+        (start, min(start + PDF_BATCH_SIZE - 1, page_count))
+        for start in range(1, page_count + 1, PDF_BATCH_SIZE)
+    ]
 
 
 def warmup() -> None:
