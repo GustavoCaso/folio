@@ -101,6 +101,45 @@ func TestStatusEventJSONShape(t *testing.T) {
 	}
 }
 
+func TestSubscribeReplaysEventsPublishedBeforeConnect(t *testing.T) {
+	h := newHub(t)
+
+	h.Publish("job-r", hub.StatusEvent{Status: "PROCESSING", Message: "batch 1"})
+	h.Publish("job-r", hub.StatusEvent{Status: "PROCESSING", Message: "batch 2"})
+
+	ch := h.Subscribe("job-r")
+	defer h.Unsubscribe("job-r", ch)
+
+	for _, want := range []string{"batch 1", "batch 2"} {
+		select {
+		case got := <-ch:
+			if got.Message != want {
+				t.Fatalf("expected %q, got %q", want, got.Message)
+			}
+		default:
+			t.Fatalf("expected replayed event %q, got nothing", want)
+		}
+	}
+}
+
+func TestReplayBufferClearedOnLastUnsubscribe(t *testing.T) {
+	h := newHub(t)
+
+	h.Publish("job-c", hub.StatusEvent{Status: "PROCESSING", Message: "batch 1"})
+	ch := h.Subscribe("job-c")
+	h.Unsubscribe("job-c", ch)
+
+	// New subscriber after cleanup should get no replayed events.
+	ch2 := h.Subscribe("job-c")
+	defer h.Unsubscribe("job-c", ch2)
+
+	select {
+	case got := <-ch2:
+		t.Fatalf("expected no events after cleanup, got %+v", got)
+	default:
+	}
+}
+
 func TestUnsubscribeStopsDelivery(t *testing.T) {
 	h := newHub(t)
 	ch := h.Subscribe("job-1")
