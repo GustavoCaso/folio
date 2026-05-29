@@ -100,14 +100,14 @@ func collectBuffered(ch chan hub.StatusEvent) []hub.StatusEvent {
 func TestConvert_DoesNotPublishDONEEvent(t *testing.T) {
 	responses := []*pb.ConvertResult{
 		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{
-			Status: "PROCESSING", Stage: "layout", PagesDone: 0, PagesTotal: 1,
+			Status: "PROCESSING", Message: "converting",
 		}}},
 		{Payload: &pb.ConvertResult_MarkdownChunk{MarkdownChunk: []byte("# Hello")}},
 		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{
 			Title: "My Book", Author: "Alice", Cover: []byte{1, 2, 3},
 		}}},
 		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{
-			Status: "DONE", Stage: "done", PagesDone: 1, PagesTotal: 1,
+			Status: "DONE",
 		}}},
 	}
 
@@ -167,7 +167,7 @@ func TestConvert_CollectsImageChunks(t *testing.T) {
 			Data:     pngBytes,
 		}}},
 		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{}}},
-		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE", Stage: "done"}}},
+		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE"}}},
 	}
 
 	addr := startFakeParser(t, responses)
@@ -197,7 +197,7 @@ func TestConvert_NoImagesWhenNoneStreamed(t *testing.T) {
 	responses := []*pb.ConvertResult{
 		{Payload: &pb.ConvertResult_MarkdownChunk{MarkdownChunk: []byte("# Hello")}},
 		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{}}},
-		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE", Stage: "done"}}},
+		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE"}}},
 	}
 
 	addr := startFakeParser(t, responses)
@@ -226,7 +226,7 @@ func TestConvertFromURL_CollectsImageChunks(t *testing.T) {
 			Data:     pngBytes,
 		}}},
 		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{}}},
-		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE", Stage: "done"}}},
+		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE"}}},
 	}
 
 	addr := startFakeParserURL(t, responses)
@@ -256,7 +256,7 @@ func TestConvertFromURL_NoImagesWhenNoneStreamed(t *testing.T) {
 	responses := []*pb.ConvertResult{
 		{Payload: &pb.ConvertResult_MarkdownChunk{MarkdownChunk: []byte("# Hello")}},
 		{Payload: &pb.ConvertResult_Metadata{Metadata: &pb.DocumentMetadata{}}},
-		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE", Stage: "done"}}},
+		{Payload: &pb.ConvertResult_Status{Status: &pb.StatusUpdate{Status: "DONE"}}},
 	}
 
 	addr := startFakeParserURL(t, responses)

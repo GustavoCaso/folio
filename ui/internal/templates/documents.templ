@@ -48,7 +48,7 @@ templ jobCard(j domain.Job) {
 					</div>
 				}
 			</div>
-			<p class="text-xs text-muted-foreground" data-error-text>
+			<p class="text-xs text-muted-foreground" data-status-text>
 				if j.Status == "FAILED" {
 					{ j.Error }
 				}

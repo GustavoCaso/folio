@@ -55,10 +55,7 @@ message DocumentMetadata {
 }
 
 message StatusUpdate {
-  string status      = 1;  // PROCESSING | DONE | FAILED
-  int32 pages_done   = 2;
-  int32 pages_total  = 3;
-  string error       = 4;
-  string stage       = 5;  // received | loading | processing | exporting
-  string message     = 6;  // human-readable detail
+  string status  = 1;  // PROCESSING | DONE | FAILED
+  string error   = 2;
+  string message = 3;  // human-readable detail
 }

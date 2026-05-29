@@ -88,7 +88,7 @@ async def test_convert_document_yields_markdown_chunk():
 
 
 @pytest.mark.asyncio
-async def test_convert_document_emits_stage_transitions():
+async def test_convert_document_emits_messages():
     servicer = ParserServicer(num_workers=1)
     context = MagicMock()
 
@@ -106,16 +106,9 @@ async def test_convert_document_emits_stage_transitions():
         async for result in servicer.ConvertDocument(stream, context):
             results.append(result)
 
-    stages = [r.status.stage for r in results if r.HasField("status")]
-    assert "received" in stages
-    assert "loading" in stages
-    assert "exporting" in stages
-    assert "done" in stages
-
-    loading = next(
-        r.status for r in results if r.HasField("status") and r.status.stage == "loading"
-    )
-    assert loading.pages_total == 7
+    messages = [r.status.message for r in results if r.HasField("status")]
+    assert any("received" in m for m in messages)
+    assert any("loading document (7 pages)" in m for m in messages)
 
 
 @pytest.mark.asyncio
@@ -434,14 +427,14 @@ async def test_batched_path_yields_progress_per_batch():
         async for result in servicer.ConvertDocument(stream, context):
             results.append(result)
 
-    converting = [
-        r.status for r in results if r.HasField("status") and r.status.stage == "converting"
+    converting_msgs = [
+        r.status.message
+        for r in results
+        if r.HasField("status") and "converting batch" in r.status.message
     ]
-    assert len(converting) == 2
-    assert converting[0].pages_done == 100
-    assert converting[0].pages_total == 150
-    assert converting[1].pages_done == 150
-    assert converting[1].pages_total == 150
+    assert len(converting_msgs) == 2
+    assert "1" in converting_msgs[0] and "100" in converting_msgs[0]
+    assert "101" in converting_msgs[1] and "150" in converting_msgs[1]
 
 
 @pytest.mark.asyncio
@@ -581,8 +574,8 @@ async def test_convert_url_yields_failed_on_error():
 
 
 @pytest.mark.asyncio
-async def test_convert_url_no_page_count_in_loading_status():
-    """URL conversions skip page counting — pages_total stays 0 in loading status."""
+async def test_convert_url_loading_status_message():
+    """URL conversions emit a loading message."""
     servicer = ParserServicer(num_workers=1)
     context = MagicMock()
 
@@ -600,7 +593,5 @@ async def test_convert_url_no_page_count_in_loading_status():
         async for result in servicer.ConvertURL(request, context):
             results.append(result)
 
-    loading = next(
-        r.status for r in results if r.HasField("status") and r.status.stage == "loading"
-    )
-    assert loading.pages_total == 0
+    messages = [r.status.message for r in results if r.HasField("status")]
+    assert any("fetching" in m or "loading" in m for m in messages)

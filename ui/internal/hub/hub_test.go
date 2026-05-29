@@ -31,7 +31,7 @@ func TestPublishReachesSubscriber(t *testing.T) {
 	ch := h.Subscribe("job-1")
 	defer h.Unsubscribe("job-1", ch)
 
-	event := hub.StatusEvent{Status: "PROCESSING", PagesDone: 5, PagesTotal: 100}
+	event := hub.StatusEvent{Status: "PROCESSING", Message: "progress"}
 	h.Publish("job-1", event)
 
 	select {
@@ -39,8 +39,8 @@ func TestPublishReachesSubscriber(t *testing.T) {
 		if got.Status != "PROCESSING" {
 			t.Fatalf("expected PROCESSING, got %s", got.Status)
 		}
-		if got.PagesDone != 5 {
-			t.Fatalf("expected PagesDone 5, got %d", got.PagesDone)
+		if got.Message != "progress" {
+			t.Fatalf("expected Message 'progress', got %q", got.Message)
 		}
 	default:
 		t.Fatal("expected event on channel, got nothing")
@@ -61,24 +61,18 @@ func TestPublishDoesNotReachUnrelatedJob(t *testing.T) {
 	}
 }
 
-func TestPublishCarriesStageAndMessage(t *testing.T) {
+func TestPublishCarriesMessage(t *testing.T) {
 	h := newHub(t)
 	ch := h.Subscribe("job-3")
 	defer h.Unsubscribe("job-3", ch)
 
 	h.Publish("job-3", hub.StatusEvent{
-		Status:     "PROCESSING",
-		Stage:      "processing",
-		Message:    "converted page 3/10",
-		PagesDone:  3,
-		PagesTotal: 10,
+		Status:  "PROCESSING",
+		Message: "converted page 3/10",
 	})
 
 	select {
 	case got := <-ch:
-		if got.Stage != "processing" {
-			t.Fatalf("expected stage processing, got %q", got.Stage)
-		}
 		if got.Message != "converted page 3/10" {
 			t.Fatalf("unexpected message %q", got.Message)
 		}
@@ -89,11 +83,8 @@ func TestPublishCarriesStageAndMessage(t *testing.T) {
 
 func TestStatusEventJSONShape(t *testing.T) {
 	evt := hub.StatusEvent{
-		Status:     "PROCESSING",
-		PagesDone:  2,
-		PagesTotal: 5,
-		Stage:      "loading",
-		Message:    "loading document",
+		Status:  "PROCESSING",
+		Message: "loading document",
 	}
 	data, err := json.Marshal(evt)
 	if err != nil {
@@ -103,10 +94,49 @@ func TestStatusEventJSONShape(t *testing.T) {
 	if err := json.Unmarshal(data, &decoded); err != nil {
 		t.Fatal(err)
 	}
-	for _, key := range []string{"Status", "PagesDone", "PagesTotal", "Stage", "Message"} {
+	for _, key := range []string{"Status", "Message"} {
 		if _, ok := decoded[key]; !ok {
 			t.Errorf("missing JSON field %q in %s", key, data)
 		}
+	}
+}
+
+func TestSubscribeReplaysEventsPublishedBeforeConnect(t *testing.T) {
+	h := newHub(t)
+
+	h.Publish("job-r", hub.StatusEvent{Status: "PROCESSING", Message: "batch 1"})
+	h.Publish("job-r", hub.StatusEvent{Status: "PROCESSING", Message: "batch 2"})
+
+	ch := h.Subscribe("job-r")
+	defer h.Unsubscribe("job-r", ch)
+
+	for _, want := range []string{"batch 1", "batch 2"} {
+		select {
+		case got := <-ch:
+			if got.Message != want {
+				t.Fatalf("expected %q, got %q", want, got.Message)
+			}
+		default:
+			t.Fatalf("expected replayed event %q, got nothing", want)
+		}
+	}
+}
+
+func TestReplayBufferClearedOnLastUnsubscribe(t *testing.T) {
+	h := newHub(t)
+
+	h.Publish("job-c", hub.StatusEvent{Status: "PROCESSING", Message: "batch 1"})
+	ch := h.Subscribe("job-c")
+	h.Unsubscribe("job-c", ch)
+
+	// New subscriber after cleanup should get no replayed events.
+	ch2 := h.Subscribe("job-c")
+	defer h.Unsubscribe("job-c", ch2)
+
+	select {
+	case got := <-ch2:
+		t.Fatalf("expected no events after cleanup, got %+v", got)
+	default:
 	}
 }
 
