@@ -417,7 +417,7 @@ func Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight) 
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, " <article class=\"mx-auto max-w-[68ch] px-2 py-4 pb-24\"><div id=\"reader\" data-job-id=\"")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 20, " <article class=\"mx-auto max-w-[68ch] px-2 py-4 pb-24 overflow-x-auto\"><div id=\"reader\" data-job-id=\"")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

@@ -22,7 +22,8 @@ services:
       - GRPC_PORT=50051
       - NUM_WORKERS=2
       - PDF_DO_OCR=false
-      - PDF_DO_TABLE_STRUCTURE=false
+      - PDF_DO_TABLE_STRUCTURE=true
+      - PDF_TABLE_STRUCTURE_MODE=accurate
       - PDF_POST_PROCESS_CODE_BLOCKS=true
       - HTML_FETCH_IMAGES=true
       - HTML_POST_PROCESS_CODE_BLOCKS=true
