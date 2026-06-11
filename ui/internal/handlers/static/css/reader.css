@@ -1,3 +1,8 @@
+/* Clear the sticky header (~57px) when scrolling to anchors / highlights. */
+html {
+  scroll-padding-top: 4.5rem;
+}
+
 #progress-bar {
   position: fixed;
   top: 0;

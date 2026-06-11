@@ -138,7 +138,7 @@ templ DocumentList(jobs []domain.Job) {
 }
 
 templ Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) {
-	@Layout("Documents") {
+	@Layout("Documents", NoAction()) {
 		@ErrorBanner(errMsg)
 		<div class="flex flex-col gap-8">
 			<div class="flex flex-col gap-4">
