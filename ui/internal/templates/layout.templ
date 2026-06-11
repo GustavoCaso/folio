@@ -4,8 +4,12 @@ import "github.com/templui/templui/components/badge"
 import "github.com/templui/templui/components/collapsible"
 import "github.com/templui/templui/components/sheet"
 import "github.com/templui/templui/components/toast"
+import "github.com/templui/templui/components/icon"
 
-templ Layout(title string) {
+templ NoAction() {
+}
+
+templ Layout(title string, headerActions templ.Component) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -22,16 +26,24 @@ templ Layout(title string) {
 			@toast.Script()
 		</head>
 		<body class="min-h-screen bg-background text-foreground">
-			<header class="border-b border-border">
+			<header id="site-header" class="sticky top-0 z-40 border-b border-transparent bg-background/80 backdrop-blur-md transition-[border-color,box-shadow] duration-200">
 				<div class="mx-auto max-w-4xl flex items-center justify-between px-4 py-3">
 					<div class="flex items-center gap-6">
-						<a href="/" class="font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity" style="font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;">Folio</a>
+						<a href="/" class="group flex items-center gap-2 font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity" style="font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;">
+							@icon.BookOpen(icon.Props{Class: "h-4 w-4 -translate-y-px text-primary"})
+							Folio
+						</a>
 						<a href="/exports" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Exports</a>
 					</div>
-					<div id="parser-status-badge">
-						@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-							Parser checking…
-						}
+					<div class="flex items-center gap-3">
+						<div id="header-actions" class="flex items-center gap-2">
+							@headerActions
+						</div>
+						<div id="parser-status-badge">
+							@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
+								Parser checking…
+							}
+						</div>
 					</div>
 				</div>
 			</header>
@@ -39,43 +51,55 @@ templ Layout(title string) {
 				{ children... }
 			</main>
 			<script>
-		(function() {
-			var container = document.getElementById('parser-status-badge');
+				(function() {
+					var container = document.getElementById('parser-status-badge');
 
-			function setBadge(s) {
-				var variantClass = {
-					healthy:   'bg-green-100 text-green-800 border-green-200',
-					unhealthy: 'bg-red-100 text-red-800 border-red-200',
-					checking:  'bg-secondary text-secondary-foreground',
-				}[s] || 'bg-secondary text-secondary-foreground';
+					function setBadge(s) {
+						var variantClass = {
+							healthy:   'bg-green-100 text-green-800 border-green-200',
+							unhealthy: 'bg-red-100 text-red-800 border-red-200',
+							checking:  'bg-secondary text-secondary-foreground',
+						}[s] || 'bg-secondary text-secondary-foreground';
 
-				var label = {
-					healthy:   'Parser ready',
-					unhealthy: 'Parser unavailable',
-					checking:  'Parser checking…',
-				}[s] || 'Parser checking…';
+						var label = {
+							healthy:   'Parser ready',
+							unhealthy: 'Parser unavailable',
+							checking:  'Parser checking…',
+						}[s] || 'Parser checking…';
 
-				container.innerHTML = '<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ' + variantClass + '">' + label + '</span>';
-        
-				var uploadBtn = document.getElementById('upload-btn');
-				var retryBtns = document.querySelectorAll('[data-retry-job]');
-				if (uploadBtn) { uploadBtn.disabled = (s !== 'healthy'); }
-				retryBtns.forEach(function(retryBtn) {
-					retryBtn.disabled = (s !== 'healthy');
-				});
-			}
+						container.innerHTML = '<span class="inline-flex items-center rounded-full border px-2.5 py-0.5 text-xs font-semibold ' + variantClass + '">' + label + '</span>';
+						
+						var uploadBtn = document.getElementById('upload-btn');
+						var retryBtns = document.querySelectorAll('[data-retry-job]');
+						if (uploadBtn) { uploadBtn.disabled = (s !== 'healthy'); }
+						retryBtns.forEach(function(retryBtn) {
+							retryBtn.disabled = (s !== 'healthy');
+						});
+					}
 
-			function poll() {
-				fetch('/health/parser')
-					.then(function(r) { return r.json(); })
-					.then(function(d) { setBadge(d.status === 'healthy' ? 'healthy' : 'unhealthy'); })
-					.catch(function()  { setBadge('unhealthy'); });
-			}
+					function poll() {
+						fetch('/health/parser')
+							.then(function(r) { return r.json(); })
+							.then(function(d) { setBadge(d.status === 'healthy' ? 'healthy' : 'unhealthy'); })
+							.catch(function()  { setBadge('unhealthy'); });
+					}
 
-			poll();
-			setInterval(poll, 10000);
-		})();
-		</script>
+					poll();
+					setInterval(poll, 10000);
+					
+					var header = document.getElementById('site-header');
+					if (!header) return;
+					function onScroll() {
+						var scrolled = window.scrollY > 8;
+						header.classList.toggle('border-border', scrolled);
+						header.classList.toggle('shadow-sm', scrolled);
+						header.classList.toggle('border-transparent', !scrolled);
+					}
+					window.addEventListener('scroll', onScroll, { passive: true });
+					onScroll();
+					
+				})();
+			</script>
 		</body>
 	</html>
 }
@@ -87,7 +111,7 @@ templ ErrorBanner(msg string) {
 }
 
 templ ErrorPage(msg string) {
-	@Layout("Error") {
+	@Layout("Error", NoAction()) {
 		@ErrorBanner(msg)
 	}
 }

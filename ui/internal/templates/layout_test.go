@@ -12,7 +12,7 @@ import (
 func renderLayout(t *testing.T) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.Layout("Test").Render(context.Background(), &buf); err != nil {
+	if err := templates.Layout("Test", templates.NoAction()).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()

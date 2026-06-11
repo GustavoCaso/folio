@@ -36,7 +36,7 @@ templ exportStatusBadge(status string) {
 }
 
 templ Exports(records []domain.ExportRecord) {
-	@Layout("Exports") {
+	@Layout("Exports", NoAction()) {
 		<div class="flex flex-col gap-6">
 			<h1 class="text-2xl font-semibold">Export History</h1>
 			if len(records) == 0 {

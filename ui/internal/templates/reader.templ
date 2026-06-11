@@ -1,14 +1,21 @@
 package templates
 
 import (
+	"strconv"
+
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
+	"github.com/templui/templui/components/icon"
 	"github.com/templui/templui/components/input"
 	"github.com/templui/templui/components/popover"
 	"github.com/templui/templui/components/sheet"
 	"github.com/templui/templui/components/textarea"
 )
+
+func highlightCount(highlights []domain.Highlight) string {
+	return strconv.Itoa(len(highlights))
+}
 
 templ highlightCard(h domain.Highlight) {
 	@card.Card(card.Props{Class: "cursor-pointer", Attributes: map[string]any{"data-scroll-to-highlight": h.ID}}) {
@@ -64,20 +71,30 @@ templ highlightsPanel(highlights []domain.Highlight) {
 	}
 }
 
-templ Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight) {
-	@Layout(job.Filename) {
-		<div id="progress-bar"></div>
-		@highlightsPanel(highlights)
-		// External trigger outside of Sheet component
+templ headerActions(highlights []domain.Highlight) {
+	<div>
 		@sheet.Trigger(sheet.TriggerProps{
 			For: "highlights-panel",
 		}) {
 			@button.Button(button.Props{
 				Variant: button.VariantOutline,
+				Size:    button.SizeSm,
+				Class:   "gap-1.5",
 			}) {
+				@icon.Highlighter(icon.Props{Class: "h-3.5 w-3.5"})
 				Highlights
+				if len(highlights) > 0 {
+					<span class="ml-0.5 inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 text-[0.6875rem] font-semibold text-primary">{ highlightCount(highlights) }</span>
+				}
 			}
 		}
+	</div>
+}
+
+templ Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight) {
+	@Layout(job.Filename, headerActions(highlights)) {
+		<div id="progress-bar"></div>
+		@highlightsPanel(highlights)
 		<article class="mx-auto max-w-[68ch] px-2 py-4 pb-24 overflow-x-auto">
 			<div id="reader" data-job-id={ job.ID } data-reading-progress={ job.ReadingProgress }>
 				@templ.Raw(renderedHTML)
