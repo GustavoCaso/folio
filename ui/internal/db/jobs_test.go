@@ -17,7 +17,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, err := database.CreateJob(context.Background(), "book.pdf", content, "req-123")
+	job, err := database.CreateJob(context.Background(), "book.pdf", content, "req-123", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -49,6 +49,22 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 }
 
+func TestCreateJob_DefaultsFormatToPDF(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+
+	job, err := database.CreateJob(context.Background(), "book.pdf", content, "req-1", "pdf")
+	if err != nil {
+		t.Fatalf("CreateJob: %v", err)
+	}
+	if job.Format != "pdf" {
+		t.Errorf("Format = %q, want %q", job.Format, "pdf")
+	}
+}
+
 func TestUpdateJobStatus(t *testing.T) {
 	database, err := db.New(":memory:")
 	if err != nil {
@@ -56,7 +72,7 @@ func TestUpdateJobStatus(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, err := database.CreateJob(context.Background(), "book.pdf", content, "")
+	job, err := database.CreateJob(context.Background(), "book.pdf", content, "", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -77,7 +93,7 @@ func TestUpdateReadingProgress(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "")
+	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "", "pdf")
 	if err := database.UpdateReadingProgress(context.Background(), job.ID, "paragraph-42"); err != nil {
 		t.Fatal(err)
 	}
@@ -97,11 +113,11 @@ func TestGetPendingJobs(t *testing.T) {
 
 	ctx := context.Background()
 
-	pending1, _ := database.CreateJob(ctx, "a.pdf", content, "")
-	pending2, _ := database.CreateJob(ctx, "b.pdf", content, "")
-	processing, _ := database.CreateJob(ctx, "c.pdf", content, "")
-	done, _ := database.CreateJob(ctx, "d.pdf", content, "")
-	failed, _ := database.CreateJob(ctx, "e.pdf", content, "")
+	pending1, _ := database.CreateJob(ctx, "a.pdf", content, "", "pdf")
+	pending2, _ := database.CreateJob(ctx, "b.pdf", content, "", "pdf")
+	processing, _ := database.CreateJob(ctx, "c.pdf", content, "", "pdf")
+	done, _ := database.CreateJob(ctx, "d.pdf", content, "", "pdf")
+	failed, _ := database.CreateJob(ctx, "e.pdf", content, "", "pdf")
 
 	if err := database.UpdateJobStatus(ctx, processing.ID, "PROCESSING"); err != nil {
 		t.Fatal(err)
@@ -159,7 +175,7 @@ func TestMarkJobDone(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "")
+	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "", "pdf")
 	if len(job.Content) == 0 {
 		t.Fatalf("expected content to not be empty, got %v", job.Content)
 	}
@@ -190,7 +206,7 @@ func TestDeleteJob(t *testing.T) {
 
 	ctx := context.Background()
 
-	job, err := database.CreateJob(ctx, "test.pdf", content, "req-1")
+	job, err := database.CreateJob(ctx, "test.pdf", content, "req-1", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -213,7 +229,7 @@ func TestMarkJobDonePersistsMetadata(t *testing.T) {
 	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
-	job, err := database.CreateJob(ctx, "test.pdf", []byte("%PDF"), "req-1")
+	job, err := database.CreateJob(ctx, "test.pdf", []byte("%PDF"), "req-1", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -250,7 +266,7 @@ func TestRetryJob(t *testing.T) {
 
 	ctx := context.Background()
 
-	job, err := database.CreateJob(ctx, "test.pdf", content, "req-1")
+	job, err := database.CreateJob(ctx, "test.pdf", content, "req-1", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}

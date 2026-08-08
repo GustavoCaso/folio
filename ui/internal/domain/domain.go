@@ -16,6 +16,7 @@ type Job struct {
 	Author          string
 	Cover           []byte
 	SourceURL       string
+	Format          string
 	Tags            []string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

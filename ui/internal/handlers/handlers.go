@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/converter"
+	"github.com/GustavoCaso/folio/ui/internal/epubconvert"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
@@ -23,12 +24,13 @@ import (
 var staticFS embed.FS
 
 type Handlers struct {
-	store     repository.Store
-	hub       *hub.Hub
-	parser    client.Client
-	converter *converter.Runner
-	dataDir   string
-	backends  []export.Backend
+	store         repository.Store
+	hub           *hub.Hub
+	parser        client.Client
+	converter     *converter.Runner
+	epubConverter *epubconvert.Runner
+	dataDir       string
+	backends      []export.Backend
 }
 
 func (h *Handlers) backendByName(name string) export.Backend {
@@ -58,7 +60,9 @@ func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir stri
 		runner = converter.New(store, h, pc, dataDir, logger)
 	}
 
-	hs := &Handlers{store: store, hub: h, parser: pc, converter: runner, dataDir: dataDir, backends: backends}
+	epubRunner := epubconvert.New(store, h, dataDir)
+
+	hs := &Handlers{store: store, hub: h, parser: pc, converter: runner, epubConverter: epubRunner, dataDir: dataDir, backends: backends}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)

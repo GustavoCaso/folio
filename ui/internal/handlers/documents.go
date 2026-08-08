@@ -79,8 +79,13 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	format := "pdf"
+	if strings.HasSuffix(strings.ToLower(header.Filename), ".epub") {
+		format = "epub"
+	}
+
 	reqID := logging.RequestIDFrom(r.Context())
-	job, err := h.store.CreateJob(r.Context(), header.Filename, pdfBytes, reqID)
+	job, err := h.store.CreateJob(r.Context(), header.Filename, pdfBytes, reqID, format)
 	if err != nil {
 		log.Error("create job failed", logging.Err(err), "filename", header.Filename)
 		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store job. %v", err))
@@ -91,9 +96,14 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		"job_id", job.ID,
 		"filename", header.Filename,
 		"bytes", len(pdfBytes),
+		"format", format,
 	)
 
-	go h.converter.Run(job.ID, reqID, header.Filename, pdfBytes)
+	if format == "epub" {
+		go h.epubConverter.Run(context.Background(), job.ID, pdfBytes)
+	} else {
+		go h.converter.Run(job.ID, reqID, header.Filename, pdfBytes)
+	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

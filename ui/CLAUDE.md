@@ -24,6 +24,8 @@ Python is treated as stateless — no file paths are exchanged.
 - `parser/proto/` — generated protobuf bindings (do not edit manually)
 - `converter/` — `Runner` struct: executes conversions (file upload and URL), rewrites image refs to base64, writes Markdown to disk, marks jobs done/failed; owns cancel tracking
 - `renderer/` — goldmark Markdown renderer with data-block-id injection for highlight anchoring
+- `epubconvert/` — `Runner` struct: parses uploaded EPUB bytes (no gRPC, synchronous), writes one HTML file per chapter + `toc.json` to disk, marks jobs done/failed
+- `epubrender/` — HTML-tree walker: injects `data-block-id` on block-level elements per chapter, rewrites `<img>` refs to base64 data URIs
 - `domain/` — domain types
 - `repository/` — repository interfaces
 - `handlers/` — HTTP handlers (documents, reader, highlights CRUD, SSE); delegates conversion to `converter.Runner`
@@ -60,14 +62,32 @@ Browser imports URL
       → rewrite image refs → base64 data URIs
       → os.WriteFile(markdown)
       → store.MarkJobDone()
+
+Browser uploads EPUB
+  → POST /documents (same route, format detected by filename extension)
+  → store.CreateJob(..., format="epub")
+  → go epubconvert.Run()      # synchronous parse, no gRPC
+      → epub.NewReader(bytes) # github.com/raitucarp/epub
+      → extract Title/Author/Cover
+      → per spine item: epubrender.Render() → data-block-id + base64 images
+      → write DATA_DIR/{jobID}/chapter-N.html + toc.json
+      → store.MarkJobDone(outputPath=dir)
+  → hub.Publish DONE → SSE → browser
 ```
 
 ## Highlight anchoring
 
-Highlights are anchored to `data-block-id` attributes injected by the goldmark
-renderer. Each block-level element (heading, paragraph, code block) gets a unique
-ID of the form `kind-N` (e.g. `heading-1`, `paragraph-3`). StartPos/EndPos are
-character offsets within that block's text content, not the whole document.
+Highlights are anchored to `data-block-id` attributes.
+
+- PDF/Markdown: injected by the goldmark renderer (`renderer/`). Each block-level
+  element (heading, paragraph, code block) gets a unique ID of the form `kind-N`
+  (e.g. `heading-1`, `paragraph-3`). StartPos/EndPos are character offsets within
+  that block's text content, not the whole document.
+- EPUB: injected by `epubrender/`. IDs are chapter-prefixed, `ch{N}-{tag}-{M}`
+  (e.g. `ch0-p-1`), since a book has multiple chapter documents instead of one.
+  `Job.Format` (`"pdf"` or `"epub"`) selects which reader path handles a job;
+  `GET /read/{jobID}?chapter=N&full=1` serves a single epub chapter or the
+  whole book concatenated.
 
 This means highlights survive goldmark version upgrades and minor Docling output
 changes, as long as the block structure is preserved.

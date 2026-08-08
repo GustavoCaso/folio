@@ -96,7 +96,7 @@ func (p *blockingParser) Close() error {
 func TestRun_MarksDone(t *testing.T) {
 	store := newStore(t)
 	dir := t.TempDir()
-	job, err := store.CreateJob(context.Background(), "test.pdf", []byte("%PDF"), "req-1")
+	job, err := store.CreateJob(context.Background(), "test.pdf", []byte("%PDF"), "req-1", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +146,7 @@ func TestRunFromURL_MarksDone(t *testing.T) {
 func TestRun_ParserError_MarksJobFailed(t *testing.T) {
 	store := newStore(t)
 	dir := t.TempDir()
-	job, err := store.CreateJob(context.Background(), "fail.pdf", []byte("%PDF"), "req-1")
+	job, err := store.CreateJob(context.Background(), "fail.pdf", []byte("%PDF"), "req-1", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -169,7 +169,7 @@ func TestRun_ParserError_MarksJobFailed(t *testing.T) {
 func TestRun_CancelledContext_MarksJobCancelledByUser(t *testing.T) {
 	store := newStore(t)
 	dir := t.TempDir()
-	job, err := store.CreateJob(context.Background(), "cancel.pdf", []byte("%PDF"), "req-1")
+	job, err := store.CreateJob(context.Background(), "cancel.pdf", []byte("%PDF"), "req-1", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -207,7 +207,7 @@ func TestRun_CancelledContext_MarksJobCancelledByUser(t *testing.T) {
 func TestRun_RewritesImageRefsToBase64(t *testing.T) {
 	store := newStore(t)
 	dir := t.TempDir()
-	job, err := store.CreateJob(context.Background(), "img.pdf", []byte("%PDF"), "req-1")
+	job, err := store.CreateJob(context.Background(), "img.pdf", []byte("%PDF"), "req-1", "pdf")
 	if err != nil {
 		t.Fatal(err)
 	}
