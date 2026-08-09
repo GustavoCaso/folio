@@ -14,8 +14,6 @@ wheels/
 data/
 models/
 
-docs/
-
 # Node
 node_modules/
 

@@ -24,8 +24,8 @@ Python is treated as stateless — no file paths are exchanged.
 - `parser/proto/` — generated protobuf bindings (do not edit manually)
 - `converter/` — `Runner` struct: dispatches conversions (file upload and URL) to a `map[string]parser.Parser` keyed by `domain.Format`; owns cancel tracking
 - `converter/parser/` — `Parser` interface, implemented per format; each implementation owns its full conversion lifecycle (writing output, marking the job done/failed, publishing hub events). `NewPDF` (gRPC to Python, rewrites image refs to base64, writes Markdown to disk) and `NewEPUB` (parses uploaded EPUB bytes, no gRPC, synchronous, writes one HTML file per chapter + `toc.json` to disk)
-- `renderer/` — goldmark Markdown renderer with data-block-id injection for highlight anchoring
-- `epubrender/` — HTML-tree walker: injects `data-block-id` on block-level elements per chapter, rewrites `<img>` refs to base64 data URIs
+- `renderer/markdown/` — goldmark Markdown renderer with data-block-id injection for highlight anchoring
+- `renderer/epub/` — HTML-tree walker: injects `data-block-id` on block-level elements per chapter, rewrites `<img>` refs to base64 data URIs
 - `domain/` — domain types
 - `repository/` — repository interfaces
 - `handlers/` — HTTP handlers (documents, reader, highlights CRUD, SSE); delegates conversion to `converter.Runner`
