@@ -22,7 +22,7 @@ func TestWithTx_CommitsOnSuccess(t *testing.T) {
 
 	err = database.WithTx(ctx, func(ctx context.Context, tx repository.Store) error {
 		var err error
-		created, err = tx.CreateJob(ctx, "book.pdf", content, "req-1", "pdf")
+		created, err = tx.CreateJob(ctx, "book.pdf", content, "req-1", domain.PdfFormat)
 		return err
 	})
 	if err != nil {
@@ -49,7 +49,7 @@ func TestWithTx_RollsBackOnError(t *testing.T) {
 	var jobID string
 
 	err = database.WithTx(ctx, func(ctx context.Context, tx repository.Store) error {
-		job, err := tx.CreateJob(ctx, "book.pdf", content, "req-1", "pdf")
+		job, err := tx.CreateJob(ctx, "book.pdf", content, "req-1", domain.PdfFormat)
 		if err != nil {
 			return err
 		}
@@ -79,7 +79,7 @@ func TestWithTx_MultipleOpsAtomic(t *testing.T) {
 	// Transaction creates a job and a highlight; fails after the highlight —
 	// both should be rolled back.
 	err = database.WithTx(ctx, func(ctx context.Context, tx repository.Store) error {
-		job, err := tx.CreateJob(ctx, "book.pdf", content, "req-1", "pdf")
+		job, err := tx.CreateJob(ctx, "book.pdf", content, "req-1", domain.PdfFormat)
 		if err != nil {
 			return err
 		}

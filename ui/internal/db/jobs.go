@@ -9,7 +9,7 @@ import (
 	"github.com/google/uuid"
 )
 
-func (d *db) CreateJob(ctx context.Context, filename string, content []byte, requestID, format string) (domain.Job, error) {
+func (d *db) CreateJob(ctx context.Context, filename string, content []byte, requestID string, format domain.JobFormat) (domain.Job, error) {
 	now := time.Now().UTC()
 	id := uuid.NewString()
 	_, err := d.conn.ExecContext(ctx,
@@ -20,7 +20,7 @@ func (d *db) CreateJob(ctx context.Context, filename string, content []byte, req
 	if err != nil {
 		return domain.Job{}, err
 	}
-	return domain.Job{ID: id, Filename: filename, RequestID: requestID, Content: content, Status: "PENDING", Format: format, CreatedAt: now, UpdatedAt: now}, nil
+	return domain.Job{ID: id, Filename: filename, RequestID: requestID, Content: content, Status: "PENDING", Format: domain.JobFormat(format), CreatedAt: now, UpdatedAt: now}, nil
 }
 
 func (d *db) CreateJobFromURL(ctx context.Context, sourceURL, filename, requestID string) (domain.Job, error) {
@@ -152,11 +152,12 @@ type scanner interface {
 func scanJob(s scanner) (domain.Job, error) {
 	var j domain.Job
 	var createdAt, updatedAt string
+	var format string
 	var tagsStr string
 	err := s.Scan(
 		&j.ID, &j.Filename, &j.RequestID, &j.Content, &j.RetryCount, &j.Status,
 		&j.ReadingProgress, &j.Error, &j.OutputPath, &j.Title, &j.Author, &j.Cover,
-		&j.SourceURL, &tagsStr, &j.Format, &createdAt, &updatedAt,
+		&j.SourceURL, &tagsStr, &format, &createdAt, &updatedAt,
 	)
 	if err != nil {
 		return domain.Job{}, err
@@ -167,6 +168,7 @@ func scanJob(s scanner) (domain.Job, error) {
 			return domain.Job{}, jsonErr
 		}
 	}
+	j.Format = domain.JobFormat(format)
 	j.CreatedAt, _ = time.Parse(time.RFC3339, createdAt)
 	j.UpdatedAt, _ = time.Parse(time.RFC3339, updatedAt)
 	return j, nil

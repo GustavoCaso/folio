@@ -17,6 +17,7 @@ import (
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/handlers"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
@@ -89,7 +90,7 @@ func emptyMultipartRequest(t *testing.T) *http.Request {
 
 func TestUploadDocumentError_ShowsExistingJobs(t *testing.T) {
 	store := newTestStore(t)
-	if _, err := store.CreateJob(context.Background(), "existing.pdf", []byte{}, "req-seed", "pdf"); err != nil {
+	if _, err := store.CreateJob(context.Background(), "existing.pdf", []byte{}, "req-seed", domain.PdfFormat); err != nil {
 		t.Fatal(err)
 	}
 
@@ -149,14 +150,14 @@ func TestUploadDocument_EPUBSetsFormat(t *testing.T) {
 	if len(jobs) != 1 {
 		t.Fatalf("expected 1 job, got %d", len(jobs))
 	}
-	if jobs[0].Format != "epub" {
-		t.Errorf("Format = %q, want %q", jobs[0].Format, "epub")
+	if jobs[0].Format != domain.EpubFormat {
+		t.Errorf("Format = %q, want %q", jobs[0].Format, domain.EpubFormat)
 	}
 }
 
 func TestDeleteDocument_RejectsPending(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "pending.pdf", []byte{}, "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "pending.pdf", []byte{}, "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -173,7 +174,7 @@ func TestDeleteDocument_RejectsPending(t *testing.T) {
 
 func TestDeleteDocument_DeletesFailedJob(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "failed.pdf", []byte{}, "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "failed.pdf", []byte{}, "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -204,7 +205,7 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	job, err := store.CreateJob(context.Background(), "done.pdf", []byte{}, "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "done.pdf", []byte{}, "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -258,7 +259,7 @@ func TestRetryDocument_NotFound(t *testing.T) {
 
 func TestRetryDocument_RejectsNonFailed(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "pending.pdf", []byte{}, "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "pending.pdf", []byte{}, "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -275,7 +276,7 @@ func TestRetryDocument_RejectsNonFailed(t *testing.T) {
 
 func TestRetryDocument_HappyPath(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "broken.pdf", []byte("pdf"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "broken.pdf", []byte(domain.PdfFormat), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +317,7 @@ func TestCancelDocument_UnknownID(t *testing.T) {
 
 func TestCancelDocument_InvalidState(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "stuck.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "stuck.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -337,7 +338,7 @@ func TestCancelDocument_InvalidState(t *testing.T) {
 
 func TestCancelDocument_ParserNotRunnig(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "stuck.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "stuck.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -457,12 +458,12 @@ func TestCancelDocument_OK(t *testing.T) {
 
 func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
 	store := newTestStore(t)
-	job1, err := store.CreateJob(t.Context(), "report.pdf", []byte{}, "", "pdf")
+	job1, err := store.CreateJob(t.Context(), "report.pdf", []byte{}, "", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	job2, err := store.CreateJob(t.Context(), "pending-report.pdf", []byte{}, "", "pdf")
+	job2, err := store.CreateJob(t.Context(), "pending-report.pdf", []byte{}, "", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}

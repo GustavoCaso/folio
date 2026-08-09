@@ -2,6 +2,11 @@ package domain
 
 import "time"
 
+type JobFormat string
+
+const PdfFormat JobFormat = "pdf"
+const EpubFormat JobFormat = "epub"
+
 type Job struct {
 	ID              string
 	Filename        string
@@ -16,7 +21,7 @@ type Job struct {
 	Author          string
 	Cover           []byte
 	SourceURL       string
-	Format          string
+	Format          JobFormat
 	Tags            []string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time

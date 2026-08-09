@@ -12,7 +12,7 @@ import (
 // seedJobAndHighlightForExport creates a DONE job, one highlight, and a PENDING export row for backendName.
 func seedJobAndHighlightForExport(t *testing.T, store repository.Store, backendName string) (domain.Job, domain.Highlight) {
 	t.Helper()
-	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req", "pdf")
+	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}

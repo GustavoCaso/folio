@@ -12,6 +12,7 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	parserclient "github.com/GustavoCaso/folio/ui/internal/parser/client"
 	"github.com/GustavoCaso/folio/ui/internal/repository"
@@ -84,7 +85,7 @@ func (c *blockingClient) Close() error                  { return nil }
 func TestPDFParser_Convert_MarksDone(t *testing.T) {
 	store := newStore(t)
 	dir := t.TempDir()
-	job, err := store.CreateJob(context.Background(), "test.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "test.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +115,7 @@ func TestPDFParser_Convert_MarksDone(t *testing.T) {
 func TestPDFParser_Convert_RewritesImageRefsToBase64(t *testing.T) {
 	store := newStore(t)
 	dir := t.TempDir()
-	job, err := store.CreateJob(context.Background(), "img.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "img.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -146,7 +147,7 @@ func TestPDFParser_Convert_RewritesImageRefsToBase64(t *testing.T) {
 func TestPDFParser_Convert_ClientError_MarksJobFailed(t *testing.T) {
 	store := newStore(t)
 	dir := t.TempDir()
-	job, err := store.CreateJob(context.Background(), "fail.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "fail.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -172,7 +173,7 @@ func TestPDFParser_Convert_ClientError_MarksJobFailed(t *testing.T) {
 func TestPDFParser_Convert_CancelledContext_MarksJobCancelledByUser(t *testing.T) {
 	store := newStore(t)
 	dir := t.TempDir()
-	job, err := store.CreateJob(context.Background(), "cancel.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "cancel.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}

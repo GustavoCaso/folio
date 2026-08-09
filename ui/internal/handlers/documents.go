@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
@@ -79,9 +80,9 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	format := "pdf"
+	format := domain.PdfFormat
 	if strings.HasSuffix(strings.ToLower(header.Filename), ".epub") {
-		format = "epub"
+		format = domain.EpubFormat
 	}
 
 	reqID := logging.RequestIDFrom(r.Context())
@@ -291,7 +292,7 @@ func (h *Handlers) ImportDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("url import accepted", "job_id", job.ID, "url", rawURL)
-	go h.converter.RunFromURL(job.ID, reqID, "pdf", rawURL)
+	go h.converter.RunFromURL(job.ID, reqID, domain.PdfFormat, rawURL)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

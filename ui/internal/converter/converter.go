@@ -8,6 +8,7 @@ import (
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/repository"
@@ -18,12 +19,12 @@ import (
 type Runner struct {
 	store   repository.Store
 	hub     *hub.Hub
-	parsers map[string]parser.Parser
+	parsers map[domain.JobFormat]parser.Parser
 	logger  *slog.Logger
 	cancels sync.Map // jobID → context.CancelFunc
 }
 
-func New(store repository.Store, h *hub.Hub, parsers map[string]parser.Parser, logger *slog.Logger) *Runner {
+func New(store repository.Store, h *hub.Hub, parsers map[domain.JobFormat]parser.Parser, logger *slog.Logger) *Runner {
 	return &Runner{
 		store:   store,
 		hub:     h,
@@ -47,7 +48,7 @@ func (r *Runner) HasCancel(jobID string) bool {
 	return ok
 }
 
-func (r *Runner) Run(jobID, requestID, format, filename string, data []byte) {
+func (r *Runner) Run(jobID, requestID string, format domain.JobFormat, filename string, data []byte) {
 	log := r.logger.With("job_id", jobID, "request_id", requestID, "filename", filename, "format", format)
 	start := time.Now()
 	log.Info("conversion start", "bytes", len(data))
@@ -71,7 +72,7 @@ func (r *Runner) Run(jobID, requestID, format, filename string, data []byte) {
 	log.Info("conversion done", "dur_ms", time.Since(start).Milliseconds())
 }
 
-func (r *Runner) RunFromURL(jobID, requestID, format, sourceURL string) {
+func (r *Runner) RunFromURL(jobID, requestID string, format domain.JobFormat, sourceURL string) {
 	log := r.logger.With("job_id", jobID, "request_id", requestID, "source_url", sourceURL, "format", format)
 	start := time.Now()
 	log.Info("url conversion start")
@@ -95,7 +96,7 @@ func (r *Runner) RunFromURL(jobID, requestID, format, sourceURL string) {
 	log.Info("url conversion done", "dur_ms", time.Since(start).Milliseconds())
 }
 
-func (r *Runner) handleUnknownFormat(log *slog.Logger, jobID, format string) {
+func (r *Runner) handleUnknownFormat(log *slog.Logger, jobID string, format domain.JobFormat) {
 	errMsg := fmt.Sprintf("no parser registered for format %q", format)
 	log.Error(errMsg)
 	if markErr := r.store.MarkJobFailed(context.Background(), jobID, errMsg); markErr != nil {

@@ -13,6 +13,7 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/converter"
 	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
 	"github.com/GustavoCaso/folio/ui/internal/db"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
@@ -91,14 +92,14 @@ func (p *blockingParser) ConvertFromURL(ctx context.Context, jobID, _, _ string,
 
 func TestRun_MarksDone(t *testing.T) {
 	store := newStore(t)
-	job, err := store.CreateJob(context.Background(), "test.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "test.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	parsers := map[string]parser.Parser{"pdf": &successParser{store: store}}
+	parsers := map[domain.JobFormat]parser.Parser{domain.PdfFormat: &successParser{store: store}}
 	r := converter.New(store, newHub(t), parsers, newLogger())
-	r.Run(job.ID, "req-1", "pdf", "test.pdf", []byte("%PDF"))
+	r.Run(job.ID, "req-1", domain.PdfFormat, "test.pdf", []byte("%PDF"))
 
 	got, err := store.GetJob(context.Background(), job.ID)
 	if err != nil {
@@ -119,9 +120,9 @@ func TestRunFromURL_MarksDone(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsers := map[string]parser.Parser{"pdf": &successParser{store: store}}
+	parsers := map[domain.JobFormat]parser.Parser{domain.PdfFormat: &successParser{store: store}}
 	r := converter.New(store, newHub(t), parsers, newLogger())
-	r.RunFromURL(job.ID, "req-1", "pdf", "https://example.com/doc")
+	r.RunFromURL(job.ID, "req-1", domain.PdfFormat, "https://example.com/doc")
 
 	got, err := store.GetJob(context.Background(), job.ID)
 	if err != nil {
@@ -134,14 +135,14 @@ func TestRunFromURL_MarksDone(t *testing.T) {
 
 func TestRun_ParserError_MarksJobFailed(t *testing.T) {
 	store := newStore(t)
-	job, err := store.CreateJob(context.Background(), "fail.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "fail.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	parsers := map[string]parser.Parser{"pdf": &failParser{store: store, err: errors.New("parser exploded")}}
+	parsers := map[domain.JobFormat]parser.Parser{domain.PdfFormat: &failParser{store: store, err: errors.New("parser exploded")}}
 	r := converter.New(store, newHub(t), parsers, newLogger())
-	r.Run(job.ID, "req-1", "pdf", "fail.pdf", []byte("%PDF"))
+	r.Run(job.ID, "req-1", domain.PdfFormat, "fail.pdf", []byte("%PDF"))
 
 	got, err := store.GetJob(context.Background(), job.ID)
 	if err != nil {
@@ -157,19 +158,19 @@ func TestRun_ParserError_MarksJobFailed(t *testing.T) {
 
 func TestRun_CancelledContext_MarksJobCancelledByUser(t *testing.T) {
 	store := newStore(t)
-	job, err := store.CreateJob(context.Background(), "cancel.pdf", []byte("%PDF"), "req-1", "pdf")
+	job, err := store.CreateJob(context.Background(), "cancel.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	bp := &blockingParser{store: store, started: make(chan struct{})}
-	parsers := map[string]parser.Parser{"pdf": bp}
+	parsers := map[domain.JobFormat]parser.Parser{domain.PdfFormat: bp}
 	r := converter.New(store, newHub(t), parsers, newLogger())
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		r.Run(job.ID, "req-1", "pdf", "cancel.pdf", []byte("%PDF"))
+		r.Run(job.ID, "req-1", domain.PdfFormat, "cancel.pdf", []byte("%PDF"))
 	}()
 
 	<-bp.started
@@ -201,13 +202,13 @@ func TestRunFromURL_CancelledContext_MarksJobCancelledByUser(t *testing.T) {
 	}
 
 	bp := &blockingParser{store: store, started: make(chan struct{})}
-	parsers := map[string]parser.Parser{"pdf": bp}
+	parsers := map[domain.JobFormat]parser.Parser{domain.PdfFormat: bp}
 	r := converter.New(store, newHub(t), parsers, newLogger())
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		r.RunFromURL(job.ID, "req-1", "pdf", "https://example.com/doc")
+		r.RunFromURL(job.ID, "req-1", domain.PdfFormat, "https://example.com/doc")
 	}()
 
 	<-bp.started
@@ -238,7 +239,7 @@ func TestRun_UnknownFormat_MarksJobFailed(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	parsers := map[string]parser.Parser{"pdf": &successParser{store: store}}
+	parsers := map[domain.JobFormat]parser.Parser{domain.PdfFormat: &successParser{store: store}}
 	r := converter.New(store, newHub(t), parsers, newLogger())
 	r.Run(job.ID, "req-1", "mobi", "test.mobi", []byte("x"))
 

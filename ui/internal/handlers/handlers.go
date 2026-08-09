@@ -12,6 +12,7 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/converter"
 	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
@@ -54,11 +55,11 @@ func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir stri
 		return nil, errors.New("handlers.Register: store is required")
 	}
 
-	parsers := map[string]parser.Parser{
-		"epub": parser.NewEPUB(store, h, dataDir),
+	parsers := map[domain.JobFormat]parser.Parser{
+		domain.EpubFormat: parser.NewEPUB(store, h, dataDir),
 	}
 	if pc != nil {
-		parsers["pdf"] = parser.NewPDF(store, h, pc, dataDir, logger)
+		parsers[domain.PdfFormat] = parser.NewPDF(store, h, pc, dataDir, logger)
 	}
 	runner := converter.New(store, h, parsers, logger)
 

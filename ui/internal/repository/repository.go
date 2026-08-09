@@ -7,7 +7,7 @@ import (
 )
 
 type JobRepository interface {
-	CreateJob(ctx context.Context, filename string, content []byte, requestID, format string) (domain.Job, error)
+	CreateJob(ctx context.Context, filename string, content []byte, requestID string, format domain.JobFormat) (domain.Job, error)
 	CreateJobFromURL(ctx context.Context, sourceURL, filename, requestID string) (domain.Job, error)
 	GetJob(ctx context.Context, id string) (domain.Job, error)
 	GetPendingJobs(ctx context.Context) ([]domain.Job, error)
