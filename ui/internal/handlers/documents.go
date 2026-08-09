@@ -12,6 +12,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
@@ -72,15 +73,20 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = file.Close() }()
 
-	pdfBytes, err := io.ReadAll(file)
+	documentBytes, err := io.ReadAll(file)
 	if err != nil {
 		log.Error("read upload failed", logging.Err(err), "filename", header.Filename)
 		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to read uploaded file. %v", err))
 		return
 	}
 
+	format := domain.PdfFormat
+	if strings.HasSuffix(strings.ToLower(header.Filename), ".epub") {
+		format = domain.EpubFormat
+	}
+
 	reqID := logging.RequestIDFrom(r.Context())
-	job, err := h.store.CreateJob(r.Context(), header.Filename, pdfBytes, reqID)
+	job, err := h.store.CreateJob(r.Context(), header.Filename, documentBytes, reqID, format)
 	if err != nil {
 		log.Error("create job failed", logging.Err(err), "filename", header.Filename)
 		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store job. %v", err))
@@ -90,10 +96,11 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	log.Info("upload accepted",
 		"job_id", job.ID,
 		"filename", header.Filename,
-		"bytes", len(pdfBytes),
+		"bytes", len(documentBytes),
+		"format", format,
 	)
 
-	go h.converter.Run(job.ID, reqID, header.Filename, pdfBytes)
+	go h.converter.Run(job.ID, reqID, format, header.Filename, documentBytes)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -129,9 +136,9 @@ func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if job.SourceURL != "" {
-		go h.converter.RunFromURL(job.ID, job.RequestID, job.SourceURL)
+		go h.converter.RunFromURL(job.ID, job.RequestID, job.Format, job.SourceURL)
 	} else {
-		go h.converter.Run(job.ID, job.RequestID, job.Filename, job.Content)
+		go h.converter.Run(job.ID, job.RequestID, job.Format, job.Filename, job.Content)
 	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -285,7 +292,7 @@ func (h *Handlers) ImportDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("url import accepted", "job_id", job.ID, "url", rawURL)
-	go h.converter.RunFromURL(job.ID, reqID, rawURL)
+	go h.converter.RunFromURL(job.ID, reqID, domain.PdfFormat, rawURL)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

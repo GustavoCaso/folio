@@ -17,7 +17,7 @@ import (
 // attached to that job. Returns both for further assertions.
 func seedJobAndHighlight(t *testing.T, store repository.Store) (domain.Job, domain.Highlight) {
 	t.Helper()
-	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "req-1")
+	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -42,7 +42,7 @@ func seedJobAndHighlight(t *testing.T, store repository.Store) (domain.Job, doma
 
 func TestCreateHighlight_HappyPath(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "req-1")
+	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}

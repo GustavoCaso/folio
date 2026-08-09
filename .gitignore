@@ -21,3 +21,4 @@ node_modules/
 
 # Add CLAUDE.MD file
 !CLAUDE.md
+.tokensave

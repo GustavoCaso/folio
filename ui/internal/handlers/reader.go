@@ -10,7 +10,7 @@ import (
 	"strings"
 
 	"github.com/GustavoCaso/folio/ui/internal/logging"
-	"github.com/GustavoCaso/folio/ui/internal/renderer"
+	"github.com/GustavoCaso/folio/ui/internal/renderer/markdown"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
 )
 
@@ -60,7 +60,7 @@ func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	rendered, err := renderer.Render(src)
+	rendered, err := markdown.Render(src)
 	if err != nil {
 		log.Error("render markdown failed", logging.Err(err))
 		renderErr(http.StatusInternalServerError, "Failed to render document. Please try again.")

@@ -1,6 +1,6 @@
 module github.com/GustavoCaso/folio/ui
 
-go 1.25.0
+go 1.25.3
 
 require (
 	github.com/a-h/templ v0.3.1001
@@ -18,12 +18,16 @@ require (
 )
 
 require (
+	github.com/JohannesKaufmann/dom v0.2.0 // indirect
+	github.com/JohannesKaufmann/html-to-markdown/v2 v2.4.0 // indirect
 	github.com/Oudwins/tailwind-merge-go v0.2.0 // indirect
 	github.com/dlclark/regexp2 v1.11.5 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/mattn/go-isatty v0.0.20 // indirect
 	github.com/ncruces/go-strftime v1.0.0 // indirect
+	github.com/raitucarp/epub v0.2.7 // indirect
 	github.com/remyoudompheng/bigfft v0.0.0-20230129092748-24d4a6f8daec // indirect
+	golang.org/x/image v0.32.0 // indirect
 	golang.org/x/net v0.49.0 // indirect
 	golang.org/x/sys v0.42.0 // indirect
 	golang.org/x/text v0.33.0 // indirect

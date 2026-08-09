@@ -73,7 +73,7 @@ func TestListExports_ShowsExportedRecord(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "paper.pdf", []byte{}, "req-1")
+	job, err := store.CreateJob(ctx, "paper.pdf", []byte{}, "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -131,7 +131,7 @@ func TestListExports_ShowsFailedRecord(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "doc.pdf", []byte{}, "req-1")
+	job, err := store.CreateJob(ctx, "doc.pdf", []byte{}, "req-1", domain.PdfFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
