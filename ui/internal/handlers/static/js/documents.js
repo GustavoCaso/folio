@@ -99,7 +99,12 @@ function initDropZone() {
   if (!zone || !fileInput) return;
 
   function selectFile(file) {
-    if (!file || file.type !== "application/pdf") return;
+    const isPDF = file && file.type === "application/pdf";
+    const isEPUB = file && (
+      file.type === "application/epub+zip" ||
+      file.name?.toLowerCase().endsWith(".epub")
+    );
+    if (!isPDF && !isEPUB) return;
     const dt = new DataTransfer();
     dt.items.add(file);
     fileInput.files = dt.files;

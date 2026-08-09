@@ -155,6 +155,23 @@ export function applyHighlights(reader, highlights) {
   highlights.forEach((h) => applyHighlight(reader, h));
 }
 
+// Filters highlights down to those belonging to the currently viewed epub
+// chapter. Reads #reader's own data-current-chapter attribute (set by
+// reader.templ's currentChapterAttr):
+//   - absent entirely: not an epub document (pdf/markdown) — pass through all highlights.
+//   - "-1": full-book view — no single-chapter restriction, pass through all highlights.
+//   - "N": single-chapter view — keep only highlights whose start_block_id starts
+//     with "chN-" (epubrender's chapter-prefixed block ID scheme).
+export function filterHighlightsByChapter(reader, highlights) {
+  if (!highlights) return highlights;
+
+  const chapterIdx = reader.dataset.currentChapter;
+  if (chapterIdx === undefined || chapterIdx === "-1") return highlights;
+
+  const prefix = `ch${chapterIdx}-`;
+  return highlights.filter((h) => h.start_block_id && h.start_block_id.startsWith(prefix));
+}
+
 // Convert a DOM Range endpoint (node + nodeOffset) into a character position.
 // DOM endpoints come in two flavors:
 //   - text node: nodeOffset is a char index within the text
@@ -275,6 +292,158 @@ export function buildPendingSelection(reader, jobID, sel) {
   };
 }
 
+// --- Sidebar state mirroring ---
+//
+// TemplUI's sidebar toggle mutates a `data-tui-sidebar-state` attribute on
+// the sidebar's own wrapper element (see sidebar.js's setSidebarState) —
+// there's no custom event, and TemplUI's built-in `peer`/`group-data-*` CSS
+// mechanism only reaches DOM siblings positioned after that wrapper. The
+// site header (#site-header in layout.templ) lives outside the sidebar's
+// component tree entirely, so it can't use that mechanism to react to the
+// sidebar opening/closing. Instead we mirror the wrapper's state onto
+// document.body as `data-sidebar-state`, which #site-header's CSS can key
+// off regardless of DOM position.
+const EPUB_SIDEBAR_ID = "epub-toc-sidebar";
+
+// Reads the current data-tui-sidebar-state off the given sidebar wrapper and
+// copies it onto document.body as data-sidebar-state. Exported for tests.
+export function mirrorSidebarState(wrapper) {
+  const state = wrapper.getAttribute("data-tui-sidebar-state");
+  if (state) {
+    document.body.setAttribute("data-sidebar-state", state);
+  } else {
+    document.body.removeAttribute("data-sidebar-state");
+  }
+}
+
+// Finds the epub TOC sidebar's wrapper element (if present on this page),
+// mirrors its initial state onto document.body, and keeps it in sync via a
+// MutationObserver watching for attribute changes. No-ops entirely when no
+// sidebar is present (pdf/markdown reader pages, or any non-reader page),
+// so document.body never gets a data-sidebar-state attribute there.
+export function setupSidebarStateMirror() {
+  const wrapper = document.querySelector(
+    `[data-tui-sidebar-wrapper][data-tui-sidebar-id="${EPUB_SIDEBAR_ID}"]`
+  );
+  if (!wrapper) return;
+
+  mirrorSidebarState(wrapper);
+
+  const observer = new MutationObserver(() => mirrorSidebarState(wrapper));
+  observer.observe(wrapper, {
+    attributes: true,
+    attributeFilter: ["data-tui-sidebar-state"],
+  });
+  return observer;
+}
+
+// --- TOC subsection active-state tracking ---
+//
+// Chapter links (menu-button) get their `data-tui-sidebar-active` state from
+// the server (Reader's IsActive prop), since clicking one always does a full
+// page navigation. Subsection links (menu-sub-button) that jump to an anchor
+// within the *current* chapter don't navigate at all — the server has no way
+// to know which one was clicked. This click handler fills that gap: it
+// deactivates any TOC link inside the sidebar's menu and activates whichever
+// menu-button or menu-sub-button was clicked, giving same-page anchor jumps
+// the same "selected" styling cross-chapter links already get for free.
+export function setupTOCActiveOnClick(sidebar) {
+  if (!sidebar) return;
+
+  sidebar.addEventListener("click", (e) => {
+    const link = e.target.closest(
+      '[data-tui-sidebar="menu-button"], [data-tui-sidebar="menu-sub-button"]'
+    );
+    if (!link || !sidebar.contains(link)) return;
+
+    sidebar
+      .querySelectorAll('[data-tui-sidebar-active="true"]')
+      .forEach((el) => el.removeAttribute("data-tui-sidebar-active"));
+    link.setAttribute("data-tui-sidebar-active", "true");
+  });
+}
+
+// --- TOC scroll tracking ---
+//
+// As the reader scrolls through the current chapter, highlight whichever TOC
+// link (chapter root or subsection) corresponds to the heading nearest the
+// top of the viewport, and keep that link scrolled into view within the
+// sidebar's own scroll container. Only links tagged with the chapter
+// currently being read are considered — cross-chapter subsection links
+// (rendered with `?chapter=N#anchor` hrefs) point at headings that aren't in
+// this page's DOM at all, so they're excluded up front.
+//
+// reader.templ tags every TOC link with data-toc-chapter/data-toc-anchor;
+// the chapter-root link carries data-toc-anchor="" and represents the top of
+// the chapter, before its first subsection heading.
+export function buildTOCScrollEntries(reader, sidebar, currentChapterIdx) {
+  if (!reader || !sidebar) return [];
+
+  const links = Array.from(
+    sidebar.querySelectorAll(`[data-toc-chapter="${currentChapterIdx}"]`)
+  );
+
+  const entries = [];
+  for (const link of links) {
+    const anchor = link.dataset.tocAnchor;
+    if (!anchor) {
+      entries.push({ link, top: -Infinity });
+      continue;
+    }
+    const heading = document.getElementById(anchor);
+    if (!heading) continue;
+    entries.push({ link, top: heading.getBoundingClientRect().top + window.scrollY });
+  }
+
+  entries.sort((a, b) => a.top - b.top);
+  return entries;
+}
+
+// Picks the last entry whose heading is at or above the current scroll
+// position (i.e. the section the reader is currently inside), given entries
+// already sorted by document position (see buildTOCScrollEntries).
+export function activeTOCEntry(entries, scrollY) {
+  let active = entries[0] ?? null;
+  for (const entry of entries) {
+    if (entry.top <= scrollY) {
+      active = entry;
+    } else {
+      break;
+    }
+  }
+  return active;
+}
+
+export function setupTOCScrollTracking(reader, sidebar, currentChapterIdx) {
+  if (!reader || !sidebar || currentChapterIdx == null) return;
+
+  const entries = buildTOCScrollEntries(reader, sidebar, currentChapterIdx);
+  if (entries.length === 0) return;
+
+  let lastActiveLink = null;
+
+  function update() {
+    // scroll-padding-top (see reader.css) offsets anchor jumps by the
+    // header height; add the same offset here so the section that just
+    // scrolled to the top of the visible area is the one marked active.
+    const offset = parseFloat(getComputedStyle(document.documentElement).scrollPaddingTop) || 0;
+    const active = activeTOCEntry(entries, window.scrollY + offset + 1);
+    if (!active || active.link === lastActiveLink) return;
+
+    lastActiveLink = active.link;
+    sidebar
+      .querySelectorAll('[data-tui-sidebar-active="true"]')
+      .forEach((el) => el.removeAttribute("data-tui-sidebar-active"));
+    active.link.setAttribute("data-tui-sidebar-active", "true");
+    if (typeof active.link.scrollIntoView === "function") {
+      active.link.scrollIntoView({ block: "start", behavior: "smooth" });
+    }
+  }
+
+  window.addEventListener("scroll", update, { passive: true });
+  update();
+}
+
 // --- Bootstrap (browser only) ---
 
 function bootstrap() {
@@ -307,8 +476,9 @@ function bootstrap() {
   let pendingSelection = null;
   let popoverOpen = false;
   let suppressNextClick = false;
-  if (highlights != null && highlights.length > 0) {
-    applyHighlights(reader, highlights);
+  const filteredHighlights = filterHighlightsByChapter(reader, highlights);
+  if (filteredHighlights != null && filteredHighlights.length > 0) {
+    applyHighlights(reader, filteredHighlights);
     console.log('[highlight.js] Highlights applied')
   }
 
@@ -502,4 +672,14 @@ function bootstrap() {
 
 if (typeof document !== "undefined" && document.getElementById("reader")) {
   bootstrap();
+  setupSidebarStateMirror();
+
+  const tocSidebar = document.querySelector('[data-tui-sidebar-content="epub-toc-sidebar"]');
+  setupTOCActiveOnClick(tocSidebar);
+
+  const readerEl = document.getElementById("reader");
+  const currentChapterIdx = readerEl ? readerEl.dataset.currentChapter : undefined;
+  if (currentChapterIdx !== undefined && currentChapterIdx !== "-1") {
+    setupTOCScrollTracking(readerEl, tocSidebar, currentChapterIdx);
+  }
 }

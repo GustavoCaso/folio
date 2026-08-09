@@ -10,11 +10,34 @@ import (
 	"github.com/templui/templui/components/input"
 	"github.com/templui/templui/components/popover"
 	"github.com/templui/templui/components/sheet"
+	"github.com/templui/templui/components/sidebar"
 	"github.com/templui/templui/components/textarea"
 )
 
 func highlightCount(highlights []domain.Highlight) string {
 	return strconv.Itoa(len(highlights))
+}
+
+// EpubTOCEntry mirrors the shape written by epubconvert.Runner to toc.json.
+// reader.go unmarshals toc.json directly into this type (the JSON tags match
+// epubconvert's write-side tocEntry struct exactly), so there is no separate
+// read-side struct in the handlers package.
+type EpubTOCEntry struct {
+	Title      string         `json:"title"`
+	ChapterIdx int            `json:"chapter_idx"`
+	Anchor     string         `json:"anchor"`
+	Items      []EpubTOCEntry `json:"items"`
+}
+
+// subsectionHref reproduces the link logic previously in reader.go's
+// writeTOCList: a same-page "#anchor" jump when the subsection belongs to
+// the chapter currently being viewed and we're not in full-view mode;
+// otherwise a cross-chapter "?chapter=N#anchor" link.
+func subsectionHref(item EpubTOCEntry, currentChapterIdx int, full bool) string {
+	if !full && item.ChapterIdx == currentChapterIdx {
+		return "#" + item.Anchor
+	}
+	return "?chapter=" + strconv.Itoa(item.ChapterIdx) + "#" + item.Anchor
 }
 
 templ highlightCard(h domain.Highlight) {
@@ -72,7 +95,7 @@ templ highlightsPanel(highlights []domain.Highlight) {
 }
 
 templ headerActions(highlights []domain.Highlight) {
-	<div>
+	<div class="flex items-center gap-1.5">
 		@sheet.Trigger(sheet.TriggerProps{
 			For: "highlights-panel",
 		}) {
@@ -91,54 +114,268 @@ templ headerActions(highlights []domain.Highlight) {
 	</div>
 }
 
-templ Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight) {
-	@Layout(job.Filename, headerActions(highlights)) {
-		<div id="progress-bar"></div>
-		@highlightsPanel(highlights)
-		<article class="mx-auto max-w-[68ch] px-2 py-4 pb-24 overflow-x-auto">
-			<div id="reader" data-job-id={ job.ID } data-reading-progress={ job.ReadingProgress }>
+// epubTOCItems recursively renders tocEntries as sidebar menu items. Nesting
+// is limited to exactly two levels (chapter + subsection), matching what
+// epubconvert's TOC tree actually produces and what the prior writeTOCList
+// implementation was exercised against — subsections themselves are rendered
+// via MenuSub/MenuSubButton rather than recursing further.
+//
+// data-toc-chapter/data-toc-anchor tag each link so reader.js's scroll
+// tracker (setupTOCScrollTracking) can match the heading nearest the top of
+// the viewport back to its TOC link and mark it active, independent of the
+// href (which for cross-chapter subsections points at a page reader.js
+// never navigates to during same-page scrolling).
+templ epubTOCItems(entries []EpubTOCEntry, currentChapterIdx int, full bool) {
+	for _, entry := range entries {
+		@sidebar.MenuItem() {
+			@sidebar.MenuButton(sidebar.MenuButtonProps{
+				Href:     "?chapter=" + strconv.Itoa(entry.ChapterIdx),
+				IsActive: !full && entry.Anchor == "" && entry.ChapterIdx == currentChapterIdx,
+				Attributes: map[string]any{
+					"data-toc-chapter": strconv.Itoa(entry.ChapterIdx),
+					"data-toc-anchor":  "",
+				},
+			}) {
+				{ entry.Title }
+			}
+			if len(entry.Items) > 0 {
+				@sidebar.MenuSub() {
+					for _, item := range entry.Items {
+						@sidebar.MenuSubItem() {
+							@sidebar.MenuSubButton(sidebar.MenuSubButtonProps{
+								Href:     subsectionHref(item, currentChapterIdx, full),
+								IsActive: false,
+								Attributes: map[string]any{
+									"data-toc-chapter": strconv.Itoa(item.ChapterIdx),
+									"data-toc-anchor":  item.Anchor,
+								},
+							}) {
+								{ item.Title }
+							}
+						}
+					}
+				}
+			}
+		}
+	}
+}
+
+// epubPrevNext renders the mobile prev/next bar above the article. On md+
+// screens these links are replaced by the sticky side rail buttons
+// (epubPrevNextRail), so they're hidden here. The "Full view" link
+// (?full=1) still exists as a route — reader.go still handles it — it's
+// just not surfaced in this bar visually. lastChapterIdx is
+// chapterCount-1. When full is true there is no single "current chapter",
+// so prev/next controls are replaced by a static indicator, matching prior
+// behavior.
+templ epubPrevNext(currentChapterIdx, lastChapterIdx int, full bool) {
+	<div class="flex items-center gap-4 text-xs font-medium tracking-widest uppercase text-muted-foreground md:hidden">
+		if full {
+			<span>Full view</span>
+		} else {
+			if currentChapterIdx > 0 {
+				<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx-1)) } class="hover:text-foreground" rel="prev">&larr; Previous</a>
+			} else {
+				<span class="opacity-40" aria-disabled="true">&larr; Previous</span>
+			}
+			if currentChapterIdx < lastChapterIdx {
+				<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx+1)) } class="hover:text-foreground" rel="next">Next &rarr;</a>
+			} else {
+				<span class="opacity-40" aria-disabled="true">Next &rarr;</span>
+			}
+		}
+	</div>
+}
+
+// epubPrevNextRail renders sticky icon-only prev/next buttons flanking the
+// article column on md+ screens, replacing the inline text links in
+// epubPrevNext at that breakpoint. side picks left ("prev") or right
+// ("next") so both calls share one implementation. top-24 clears the
+// site header (~57px) plus breathing room, matching the reader's existing
+// scroll-padding-top offset (ui/internal/handlers/static/css/reader.css).
+templ epubPrevNextRail(side string, targetChapterIdx int, enabled bool) {
+	<div class="hidden md:flex md:sticky md:top-24 md:h-0 md:shrink-0 md:basis-12">
+		if enabled {
+			<a
+				href={ templ.SafeURL("?chapter=" + strconv.Itoa(targetChapterIdx)) }
+				class="flex size-9 items-center justify-center rounded-full border border-border text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
+				rel={ side }
+				aria-label={ railLabel(side) }
+			>
+				if side == "prev" {
+					@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
+				} else {
+					@icon.ChevronRight(icon.Props{Class: "h-4 w-4"})
+				}
+			</a>
+		} else {
+			<span
+				class="flex size-9 items-center justify-center rounded-full border border-border text-muted-foreground opacity-30"
+				aria-disabled="true"
+			>
+				if side == "prev" {
+					@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
+				} else {
+					@icon.ChevronRight(icon.Props{Class: "h-4 w-4"})
+				}
+			</span>
+		}
+	</div>
+}
+
+func railLabel(side string) string {
+	if side == "prev" {
+		return "Previous chapter"
+	}
+	return "Next chapter"
+}
+
+// epubSidebarID is a fixed, explicit sidebar ID used by both
+// sidebar.Sidebar() (in epubSidebar) and sidebar.Trigger() (rendered in
+// Reader's sidebar.Inset() block, outside the collapsible sidebar panel so
+// it stays clickable when the sidebar is collapsed). The trigger cannot
+// rely on auto-generated/context-propagated IDs, so it's given this same
+// fixed ID explicitly via TriggerProps.Target.
+const epubSidebarID = "epub-toc-sidebar"
+
+templ epubSidebar(epubTOC []EpubTOCEntry, currentChapterIdx int, full bool) {
+	@sidebar.Sidebar(sidebar.Props{
+		ID: epubSidebarID,
+		// The sticky site header (ui/internal/templates/layout.templ) uses
+		// z-40 and its headerLeft slot (sidebar trigger, logo, home link)
+		// sits directly above the fixed sidebar <aside> panel (same x-range,
+		// full viewport height). The sidebar must stay below the header in
+		// the stacking order or those controls become unclickable once the
+		// header's sticky position engages on scroll. z-30 keeps the sidebar
+		// above ordinary page content but below the header.
+		Class: "z-30",
+	}) {
+		@sidebar.Header() {
+			<span class="text-sm font-semibold text-sidebar-foreground">Chapters</span>
+		}
+		@sidebar.Content() {
+			@sidebar.Menu() {
+				@epubTOCItems(epubTOC, currentChapterIdx, full)
+			}
+		}
+	}
+}
+
+// epubSidebarTrigger renders the sidebar toggle for Layout's headerLeft slot.
+// It lives outside the collapsible sidebar panel (unlike the old placement
+// inside sidebar.Inset()) so it stays visible and clickable regardless of
+// sidebar collapsed/expanded state.
+templ epubSidebarTrigger() {
+	@sidebar.Trigger(sidebar.TriggerProps{Target: epubSidebarID})
+}
+
+// currentChapterAttr renders the value for #reader's data-current-chapter
+// attribute: "-1" in full-book view (no single current chapter, matching the
+// existing -1 convention filterHighlightsByChapter already uses in
+// reader.js), otherwise the chapter index. reader.js's TOC scroll tracker
+// reads this to know which chapter's headings to watch.
+func currentChapterAttr(currentChapterIdx int, full bool) string {
+	if full {
+		return "-1"
+	}
+	return strconv.Itoa(currentChapterIdx)
+}
+
+templ highlightsPopover(highlights []domain.Highlight) {
+	@popover.Root(popover.RootProps{ID: "hl-popover"}) {
+		@popover.Trigger(popover.TriggerProps{
+			TriggerType: popover.TriggerTypeManual,
+		}) {
+		}
+		@popover.Content(popover.ContentProps{
+			ID:        "hl-popover-content",
+			Placement: popover.PlacementBottomStart,
+		}) {
+			<div class="flex flex-col gap-4 p-4 w-72">
+				<p class="text-xs font-medium tracking-widest uppercase text-muted-foreground">Add highlight</p>
+				<p id="hl-error" class="hidden text-xs text-destructive"></p>
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-medium text-foreground" for="hl-tag">Tag</label>
+					@input.Input(input.Props{ID: "hl-tag", Placeholder: "e.g. important"})
+				</div>
+				<div class="flex flex-col gap-1.5">
+					<label class="text-xs font-medium text-foreground" for="hl-note">Note</label>
+					@textarea.Textarea(textarea.Props{ID: "hl-note", Placeholder: "Your thoughts…", Rows: 3})
+				</div>
+				<div class="flex justify-end gap-2 pt-1">
+					@button.Button(button.Props{ID: "hl-cancel", Variant: button.VariantGhost}) {
+						Cancel
+					}
+					@button.Button(button.Props{ID: "hl-save", Variant: button.VariantDefault}) {
+						Save highlight
+					}
+				</div>
+			</div>
+		}
+	}
+	<div
+		id="hl-tooltip"
+		class="hidden fixed z-50 bg-card border border-border rounded-lg shadow-lg px-3 py-2.5 max-w-xs"
+		role="status"
+	>
+		<p id="hl-tooltip-content" class="text-sm text-card-foreground leading-snug"></p>
+	</div>
+	@templ.JSONScript("highlights-data", highlights)
+	<script type="module" src="/static/js/reader.js"></script>
+}
+
+templ readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Highlight, epubTOC []EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) {
+	<div id="progress-bar"></div>
+	@highlightsPanel(highlights)
+	<div class="mx-auto max-w-[68ch] px-2 pt-4">
+		@epubPrevNext(currentChapterIdx, lastChapterIdx, full)
+	</div>
+	<div class="mx-auto flex max-w-[calc(68ch+2*(2.25rem+1rem))] items-start justify-center gap-4 px-2">
+		@epubPrevNextRail("prev", currentChapterIdx-1, !full && currentChapterIdx > 0)
+		<article class="w-full max-w-[68ch] py-4 pb-24 overflow-x-auto">
+			<div id="reader" data-job-id={ job.ID } data-reading-progress={ job.ReadingProgress } data-current-chapter={ currentChapterAttr(currentChapterIdx, full) }>
 				@templ.Raw(renderedHTML)
 			</div>
 		</article>
-		@popover.Root(popover.RootProps{ID: "hl-popover"}) {
-			@popover.Trigger(popover.TriggerProps{
-				TriggerType: popover.TriggerTypeManual,
-			}) {
-			}
-			@popover.Content(popover.ContentProps{
-				ID:        "hl-popover-content",
-				Placement: popover.PlacementBottomStart,
-			}) {
-				<div class="flex flex-col gap-4 p-4 w-72">
-					<p class="text-xs font-medium tracking-widest uppercase text-muted-foreground">Add highlight</p>
-					<p id="hl-error" class="hidden text-xs text-destructive"></p>
-					<div class="flex flex-col gap-1.5">
-						<label class="text-xs font-medium text-foreground" for="hl-tag">Tag</label>
-						@input.Input(input.Props{ID: "hl-tag", Placeholder: "e.g. important"})
-					</div>
-					<div class="flex flex-col gap-1.5">
-						<label class="text-xs font-medium text-foreground" for="hl-note">Note</label>
-						@textarea.Textarea(textarea.Props{ID: "hl-note", Placeholder: "Your thoughts…", Rows: 3})
-					</div>
-					<div class="flex justify-end gap-2 pt-1">
-						@button.Button(button.Props{ID: "hl-cancel", Variant: button.VariantGhost}) {
-							Cancel
-						}
-						@button.Button(button.Props{ID: "hl-save", Variant: button.VariantDefault}) {
-							Save highlight
-						}
-					</div>
-				</div>
+		@epubPrevNextRail("next", currentChapterIdx+1, !full && currentChapterIdx < lastChapterIdx)
+	</div>
+	@highlightsPopover(highlights)
+}
+
+templ readerMarkdownBody(job domain.Job, renderedHTML string, highlights []domain.Highlight) {
+	<div id="progress-bar"></div>
+	@highlightsPanel(highlights)
+	<article class="mx-auto max-w-[68ch] px-2 py-4 pb-24 overflow-x-auto">
+		<div id="reader" data-job-id={ job.ID } data-reading-progress={ job.ReadingProgress }>
+			@templ.Raw(renderedHTML)
+		</div>
+	</article>
+	@highlightsPopover(highlights)
+}
+
+// readerHeadExtra loads sidebar.Script() in <head> only for epub jobs
+templ readerHeadExtra() {
+	@sidebar.Script()
+}
+
+// Reader renders the reader page. epubTOC is non-empty only for epub jobs;
+// PDF/markdown jobs pass nil (and currentChapterIdx/lastChapterIdx/full are
+// unused in that case). When epubTOC is non-empty, the page content is
+// wrapped in a sidebar.Layout/sidebar.Sidebar/sidebar.Inset composition; for
+// PDF/markdown jobs no sidebar DOM/JS is emitted at all.
+templ Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight, epubTOC []EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) {
+	if len(epubTOC) > 0 {
+		@Layout(job.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded") {
+			@sidebar.Layout() {
+				@epubSidebar(epubTOC, currentChapterIdx, full)
+				@sidebar.Inset() {
+					@readerEpubBody(job, renderedHTML, highlights, epubTOC, currentChapterIdx, lastChapterIdx, full)
+				}
 			}
 		}
-		<div
-			id="hl-tooltip"
-			class="hidden fixed z-50 bg-card border border-border rounded-lg shadow-lg px-3 py-2.5 max-w-xs"
-			role="status"
-		>
-			<p id="hl-tooltip-content" class="text-sm text-card-foreground leading-snug"></p>
-		</div>
-		@templ.JSONScript("highlights-data", highlights)
-		<script type="module" src="/static/js/reader.js"></script>
+	} else {
+		@Layout(job.Filename, NoAction(), headerActions(highlights), NoAction(), "") {
+			@readerMarkdownBody(job, renderedHTML, highlights)
+		}
 	}
 }

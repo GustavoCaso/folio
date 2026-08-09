@@ -673,7 +673,7 @@ func Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) templ.Com
 								}()
 							}
 							ctx = templ.InitializeContext(ctx)
-							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<!-- Drop zone (upload) --> <form id=\"upload-form\" method=\"POST\" action=\"/documents\" enctype=\"multipart/form-data\"><input id=\"file-input\" type=\"file\" name=\"document\" accept=\".pdf\" required class=\"sr-only\"><div id=\"drop-zone\" role=\"button\" tabindex=\"0\" aria-label=\"Drop a PDF here or click to browse\" class=\"relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-6 py-8 text-center transition-all duration-200 cursor-pointer hover:border-foreground/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring\"><span class=\"text-muted-foreground/60 mb-1 pointer-events-none\">")
+							templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 36, "<!-- Drop zone (upload) --> <form id=\"upload-form\" method=\"POST\" action=\"/documents\" enctype=\"multipart/form-data\"><input id=\"file-input\" type=\"file\" name=\"document\" accept=\".pdf,.epub\" required class=\"sr-only\"><div id=\"drop-zone\" role=\"button\" tabindex=\"0\" aria-label=\"Drop a document here or click to browse\" class=\"relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-6 py-8 text-center transition-all duration-200 cursor-pointer hover:border-foreground/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring\"><span class=\"text-muted-foreground/60 mb-1 pointer-events-none\">")
 							if templ_7745c5c3_Err != nil {
 								return templ_7745c5c3_Err
 							}
@@ -810,7 +810,7 @@ func Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) templ.Com
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout("Documents", NoAction()).Render(templ.WithChildren(ctx, templ_7745c5c3_Var22), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Layout("Documents", NoAction(), NoAction(), NoAction(), "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var22), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

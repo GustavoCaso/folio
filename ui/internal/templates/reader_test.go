@@ -13,7 +13,16 @@ import (
 func renderReader(t *testing.T, job domain.Job, html string, hls []domain.Highlight) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.Reader(job, html, hls).Render(context.Background(), &buf); err != nil {
+	if err := templates.Reader(job, html, hls, nil, 0, 0, false).Render(context.Background(), &buf); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	return buf.String()
+}
+
+func renderReaderEpub(t *testing.T, job domain.Job, html string, hls []domain.Highlight, toc []templates.EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) string {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := templates.Reader(job, html, hls, toc, currentChapterIdx, lastChapterIdx, full).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()
@@ -110,6 +119,92 @@ func TestReaderHighlightsPanelEmpty(t *testing.T) {
 	}
 	if !strings.Contains(got, "No highlights yet") {
 		t.Errorf("expected empty-state message, got: %s", got)
+	}
+}
+
+func TestReaderEpubSidebarRendersTOC(t *testing.T) {
+	toc := []templates.EpubTOCEntry{
+		{Title: "Chapter One", ChapterIdx: 0, Items: []templates.EpubTOCEntry{
+			{Title: "Subsection", ChapterIdx: 0, Anchor: "sub1"},
+		}},
+		{Title: "Chapter Two", ChapterIdx: 1},
+	}
+	got := renderReaderEpub(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 1, false)
+
+	if !strings.Contains(got, "data-tui-sidebar-layout") {
+		t.Errorf("expected sidebar layout wrapper for epub job, got: %s", got)
+	}
+	if !strings.Contains(got, "Chapter One") || !strings.Contains(got, "Chapter Two") {
+		t.Errorf("expected chapter titles in sidebar, got: %s", got)
+	}
+	if !strings.Contains(got, "Subsection") {
+		t.Errorf("expected subsection title in sidebar, got: %s", got)
+	}
+	if !strings.Contains(got, `href="#sub1"`) {
+		t.Errorf("expected same-chapter subsection anchor link, got: %s", got)
+	}
+}
+
+// TestReaderEpubSidebarTriggerTargetsSidebarID is a regression test for a bug
+// where the sidebar toggle button did nothing: headerActions (which renders
+// sidebar.Trigger()) is evaluated and passed into Layout(...) as an argument
+// before Layout's body block runs, so it lives in a separate templ
+// component-tree branch from the sidebar.Layout()/sidebar.Sidebar() call
+// inside Reader's Layout body. sidebar.Sidebar() sets its ID via context
+// inside that branch, which never reaches sidebar.Trigger() in the sibling
+// branch — so without an explicit shared ID, the trigger rendered with an
+// empty data-tui-sidebar-target and clicking it matched no sidebar element.
+// This test extracts both rendered attribute values and asserts they match.
+func TestReaderEpubSidebarTriggerTargetsSidebarID(t *testing.T) {
+	toc := []templates.EpubTOCEntry{{Title: "Chapter One", ChapterIdx: 0}}
+	got := renderReaderEpub(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 0, false)
+
+	target := extractAttr(t, got, "data-tui-sidebar-target")
+	sidebarID := extractAttr(t, got, "data-tui-sidebar-id")
+
+	if target == "" {
+		t.Fatalf("expected non-empty data-tui-sidebar-target, got: %s", got)
+	}
+	if target != sidebarID {
+		t.Errorf("trigger target %q does not match sidebar id %q; toggle button would silently do nothing", target, sidebarID)
+	}
+}
+
+// extractAttr returns the value of the first occurrence of attr="..." in html.
+func extractAttr(t *testing.T, html, attr string) string {
+	t.Helper()
+	needle := attr + `="`
+	idx := strings.Index(html, needle)
+	if idx == -1 {
+		t.Fatalf("attribute %s not found in: %s", attr, html)
+	}
+	start := idx + len(needle)
+	end := strings.Index(html[start:], `"`)
+	if end == -1 {
+		t.Fatalf("unterminated attribute %s in: %s", attr, html)
+	}
+	return html[start : start+end]
+}
+
+func TestReaderNonEpubHasNoSidebar(t *testing.T) {
+	got := renderReader(t, domain.Job{ID: "j1", Filename: "doc.pdf"}, "<p>x</p>", nil)
+
+	if strings.Contains(got, "data-tui-sidebar-layout") {
+		t.Errorf("did not expect sidebar layout wrapper for non-epub job, got: %s", got)
+	}
+	// Regression: sidebar.Script() must not be loaded in <head> for pages
+	// that render no sidebar DOM at all (e.g. PDF/markdown reader pages).
+	if strings.Contains(got, "/templui/js/sidebar") {
+		t.Errorf("did not expect sidebar.Script() tag for non-epub job, got: %s", got)
+	}
+}
+
+func TestReaderEpubHasSidebarScript(t *testing.T) {
+	toc := []templates.EpubTOCEntry{{Title: "Chapter One", ChapterIdx: 0}}
+	got := renderReaderEpub(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 0, false)
+
+	if !strings.Contains(got, "/templui/js/sidebar") {
+		t.Errorf("expected sidebar.Script() tag for epub job, got: %s", got)
 	}
 }
 

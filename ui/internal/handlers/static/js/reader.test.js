@@ -5,12 +5,19 @@ import {
   buildPendingSelection,
   calcPopoverPosition,
   computeProgress,
+  filterHighlightsByChapter,
   findBlockAncestor,
   firstVisibleBlockID,
   formatHighlight,
+  mirrorSidebarState,
   offsetWithinBlock,
   removeHighlightCard,
   removeHighlightMarks,
+  activeTOCEntry,
+  buildTOCScrollEntries,
+  setupSidebarStateMirror,
+  setupTOCActiveOnClick,
+  setupTOCScrollTracking,
   wrapRangeTextNodes,
 } from "./reader.js";
 
@@ -567,6 +574,59 @@ describe("buildPendingSelection", () => {
   });
 });
 
+describe("filterHighlightsByChapter", () => {
+  const highlights = [
+    { ID: "h1", start_block_id: "ch0-p-1" },
+    { ID: "h2", start_block_id: "ch1-p-2" },
+    { ID: "h3", start_block_id: "ch1-h1-1" },
+  ];
+
+  it("returns only highlights whose start_block_id matches the current chapter prefix", () => {
+    const reader = makeReader(`<p data-block-id="ch1-p-2">hi</p>`);
+    reader.dataset.currentChapter = "1";
+    const filtered = filterHighlightsByChapter(reader, highlights);
+    expect(filtered.map((h) => h.ID)).toEqual(["h2", "h3"]);
+  });
+
+  it("returns all highlights unfiltered when data-current-chapter is -1 (full view)", () => {
+    const reader = makeReader(``);
+    reader.dataset.currentChapter = "-1";
+    const filtered = filterHighlightsByChapter(reader, highlights);
+    expect(filtered).toEqual(highlights);
+  });
+
+  it("returns all highlights unfiltered when no data-current-chapter attribute is present (pdf/markdown)", () => {
+    const reader = makeReader(`<p data-block-id="paragraph-1">hi</p>`);
+    const filtered = filterHighlightsByChapter(reader, highlights);
+    expect(filtered).toEqual(highlights);
+  });
+
+  it("excludes highlights whose start_block_id doesn't match the ch{N}- prefix pattern", () => {
+    const reader = makeReader(``);
+    reader.dataset.currentChapter = "0";
+    const mixed = [
+      { ID: "h1", start_block_id: "ch0-p-1" },
+      { ID: "h2", start_block_id: "paragraph-3" },
+    ];
+    const filtered = filterHighlightsByChapter(reader, mixed);
+    expect(filtered.map((h) => h.ID)).toEqual(["h1"]);
+  });
+
+  it("returns null unchanged when highlights is null", () => {
+    const reader = makeReader(``);
+    reader.dataset.currentChapter = "1";
+    const filtered = filterHighlightsByChapter(reader, null);
+    expect(filtered).toBeNull();
+  });
+
+  it("returns undefined unchanged when highlights is undefined", () => {
+    const reader = makeReader(``);
+    reader.dataset.currentChapter = "1";
+    const filtered = filterHighlightsByChapter(reader, undefined);
+    expect(filtered).toBeUndefined();
+  });
+});
+
 describe("removeHighlightCard", () => {
   function makePanel(html) {
     const panel = document.createElement("div");
@@ -590,5 +650,222 @@ describe("removeHighlightCard", () => {
     const panel = makePanel(`<div data-scroll-to-highlight="h2"><p>card</p></div>`);
     expect(() => removeHighlightCard(panel, "h1")).not.toThrow();
     expect(panel.children.length).toBe(1);
+  });
+});
+
+describe("mirrorSidebarState", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    document.body.removeAttribute("data-sidebar-state");
+  });
+
+  it("copies the wrapper's state attribute onto document.body", () => {
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-tui-sidebar-state", "expanded");
+    document.body.appendChild(wrapper);
+
+    mirrorSidebarState(wrapper);
+    expect(document.body.getAttribute("data-sidebar-state")).toBe("expanded");
+
+    wrapper.setAttribute("data-tui-sidebar-state", "collapsed");
+    mirrorSidebarState(wrapper);
+    expect(document.body.getAttribute("data-sidebar-state")).toBe("collapsed");
+  });
+
+  it("removes the body attribute when the wrapper has no state", () => {
+    const wrapper = document.createElement("div");
+    document.body.appendChild(wrapper);
+    document.body.setAttribute("data-sidebar-state", "expanded");
+
+    mirrorSidebarState(wrapper);
+    expect(document.body.hasAttribute("data-sidebar-state")).toBe(false);
+  });
+});
+
+describe("setupSidebarStateMirror", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+    document.body.removeAttribute("data-sidebar-state");
+  });
+
+  function makeWrapper(state) {
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-tui-sidebar-wrapper", "");
+    wrapper.setAttribute("data-tui-sidebar-id", "epub-toc-sidebar");
+    wrapper.setAttribute("data-tui-sidebar-state", state);
+    document.body.appendChild(wrapper);
+    return wrapper;
+  }
+
+  it("is a no-op when no epub sidebar wrapper is present", () => {
+    const observer = setupSidebarStateMirror();
+    expect(observer).toBeUndefined();
+    expect(document.body.hasAttribute("data-sidebar-state")).toBe(false);
+  });
+
+  it("does not react to wrappers with a different sidebar id", () => {
+    const wrapper = document.createElement("div");
+    wrapper.setAttribute("data-tui-sidebar-wrapper", "");
+    wrapper.setAttribute("data-tui-sidebar-id", "some-other-sidebar");
+    wrapper.setAttribute("data-tui-sidebar-state", "expanded");
+    document.body.appendChild(wrapper);
+
+    setupSidebarStateMirror();
+    expect(document.body.hasAttribute("data-sidebar-state")).toBe(false);
+  });
+
+  it("mirrors the initial state on setup", () => {
+    makeWrapper("expanded");
+    setupSidebarStateMirror();
+    expect(document.body.getAttribute("data-sidebar-state")).toBe("expanded");
+  });
+
+  it("mirrors subsequent state changes via MutationObserver", async () => {
+    const wrapper = makeWrapper("expanded");
+    setupSidebarStateMirror();
+    expect(document.body.getAttribute("data-sidebar-state")).toBe("expanded");
+
+    wrapper.setAttribute("data-tui-sidebar-state", "collapsed");
+    // MutationObserver callbacks run as a microtask.
+    await Promise.resolve();
+    await Promise.resolve();
+
+    expect(document.body.getAttribute("data-sidebar-state")).toBe("collapsed");
+  });
+});
+
+describe("setupTOCActiveOnClick", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function makeSidebar() {
+    const sidebar = document.createElement("div");
+    sidebar.innerHTML = `
+      <a data-tui-sidebar="menu-button" data-tui-sidebar-active="true" href="?chapter=0">Chapter 1</a>
+      <a data-tui-sidebar="menu-sub-button" href="#anchor-a">Section A</a>
+      <a data-tui-sidebar="menu-sub-button" href="#anchor-b">Section B</a>
+    `;
+    document.body.appendChild(sidebar);
+    return sidebar;
+  }
+
+  it("is a no-op when sidebar is null", () => {
+    expect(() => setupTOCActiveOnClick(null)).not.toThrow();
+  });
+
+  it("activates the clicked subsection link and deactivates the previous one", () => {
+    const sidebar = makeSidebar();
+    setupTOCActiveOnClick(sidebar);
+
+    const [chapterLink, sectionA] = sidebar.querySelectorAll("a");
+    sectionA.click();
+
+    expect(chapterLink.hasAttribute("data-tui-sidebar-active")).toBe(false);
+    expect(sectionA.getAttribute("data-tui-sidebar-active")).toBe("true");
+  });
+
+  it("moves the active state between subsection links on repeated clicks", () => {
+    const sidebar = makeSidebar();
+    setupTOCActiveOnClick(sidebar);
+
+    const [, sectionA, sectionB] = sidebar.querySelectorAll("a");
+    sectionA.click();
+    sectionB.click();
+
+    expect(sectionA.hasAttribute("data-tui-sidebar-active")).toBe(false);
+    expect(sectionB.getAttribute("data-tui-sidebar-active")).toBe("true");
+  });
+
+  it("ignores clicks outside any TOC link", () => {
+    const sidebar = makeSidebar();
+    setupTOCActiveOnClick(sidebar);
+
+    sidebar.click();
+
+    const [chapterLink] = sidebar.querySelectorAll("a");
+    expect(chapterLink.getAttribute("data-tui-sidebar-active")).toBe("true");
+  });
+});
+
+describe("buildTOCScrollEntries / activeTOCEntry", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  function makePage() {
+    const reader = document.createElement("div");
+    reader.id = "reader";
+    reader.innerHTML = `
+      <h1 id="intro">Intro</h1>
+      <h2 id="section-a">Section A</h2>
+      <h2 id="section-b">Section B</h2>
+    `;
+    document.body.appendChild(reader);
+
+    const sidebar = document.createElement("div");
+    sidebar.innerHTML = `
+      <a data-toc-chapter="0" data-toc-anchor="">Chapter 1</a>
+      <a data-toc-chapter="0" data-toc-anchor="section-a">Section A</a>
+      <a data-toc-chapter="0" data-toc-anchor="section-b">Section B</a>
+      <a data-toc-chapter="1" data-toc-anchor="other">Other chapter</a>
+    `;
+    document.body.appendChild(sidebar);
+
+    return { reader, sidebar };
+  }
+
+  it("only includes links tagged with the current chapter", () => {
+    const { reader, sidebar } = makePage();
+    const entries = buildTOCScrollEntries(reader, sidebar, "0");
+    expect(entries).toHaveLength(3);
+    expect(entries.every((e) => e.link.dataset.tocChapter === "0")).toBe(true);
+  });
+
+  it("gives the chapter-root link -Infinity so it's always the fallback", () => {
+    const { reader, sidebar } = makePage();
+    const entries = buildTOCScrollEntries(reader, sidebar, "0");
+    const rootEntry = entries.find((e) => e.link.dataset.tocAnchor === "");
+    expect(rootEntry.top).toBe(-Infinity);
+  });
+
+  it("activeTOCEntry picks the last entry at or above scrollY", () => {
+    const entries = [
+      { link: "root", top: -Infinity },
+      { link: "a", top: 100 },
+      { link: "b", top: 500 },
+    ];
+    expect(activeTOCEntry(entries, 0).link).toBe("root");
+    expect(activeTOCEntry(entries, 150).link).toBe("a");
+    expect(activeTOCEntry(entries, 600).link).toBe("b");
+  });
+
+  it("returns null for an empty entry list", () => {
+    expect(activeTOCEntry([], 0)).toBe(null);
+  });
+});
+
+describe("setupTOCScrollTracking", () => {
+  beforeEach(() => {
+    document.body.innerHTML = "";
+  });
+
+  it("is a no-op when reader or sidebar is missing", () => {
+    expect(() => setupTOCScrollTracking(null, null, "0")).not.toThrow();
+  });
+
+  it("marks the chapter-root link active when there are no headings in the DOM", () => {
+    const reader = document.createElement("div");
+    reader.id = "reader";
+    document.body.appendChild(reader);
+
+    const sidebar = document.createElement("div");
+    sidebar.innerHTML = `<a data-toc-chapter="0" data-toc-anchor="">Chapter 1</a>`;
+    document.body.appendChild(sidebar);
+
+    setupTOCScrollTracking(reader, sidebar, "0");
+
+    const link = sidebar.querySelector("a");
+    expect(link.getAttribute("data-tui-sidebar-active")).toBe("true");
   });
 });
