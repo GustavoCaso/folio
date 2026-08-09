@@ -1,8 +1,8 @@
-// Package epubrender injects highlight-anchoring block IDs into parsed EPUB
+// Package epub injects highlight-anchoring block IDs into parsed EPUB
 // chapter HTML and serializes it back to a string, mirroring the
 // data-block-id convention used by the goldmark-based renderer for
 // PDF/Markdown documents (see internal/renderer).
-package epubrender
+package epub
 
 import (
 	"bytes"

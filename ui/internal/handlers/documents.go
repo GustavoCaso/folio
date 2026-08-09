@@ -72,7 +72,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 	defer func() { _ = file.Close() }()
 
-	pdfBytes, err := io.ReadAll(file)
+	documentBytes, err := io.ReadAll(file)
 	if err != nil {
 		log.Error("read upload failed", logging.Err(err), "filename", header.Filename)
 		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to read uploaded file. %v", err))
@@ -85,7 +85,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	reqID := logging.RequestIDFrom(r.Context())
-	job, err := h.store.CreateJob(r.Context(), header.Filename, pdfBytes, reqID, format)
+	job, err := h.store.CreateJob(r.Context(), header.Filename, documentBytes, reqID, format)
 	if err != nil {
 		log.Error("create job failed", logging.Err(err), "filename", header.Filename)
 		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store job. %v", err))
@@ -95,11 +95,11 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	log.Info("upload accepted",
 		"job_id", job.ID,
 		"filename", header.Filename,
-		"bytes", len(pdfBytes),
+		"bytes", len(documentBytes),
 		"format", format,
 	)
 
-	go h.converter.Run(job.ID, reqID, format, header.Filename, pdfBytes)
+	go h.converter.Run(job.ID, reqID, format, header.Filename, documentBytes)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

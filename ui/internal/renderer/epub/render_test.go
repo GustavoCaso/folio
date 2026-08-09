@@ -1,4 +1,4 @@
-package epubrender
+package epub
 
 import (
 	"strings"

@@ -1,10 +1,10 @@
-package renderer_test
+package markdown_test
 
 import (
 	"strings"
 	"testing"
 
-	"github.com/GustavoCaso/folio/ui/internal/renderer"
+	renderer "github.com/GustavoCaso/folio/ui/internal/renderer/markdown"
 )
 
 func TestRendererInjectsBlockIDs(t *testing.T) {

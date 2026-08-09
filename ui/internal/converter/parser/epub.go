@@ -12,9 +12,9 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/GustavoCaso/folio/ui/internal/epubrender"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
+	epubRender "github.com/GustavoCaso/folio/ui/internal/renderer/epub"
 	"github.com/raitucarp/epub"
 	"golang.org/x/net/html"
 )
@@ -89,7 +89,7 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 		if doc == nil {
 			continue
 		}
-		out, err := epubrender.Render(doc, i, resolveImage(&reader))
+		out, err := epubRender.Render(doc, i, resolveImage(&reader))
 		if err != nil {
 			return p.fail(log, jobID, fmt.Sprintf("render chapter %d: %v", i, err))
 		}
@@ -329,7 +329,7 @@ func truncateTitle(s string, maxRunes int) string {
 
 // resolveImage returns an epubrender.ImageResolver backed by the epub's
 // manifest resources, keyed by href.
-func resolveImage(reader *epub.Reader) epubrender.ImageResolver {
+func resolveImage(reader *epub.Reader) epubRender.ImageResolver {
 	return func(href string) ([]byte, string, bool) {
 		res := reader.SelectResourceByHref(href)
 		if res == nil {
