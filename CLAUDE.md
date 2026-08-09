@@ -28,3 +28,13 @@ Per-service commands (`lint`, `format`, `typecheck`, `templ`, `test-race`, ...) 
 - **Proto changes touch both services.** Edit `proto/parser.proto`, then `make proto` from root — regenerates `ui/internal/parser/proto/` and `parser/src/parser/grpc/`. Generated files are checked in; do not hand-edit.
 - **Only the Go UI touches SQLite.** Python is stateless; no file paths cross the wire.
 - **Docker compose project name is `folio`** (`docker compose -p folio ...`). Models cached in `models/`, data in `data/` (both gitignored, mounted into containers).
+
+## Agent skills
+
+### Issue tracker
+
+Issues tracked in GitHub Issues (GustavoCaso/folio), via `gh` CLI. See `docs/agents/issue-tracker.md`.
+
+### Domain docs
+
+Single-context: `CONTEXT.md` + `docs/adr/` at repo root. See `docs/agents/domain.md`.
