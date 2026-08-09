@@ -99,11 +99,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		"format", format,
 	)
 
-	if format == "epub" {
-		go h.epubConverter.Run(context.Background(), job.ID, pdfBytes)
-	} else {
-		go h.converter.Run(job.ID, reqID, header.Filename, pdfBytes)
-	}
+	go h.converter.Run(job.ID, reqID, format, header.Filename, pdfBytes)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -139,9 +135,9 @@ func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if job.SourceURL != "" {
-		go h.converter.RunFromURL(job.ID, job.RequestID, job.SourceURL)
+		go h.converter.RunFromURL(job.ID, job.RequestID, job.Format, job.SourceURL)
 	} else {
-		go h.converter.Run(job.ID, job.RequestID, job.Filename, job.Content)
+		go h.converter.Run(job.ID, job.RequestID, job.Format, job.Filename, job.Content)
 	}
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
@@ -295,7 +291,7 @@ func (h *Handlers) ImportDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("url import accepted", "job_id", job.ID, "url", rawURL)
-	go h.converter.RunFromURL(job.ID, reqID, rawURL)
+	go h.converter.RunFromURL(job.ID, reqID, "pdf", rawURL)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

@@ -1,4 +1,4 @@
-package epubconvert
+package parser_test
 
 import (
 	"archive/zip"
@@ -14,6 +14,7 @@ import (
 	"strings"
 	"testing"
 
+	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
 	"github.com/raitucarp/epub"
 )
 
@@ -30,6 +31,15 @@ func (f *fakeStore) MarkJobDone(ctx context.Context, id, outputPath, title, auth
 func (f *fakeStore) MarkJobFailed(ctx context.Context, id, errMsg string) error {
 	f.failedID, f.failedErr = id, errMsg
 	return nil
+}
+
+// tocEntry mirrors the unexported parser.tocEntry shape for JSON decoding
+// in tests (package parser_test cannot reference the unexported type).
+type tocEntry struct {
+	Title      string     `json:"title"`
+	ChapterIdx int        `json:"chapter_idx"`
+	Anchor     string     `json:"anchor"`
+	Items      []tocEntry `json:"items"`
 }
 
 // buildTestEpub constructs a minimal valid epub in memory using the
@@ -81,9 +91,9 @@ func TestRun_WritesChaptersAndMarksDone(t *testing.T) {
 	epubBytes := buildTestEpub(t)
 	dataDir := t.TempDir()
 	store := &fakeStore{}
-	r := New(store, nil, dataDir)
+	p := parser.NewEPUB(store, nil, dataDir)
 
-	r.Run(context.Background(), "job-1", epubBytes)
+	_ = p.Convert(context.Background(), "job-1", "req-1", "book.epub", epubBytes, nil)
 
 	if store.doneID != "job-1" {
 		t.Fatalf("job not marked done: %+v", store)
@@ -110,9 +120,9 @@ func TestRun_TocEntryUsesRealChapterTitleNotHref(t *testing.T) {
 	epubBytes := buildTestEpub(t)
 	dataDir := t.TempDir()
 	store := &fakeStore{}
-	r := New(store, nil, dataDir)
+	p := parser.NewEPUB(store, nil, dataDir)
 
-	r.Run(context.Background(), "job-toc", epubBytes)
+	_ = p.Convert(context.Background(), "job-toc", "req-1", "book.epub", epubBytes, nil)
 
 	if store.doneID != "job-toc" {
 		t.Fatalf("job not marked done: %+v", store)
@@ -208,9 +218,9 @@ func runAndReadTOC(t *testing.T, epubBytes []byte, jobID string) []tocEntry {
 	t.Helper()
 	dataDir := t.TempDir()
 	store := &fakeStore{}
-	r := New(store, nil, dataDir)
+	p := parser.NewEPUB(store, nil, dataDir)
 
-	r.Run(context.Background(), jobID, epubBytes)
+	_ = p.Convert(context.Background(), jobID, "req-1", "book.epub", epubBytes, nil)
 
 	if store.doneID != jobID {
 		t.Fatalf("job not marked done: %+v", store)
@@ -436,9 +446,9 @@ func TestRun_TocSubsectionDoesNotOverwriteChapterTitle(t *testing.T) {
 
 func TestRun_MarksFailedOnInvalidEpub(t *testing.T) {
 	store := &fakeStore{}
-	r := New(store, nil, t.TempDir())
+	p := parser.NewEPUB(store, nil, t.TempDir())
 
-	r.Run(context.Background(), "job-2", []byte("not an epub"))
+	_ = p.Convert(context.Background(), "job-2", "req-1", "book.epub", []byte("not an epub"), nil)
 
 	if store.failedID != "job-2" || store.failedErr == "" {
 		t.Errorf("expected job-2 marked failed with an error, got %+v", store)

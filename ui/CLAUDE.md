@@ -20,11 +20,11 @@ Python is treated as stateless — no file paths are exchanged.
 **Components (`internal/`):**
 - `db/` — SQLite connection lifecycle + golang-migrate migrations, modernc.org/sqlite driver
 - `hub/` — in-memory pub/sub: routes gRPC stream status events to SSE connections per job ID
-- `parser/client/` — gRPC client: sends PDF chunks, receives StatusUpdates + markdown, publishes to Hub; defines the `Client` interface used by `converter/` and `handlers/`
+- `parser/client/` — gRPC client: sends PDF chunks, receives StatusUpdates + markdown, publishes to Hub; defines the `Client` interface used by `converter/parser/` and `handlers/`
 - `parser/proto/` — generated protobuf bindings (do not edit manually)
-- `converter/` — `Runner` struct: executes conversions (file upload and URL), rewrites image refs to base64, writes Markdown to disk, marks jobs done/failed; owns cancel tracking
+- `converter/` — `Runner` struct: dispatches conversions (file upload and URL) to a `map[string]parser.Parser` keyed by `domain.Format`; owns cancel tracking
+- `converter/parser/` — `Parser` interface, implemented per format; each implementation owns its full conversion lifecycle (writing output, marking the job done/failed, publishing hub events). `NewPDF` (gRPC to Python, rewrites image refs to base64, writes Markdown to disk) and `NewEPUB` (parses uploaded EPUB bytes, no gRPC, synchronous, writes one HTML file per chapter + `toc.json` to disk)
 - `renderer/` — goldmark Markdown renderer with data-block-id injection for highlight anchoring
-- `epubconvert/` — `Runner` struct: parses uploaded EPUB bytes (no gRPC, synchronous), writes one HTML file per chapter + `toc.json` to disk, marks jobs done/failed
 - `epubrender/` — HTML-tree walker: injects `data-block-id` on block-level elements per chapter, rewrites `<img>` refs to base64 data URIs
 - `domain/` — domain types
 - `repository/` — repository interfaces
@@ -40,40 +40,43 @@ Python is treated as stateless — no file paths are exchanged.
 ```
 Browser uploads PDF
   → POST /documents
-  → store.CreateJob()
-  → go converter.Run()        # background goroutine (converter.Runner)
-      → parser.Convert()      # opens gRPC stream
+  → store.CreateJob(..., format="pdf")
+  → go converter.Run(..., format)   # background goroutine (converter.Runner)
+      → parsers["pdf"].Convert()    # parser.NewPDF, opens gRPC stream
           → sends PDF chunks
           ← receives StatusUpdate{PROCESSING}  → hub.Publish() → SSE → browser
           ← receives markdown_chunk × N
           ← receives StatusUpdate{DONE}        → hub.Publish() → SSE → browser
-      → rewrite image refs → base64 data URIs
-      → os.WriteFile(markdown)
-      → store.MarkJobDone()
+          → rewrite image refs → base64 data URIs
+          → os.WriteFile(markdown)
+          → store.MarkJobDone()
 
 Browser imports URL
   → POST /documents/import
   → store.CreateJobFromURL()
-  → go converter.RunFromURL()  # same Runner, URL path
-      → parser.ConvertFromURL() # opens gRPC stream
+  → go converter.RunFromURL(..., "pdf")  # same Runner, URL path (pdf-only)
+      → parsers["pdf"].ConvertFromURL()  # opens gRPC stream
           ← receives StatusUpdate{PROCESSING}  → hub.Publish() → SSE → browser
           ← receives markdown_chunk × N
           ← receives StatusUpdate{DONE}        → hub.Publish() → SSE → browser
-      → rewrite image refs → base64 data URIs
-      → os.WriteFile(markdown)
-      → store.MarkJobDone()
+          → rewrite image refs → base64 data URIs
+          → os.WriteFile(markdown)
+          → store.MarkJobDone()
 
 Browser uploads EPUB
   → POST /documents (same route, format detected by filename extension)
   → store.CreateJob(..., format="epub")
-  → go epubconvert.Run()      # synchronous parse, no gRPC
-      → epub.NewReader(bytes) # github.com/raitucarp/epub
-      → extract Title/Author/Cover
-      → per spine item: epubrender.Render() → data-block-id + base64 images
-      → write DATA_DIR/{jobID}/chapter-N.html + toc.json
-      → store.MarkJobDone(outputPath=dir)
+  → go converter.Run(..., format)     # same Runner, dispatches by format
+      → parsers["epub"].Convert()     # parser.NewEPUB, synchronous, no gRPC
+          → epub.NewReader(bytes)     # github.com/raitucarp/epub
+          → extract Title/Author/Cover
+          → per spine item: epubrender.Render() → data-block-id + base64 images
+          → write DATA_DIR/{jobID}/chapter-N.html + toc.json
+          → store.MarkJobDone(outputPath=dir)
   → hub.Publish DONE → SSE → browser
 ```
+
+`converter.Runner` holds a `map[string]parser.Parser` keyed by `domain.Format`; each `parser.Parser` implementation owns its full job-completion lifecycle (output writes, `MarkJobDone`/`MarkJobFailed`, hub publish). An unregistered format marks the job failed rather than panicking.
 
 ## Highlight anchoring
 

@@ -1,12 +1,9 @@
-// Package epubconvert is the epub analog of converter.Runner: given raw
-// epub bytes, it parses them in-process (no gRPC) and writes one
-// chapter-N.html file per spine item plus a toc.json under
-// DATA_DIR/{jobID}, marking the job DONE or FAILED via the Store interface.
-package epubconvert
+package parser
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"log/slog"
 	"os"
@@ -39,19 +36,19 @@ type Store interface {
 	MarkJobFailed(ctx context.Context, id, errMsg string) error
 }
 
-// Runner parses epub bytes in-process and writes rendered chapters + toc
-// to disk, marking the job done or failed via Store.
-type Runner struct {
+// epubParser parses epub bytes in-process and writes rendered chapters +
+// toc to disk, marking the job done or failed via Store.
+type epubParser struct {
 	store   Store
 	hub     *hub.Hub
 	dataDir string
 	logger  *slog.Logger
 }
 
-// New constructs a Runner. h may be nil, in which case status events are
-// not published (Store is still updated).
-func New(store Store, h *hub.Hub, dataDir string) *Runner {
-	return &Runner{store: store, hub: h, dataDir: dataDir, logger: slog.Default()}
+// NewEPUB constructs the epub Parser. h may be nil, in which case status
+// events are not published (Store is still updated).
+func NewEPUB(store Store, h *hub.Hub, dataDir string) Parser {
+	return &epubParser{store: store, hub: h, dataDir: dataDir, logger: slog.Default()}
 }
 
 type tocEntry struct {
@@ -61,23 +58,23 @@ type tocEntry struct {
 	Items      []tocEntry `json:"items"`
 }
 
-// Run parses epubBytes and writes one chapter-N.html per spine item plus
-// toc.json under dataDir/jobID, then marks the job done or failed.
-func (r *Runner) Run(ctx context.Context, jobID string, epubBytes []byte) {
-	log := r.logger.With("job_id", jobID)
+// Convert parses data as epub bytes and writes one chapter-N.html per
+// spine item plus toc.json under dataDir/jobID, then marks the job done or
+// failed. requestID, filename, and h are accepted for interface uniformity
+// but unused — epubParser uses its own stored hub.
+func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename string, data []byte, h *hub.Hub) error {
+	log := p.logger.With("job_id", jobID)
 	start := time.Now()
-	log.Info("epub conversion start", "bytes", len(epubBytes))
+	log.Info("epub conversion start", "bytes", len(data))
 
-	reader, err := epub.NewReader(epubBytes)
+	reader, err := epub.NewReader(data)
 	if err != nil {
-		r.fail(log, jobID, fmt.Sprintf("parse epub: %v", err))
-		return
+		return p.fail(log, jobID, fmt.Sprintf("parse epub: %v", err))
 	}
 
-	outDir := filepath.Join(r.dataDir, jobID)
+	outDir := filepath.Join(p.dataDir, jobID)
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		r.fail(log, jobID, fmt.Sprintf("create output dir: %v", err))
-		return
+		return p.fail(log, jobID, fmt.Sprintf("create output dir: %v", err))
 	}
 
 	spineIdxByHref := spineIndexByHref(&reader)
@@ -94,12 +91,10 @@ func (r *Runner) Run(ctx context.Context, jobID string, epubBytes []byte) {
 		}
 		out, err := epubrender.Render(doc, i, resolveImage(&reader))
 		if err != nil {
-			r.fail(log, jobID, fmt.Sprintf("render chapter %d: %v", i, err))
-			return
+			return p.fail(log, jobID, fmt.Sprintf("render chapter %d: %v", i, err))
 		}
 		if err := os.WriteFile(filepath.Join(outDir, fmt.Sprintf("chapter-%d.html", i)), []byte(out), 0o644); err != nil {
-			r.fail(log, jobID, fmt.Sprintf("write chapter %d: %v", i, err))
-			return
+			return p.fail(log, jobID, fmt.Sprintf("write chapter %d: %v", i, err))
 		}
 		docByIdx[i] = doc
 	}
@@ -109,21 +104,19 @@ func (r *Runner) Run(ctx context.Context, jobID string, epubBytes []byte) {
 
 	tocBytes, err := json.Marshal(tocEntries)
 	if err != nil {
-		r.fail(log, jobID, fmt.Sprintf("marshal toc: %v", err))
-		return
+		return p.fail(log, jobID, fmt.Sprintf("marshal toc: %v", err))
 	}
 	if err := os.WriteFile(filepath.Join(outDir, "toc.json"), tocBytes, 0o644); err != nil {
-		r.fail(log, jobID, fmt.Sprintf("write toc: %v", err))
-		return
+		return p.fail(log, jobID, fmt.Sprintf("write toc: %v", err))
 	}
 
 	title := reader.Title()
 	author := reader.Author()
 	cover := coverBytes(&reader)
 
-	if err := r.store.MarkJobDone(ctx, jobID, outDir, title, author, cover); err != nil {
+	if err := p.store.MarkJobDone(ctx, jobID, outDir, title, author, cover); err != nil {
 		log.Error("mark job done failed", logging.Err(err))
-		return
+		return err
 	}
 
 	log.Info("epub conversion done",
@@ -132,23 +125,31 @@ func (r *Runner) Run(ctx context.Context, jobID string, epubBytes []byte) {
 		"toc_entries", len(tocEntries),
 		"dur_ms", time.Since(start).Milliseconds(),
 	)
-	if r.hub != nil {
-		r.hub.Publish(jobID, hub.StatusEvent{
+	if p.hub != nil {
+		p.hub.Publish(jobID, hub.StatusEvent{
 			Status: "DONE",
 			Title:  title,
 			Author: author,
 		})
 	}
+	return nil
 }
 
-func (r *Runner) fail(log *slog.Logger, jobID, msg string) {
+// ConvertFromURL is not supported for epub jobs — epub sources are always
+// uploaded, never fetched from a URL.
+func (p *epubParser) ConvertFromURL(ctx context.Context, jobID, requestID, sourceURL string, h *hub.Hub) error {
+	return errors.New("epub: import from URL is not supported")
+}
+
+func (p *epubParser) fail(log *slog.Logger, jobID, msg string) error {
 	log.Error("epub conversion failed", "error", msg)
-	if err := r.store.MarkJobFailed(context.Background(), jobID, msg); err != nil {
+	if err := p.store.MarkJobFailed(context.Background(), jobID, msg); err != nil {
 		log.Error("mark job failed errored", logging.Err(err))
 	}
-	if r.hub != nil {
-		r.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: msg})
+	if p.hub != nil {
+		p.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: msg})
 	}
+	return errors.New(msg)
 }
 
 // spineIndexByHref builds a normalized-href -> spine-index lookup, so TOC
