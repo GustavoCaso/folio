@@ -9,7 +9,21 @@ import "github.com/templui/templui/components/icon"
 templ NoAction() {
 }
 
-templ Layout(title string, headerActions templ.Component) {
+// Layout renders the shared page shell. headExtra is an optional extra <head>
+// component (e.g. sidebar.Script()) for pages that need component JS beyond
+// the baseline set below; pass NoAction() when a page needs nothing extra.
+// headerLeft renders before the logo (e.g. a sidebar trigger on the reader
+// page); pass NoAction() when a page has nothing to show there.
+// bodySidebarState sets <body>'s initial data-sidebar-state ("expanded" for
+// the epub reader page, "" for every other page). Without this, the site
+// header's margin-left shift only takes effect after reader.js's
+// setupSidebarStateMirror runs client-side, animating in on every page load
+// via the header's transition-[...,margin-left] — this renders it correct
+// from the first paint so there's nothing to animate. It only special-cases
+// the sidebar's own default (expanded); a user who previously collapsed the
+// sidebar still sees one flash on load, since that preference lives in a
+// cookie this isn't reading yet.
+templ Layout(title string, headerLeft templ.Component, headerActions templ.Component, headExtra templ.Component, bodySidebarState string) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -24,16 +38,27 @@ templ Layout(title string, headerActions templ.Component) {
 			@collapsible.Script()
 			@sheet.Script()
 			@toast.Script()
+			@headExtra
 		</head>
-		<body class="min-h-screen bg-background text-foreground">
-			<header id="site-header" class="sticky top-0 z-40 border-b border-transparent bg-background/80 backdrop-blur-md transition-[border-color,box-shadow] duration-200">
+		<body
+			class="min-h-screen bg-background text-foreground"
+			if bodySidebarState != "" {
+				data-sidebar-state={ bodySidebarState }
+			}
+		>
+			<header id="site-header" class="sticky top-0 z-40 border-b border-transparent bg-background/80 backdrop-blur-md transition-[border-color,box-shadow,margin-left] duration-200 ease-linear ml-0 [body[data-sidebar-state=expanded]_&]:md:ml-[var(--sidebar-width,16rem)]">
 				<div class="mx-auto max-w-4xl flex items-center justify-between px-4 py-3">
-					<div class="flex items-center gap-6">
-						<a href="/" class="group flex items-center gap-2 font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity" style="font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;">
-							@icon.BookOpen(icon.Props{Class: "h-4 w-4 -translate-y-px text-primary"})
-							Folio
-						</a>
-						<a href="/exports" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Exports</a>
+					<div class="flex items-center gap-2">
+						<div id="header-left" class="flex items-center">
+							@headerLeft
+						</div>
+						<div class="flex items-center gap-6">
+							<a href="/" class="group flex items-center gap-2 font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity" style="font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;">
+								@icon.BookOpen(icon.Props{Class: "h-4 w-4 -translate-y-px text-primary"})
+								Folio
+							</a>
+							<a href="/exports" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Exports</a>
+						</div>
 					</div>
 					<div class="flex items-center gap-3">
 						<div id="header-actions" class="flex items-center gap-2">
@@ -111,7 +136,7 @@ templ ErrorBanner(msg string) {
 }
 
 templ ErrorPage(msg string) {
-	@Layout("Error", NoAction()) {
+	@Layout("Error", NoAction(), NoAction(), NoAction(), "") {
 		@ErrorBanner(msg)
 	}
 }

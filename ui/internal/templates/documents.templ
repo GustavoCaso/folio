@@ -138,7 +138,7 @@ templ DocumentList(jobs []domain.Job) {
 }
 
 templ Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) {
-	@Layout("Documents", NoAction()) {
+	@Layout("Documents", NoAction(), NoAction(), NoAction(), "") {
 		@ErrorBanner(errMsg)
 		<div class="flex flex-col gap-8">
 			<div class="flex flex-col gap-4">
@@ -169,7 +169,7 @@ templ Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) {
 											id="file-input"
 											type="file"
 											name="document"
-											accept=".pdf"
+											accept=".pdf,.epub"
 											required
 											class="sr-only"
 										/>
@@ -177,7 +177,7 @@ templ Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) {
 											id="drop-zone"
 											role="button"
 											tabindex="0"
-											aria-label="Drop a PDF here or click to browse"
+											aria-label="Drop a document here or click to browse"
 											class="relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-6 py-8 text-center transition-all duration-200 cursor-pointer hover:border-foreground/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
 										>
 											<span class="text-muted-foreground/60 mb-1 pointer-events-none">

@@ -13,7 +13,7 @@ import (
 )
 
 templ EditDocument(j domain.Job, errMsg string) {
-	@Layout("Edit Document", NoAction()) {
+	@Layout("Edit Document", NoAction(), NoAction(), NoAction(), "") {
 		@ErrorBanner(errMsg)
 		<div class="flex flex-col gap-6">
 			<!-- Header -->
