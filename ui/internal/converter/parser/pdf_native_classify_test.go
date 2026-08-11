@@ -127,3 +127,53 @@ func TestClassifyBlocks_Empty(t *testing.T) {
 		t.Errorf("expected no blocks, got %+v", blocks)
 	}
 }
+
+func TestClassifyBlocks_WrappedLinesWithinAParagraphStayMerged(t *testing.T) {
+	// Normal single-spaced body text: consecutive lines ~12pt apart (typical
+	// line height), should stay one PROSE block despite the vertical gap.
+	rects := []textRect{
+		{Text: "This is the first line of a paragraph ", FontName: "NewBaskervilleStd-Roman", Top: 700, Bottom: 690},
+		{Text: "that wraps onto a second line.", FontName: "NewBaskervilleStd-Roman", Top: 688, Bottom: 678},
+	}
+	blocks := classifyBlocks(rects)
+	if len(blocks) != 1 {
+		t.Fatalf("expected 1 merged block (line wrap, not paragraph break), got %d: %+v", len(blocks), blocks)
+	}
+}
+
+func TestClassifyBlocks_LargeVerticalGapSplitsIntoNewParagraphBlock(t *testing.T) {
+	// A TOC-style page: many short lines packed close together, but a big
+	// gap between the two "chunks" here simulates two distinct paragraphs
+	// (e.g. separated by a section break) that must not be merged into one
+	// giant <p>.
+	rects := []textRect{
+		{Text: "Preface ix", FontName: "NewBaskervilleStd-Roman", Top: 700, Bottom: 692},
+		{Text: "1. Introducing Patterns 1", FontName: "NewBaskervilleStd-Roman", Top: 690, Bottom: 682},
+		{Text: "2. Data Ingestion Patterns 7", FontName: "NewBaskervilleStd-Roman", Top: 500, Bottom: 492},
+		{Text: "3. Error Management 39", FontName: "NewBaskervilleStd-Roman", Top: 498, Bottom: 490},
+	}
+	blocks := classifyBlocks(rects)
+	if len(blocks) != 2 {
+		t.Fatalf("expected 2 PROSE blocks split on the large vertical gap, got %d: %+v", len(blocks), blocks)
+	}
+	if blocks[0].Text != "Preface ix 1. Introducing Patterns 1" {
+		t.Errorf("unexpected first block text: %q", blocks[0].Text)
+	}
+	if blocks[1].Text != "2. Data Ingestion Patterns 7 3. Error Management 39" {
+		t.Errorf("unexpected second block text: %q", blocks[1].Text)
+	}
+}
+
+func TestClassifyBlocks_ParagraphSplitDoesNotApplyToCodeBlocks(t *testing.T) {
+	// Code listings can have larger line gaps than prose (e.g. blank lines
+	// between statements) without those being separate "blocks" — a code
+	// listing is one block regardless of internal vertical spacing.
+	rects := []textRect{
+		{Text: "fn main() {", FontName: "TheSansMonoCd-W5Regular", Top: 700, Bottom: 692},
+		{Text: "    println!(\"hi\");", FontName: "TheSansMonoCd-W5Regular", Top: 500, Bottom: 492},
+	}
+	blocks := classifyBlocks(rects)
+	if len(blocks) != 1 || blocks[0].Kind != blockCode {
+		t.Fatalf("expected 1 CODE block regardless of vertical gap, got %+v", blocks)
+	}
+}

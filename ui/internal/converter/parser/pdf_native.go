@@ -186,7 +186,12 @@ func pageTextRects(instance pdfium.Pdfium, pageRef requests.Page) ([]textRect, e
 		if r.FontInformation != nil {
 			fontName = r.FontInformation.Name
 		}
-		rects = append(rects, textRect{Text: r.Text, FontName: fontName})
+		rects = append(rects, textRect{
+			Text:     r.Text,
+			FontName: fontName,
+			Top:      r.PointPosition.Top,
+			Bottom:   r.PointPosition.Bottom,
+		})
 	}
 	return rects, nil
 }

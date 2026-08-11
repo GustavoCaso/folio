@@ -9,6 +9,14 @@ import "strings"
 type textRect struct {
 	Text     string
 	FontName string
+	// Top and Bottom are the rect's vertical position in points (pdfium's
+	// CharPosition.Top/Bottom), used to detect paragraph breaks within a
+	// contiguous PROSE run. Zero-valued for rects built outside a real
+	// pdfium page (e.g. hand-written unit tests not exercising paragraph
+	// splitting), which is safe since a zero/zero gap never exceeds the
+	// split threshold.
+	Top    float64
+	Bottom float64
 }
 
 type blockKind int
@@ -68,49 +76,87 @@ func classifyRect(fontName string) (blockKind, bool) {
 	return blockProse, true
 }
 
+// paragraphGapMultiplier is how many times the previous line's own height
+// (Top - Bottom) the gap to the next rect must exceed to count as a
+// paragraph break rather than an ordinary line wrap. Line-to-line gaps
+// within a wrapped paragraph are typically close to one line height;
+// section/paragraph breaks leave noticeably more whitespace.
+const paragraphGapMultiplier = 1.5
+
+// isParagraphBreak reports whether the vertical gap between prev and next
+// looks like a paragraph/section break rather than an ordinary wrapped
+// line. It compares the gap (prev.Bottom - next.Top, in PDF points where Y
+// increases upward, so a "gap" is prev.Bottom minus next.Top) against
+// paragraphGapMultiplier times prev's own line height (prev.Top -
+// prev.Bottom). A zero-valued line height (rects with no position data, as
+// in older unit tests) never triggers a split.
+func isParagraphBreak(prev, next textRect) bool {
+	lineHeight := prev.Top - prev.Bottom
+	if lineHeight <= 0 {
+		return false
+	}
+	gap := prev.Bottom - next.Top
+	return gap > paragraphGapMultiplier*lineHeight
+}
+
 // classifyBlocks groups a page's text rects into merged blocks. Rects with
 // no font-name signal inherit the previous rect's classification (falling
 // back to PROSE if there is no previous rect). A run of CODE rects only
 // stays CODE if it spans >=2 lines; a single-line CODE run is demoted to
 // PROSE so inline code mentions in running prose (e.g. "the `let` keyword")
-// don't become their own one-line code block — see FINDINGS.md gap #2.
+// don't become their own one-line code block — see FINDINGS.md gap #2. A
+// PROSE run splits into a new block whenever isParagraphBreak fires, so a
+// page of visually distinct paragraphs doesn't collapse into one <p>.
 func classifyBlocks(rects []textRect) []block {
 	if len(rects) == 0 {
 		return nil
 	}
 
 	type run struct {
-		kind  blockKind
-		lines []string
+		kind                 blockKind
+		lines                []string
+		wasDemoted           bool // true if this run started life as a demoted single-line CODE run
+		paragraphBreakBefore bool
 	}
 	var runs []run
 	prevKind := blockProse
+	var prevRect *textRect
 
-	for _, r := range rects {
+	for i := range rects {
+		r := &rects[i]
 		kind, known := classifyRect(r.FontName)
 		if !known {
 			kind = prevKind
 		}
 		prevKind = kind
 
-		if len(runs) > 0 && runs[len(runs)-1].kind == kind {
+		splitParagraph := kind == blockProse && prevRect != nil && isParagraphBreak(*prevRect, *r)
+		prevRect = r
+
+		if len(runs) > 0 && runs[len(runs)-1].kind == kind && !splitParagraph {
 			runs[len(runs)-1].lines = append(runs[len(runs)-1].lines, r.Text)
 			continue
 		}
-		runs = append(runs, run{kind: kind, lines: []string{r.Text}})
+		runs = append(runs, run{kind: kind, lines: []string{r.Text}, paragraphBreakBefore: splitParagraph})
 	}
 
 	// Demote single-line CODE runs to PROSE, then re-merge adjacent PROSE
-	// runs that are now the same kind (e.g. PROSE, demoted-CODE, PROSE).
+	// runs that are now the same kind (e.g. PROSE, demoted-CODE, PROSE) —
+	// but never re-merge across an explicit paragraph-break split, or a
+	// large vertical gap between two real paragraphs would collapse back
+	// into one giant block.
 	for i := range runs {
 		if runs[i].kind == blockCode && len(runs[i].lines) < 2 {
 			runs[i].kind = blockProse
+			runs[i].wasDemoted = true
 		}
 	}
 	merged := runs[:0:0]
 	for _, rn := range runs {
-		if len(merged) > 0 && merged[len(merged)-1].kind == rn.kind {
+		if len(merged) > 0 && merged[len(merged)-1].kind == rn.kind &&
+			!rn.paragraphBreakBefore && (merged[len(merged)-1].wasDemoted || rn.wasDemoted) {
 			merged[len(merged)-1].lines = append(merged[len(merged)-1].lines, rn.lines...)
+			merged[len(merged)-1].wasDemoted = merged[len(merged)-1].wasDemoted || rn.wasDemoted
 			continue
 		}
 		merged = append(merged, rn)
