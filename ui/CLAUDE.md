@@ -23,7 +23,7 @@ Python is treated as stateless — no file paths are exchanged.
 - `parser/client/` — gRPC client: sends PDF chunks, receives StatusUpdates + markdown, publishes to Hub; defines the `Client` interface used by `converter/parser/` and `handlers/`
 - `parser/proto/` — generated protobuf bindings (do not edit manually)
 - `converter/` — `Runner` struct: dispatches conversions (file upload and URL) to a `map[string]parser.Parser` keyed by `domain.Format`; owns cancel tracking
-- `converter/parser/` — `Parser` interface, implemented per format; each implementation owns its full conversion lifecycle (writing output, marking the job done/failed, publishing hub events). `NewPDF` (gRPC to Python, rewrites image refs to base64, writes Markdown to disk) and `NewEPUB` (parses uploaded EPUB bytes, no gRPC, synchronous, writes one HTML file per chapter + `toc.json` to disk)
+- `converter/parser/` — `Parser` interface, implemented per format; each implementation owns its full conversion lifecycle (writing output, marking the job done/failed, publishing hub events). `NewPDF` (gRPC to Python, rewrites image refs to base64, writes Markdown to disk), `NewEPUB` (parses uploaded EPUB bytes, no gRPC, synchronous, writes one HTML file per chapter + `toc.json` to disk), and `NewNativePDF` (parses PDF bytes in-process via pdfium/WASM, no gRPC, writes epub-shaped chapter + `toc.json` output; selected instead of `NewPDF` when `PDF_PIPELINE=native`, see docs/plans/2026-08-11-pdf-native-pipeline-design.md)
 - `renderer/markdown/` — goldmark Markdown renderer with data-block-id injection for highlight anchoring
 - `renderer/epub/` — HTML-tree walker: injects `data-block-id` on block-level elements per chapter, rewrites `<img>` refs to base64 data URIs
 - `domain/` — domain types
@@ -74,9 +74,24 @@ Browser uploads EPUB
           → write DATA_DIR/{jobID}/chapter-N.html + toc.json
           → store.MarkJobDone(outputPath=dir)
   → hub.Publish DONE → SSE → browser
+
+Browser uploads PDF, PDF_PIPELINE=native
+  → POST /documents (same route; handlers.Register picked format="pdf-native" at startup)
+  → store.CreateJob(..., format="pdf-native")
+  → go converter.Run(..., format)         # same Runner, dispatches by format
+      → parsers["pdf-native"].Convert()   # parser.NewNativePDF, synchronous, no gRPC
+          → pdfium.OpenDocument(bytes)    # github.com/klippa-app/go-pdfium, WASM mode
+          → GetBookmarks() → resolveChapters() → page ranges + toc tree
+          → per chapter: classify page text (font-name heuristics) → data-block-id HTML
+          → per page: extract embedded raster images → base64 <img> inline
+          → write DATA_DIR/{jobID}/chapter-N.html + toc.json
+          → store.MarkJobDone(outputPath=dir)
+  → hub.Publish DONE → SSE → browser
 ```
 
 `converter.Runner` holds a `map[string]parser.Parser` keyed by `domain.Format`; each `parser.Parser` implementation owns its full job-completion lifecycle (output writes, `MarkJobDone`/`MarkJobFailed`, hub publish). An unregistered format marks the job failed rather than panicking.
+
+`PDF_PIPELINE=native` swaps which `Parser` `handlers.Register` wires up under the PDF format slot at startup — `.pdf` uploads then get `format="pdf-native"` instead of `"pdf"`, and are served by the epub-shaped reader path (`ReadDocument` routes both `"epub"` and `"pdf-native"` to `readEPUBChapter`). URL import (`ConvertFromURL`) always uses the `"pdf"` (Docling/gRPC) pipeline regardless of `PDF_PIPELINE` — native PDF is upload-only.
 
 ## Highlight anchoring
 
@@ -102,6 +117,7 @@ changes, as long as the block structure is preserved.
 | `DB_PATH` | `/data/folio.db` | SQLite path for jobs and highlights |
 | `PARSER_GRPC_ADDR` | `localhost:50051` | Parser gRPC address |
 | `DATA_DIR` | `/data` | Where Markdown files are written and read |
+| `PDF_PIPELINE` | `docling` | PDF backend: `docling` (gRPC to Python) or `native` (in-process pdfium) |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
 
 ## Regenerating gRPC bindings

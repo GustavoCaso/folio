@@ -5,6 +5,7 @@ import (
 	"embed"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
@@ -31,6 +32,7 @@ type Handlers struct {
 	converter *converter.Runner
 	dataDir   string
 	backends  []export.Backend
+	pdfFormat domain.JobFormat
 }
 
 func (h *Handlers) backendByName(name string) export.Backend {
@@ -58,12 +60,25 @@ func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir stri
 	parsers := map[domain.JobFormat]parser.Parser{
 		domain.EpubFormat: parser.NewEPUB(store, h, dataDir),
 	}
-	if pc != nil {
+
+	// PDF_PIPELINE selects which backend handles ".pdf" uploads: "docling"
+	// (default) round-trips to the Python gRPC parser; "native" parses
+	// in-process via pdfium, writing epub-shaped chapter+toc output. See
+	// docs/plans/2026-08-11-pdf-native-pipeline-design.md.
+	pdfFormat := domain.PdfFormat
+	if os.Getenv("PDF_PIPELINE") == "native" {
+		nativeParser, err := parser.NewNativePDF(store, h, dataDir)
+		if err != nil {
+			return nil, fmt.Errorf("handlers.Register: init native pdf parser: %w", err)
+		}
+		parsers[domain.PdfNativeFormat] = nativeParser
+		pdfFormat = domain.PdfNativeFormat
+	} else if pc != nil {
 		parsers[domain.PdfFormat] = parser.NewPDF(store, h, pc, dataDir, logger)
 	}
 	runner := converter.New(store, h, parsers, logger)
 
-	hs := &Handlers{store: store, hub: h, parser: pc, converter: runner, dataDir: dataDir, backends: backends}
+	hs := &Handlers{store: store, hub: h, parser: pc, converter: runner, dataDir: dataDir, backends: backends, pdfFormat: pdfFormat}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)

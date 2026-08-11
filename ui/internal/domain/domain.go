@@ -6,6 +6,7 @@ type JobFormat string
 
 const PdfFormat JobFormat = "pdf"
 const EpubFormat JobFormat = "epub"
+const PdfNativeFormat JobFormat = "pdf-native"
 
 type Job struct {
 	ID              string

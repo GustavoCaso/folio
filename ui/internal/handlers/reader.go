@@ -49,7 +49,7 @@ func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
 		renderErr(http.StatusNotFound, msg)
 		return
 	}
-	if job.Format == "epub" {
+	if job.Format == domain.EpubFormat || job.Format == domain.PdfNativeFormat {
 		h.readEPUBChapter(w, r, job)
 		return
 	}
