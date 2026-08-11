@@ -13,9 +13,9 @@ import (
 // scripts/pdf-extract-test/pdfium_test/main.go.
 func bgraBufferToImage(buf []byte, width, height, stride int) image.Image {
 	img := image.NewRGBA(image.Rect(0, 0, width, height))
-	for y := 0; y < height; y++ {
+	for y := range height {
 		rowStart := y * stride
-		for x := 0; x < width; x++ {
+		for x := range width {
 			i := rowStart + x*4
 			if i+3 >= len(buf) {
 				break
