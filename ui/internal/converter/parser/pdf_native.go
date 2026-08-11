@@ -8,6 +8,7 @@ import (
 	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/hub"
@@ -149,7 +150,7 @@ func (p *nativePDFParser) fail(log *slog.Logger, jobID, msg string) error {
 // blocks, inserts embedded raster images inline at their page position, and
 // renders the result as HTML with data-block-id anchoring.
 func (p *nativePDFParser) renderChapter(instance pdfium.Pdfium, doc references.FPDF_DOCUMENT, ch chapterRange, chapterIdx int) (string, error) {
-	var out string
+	var out strings.Builder
 	for page := ch.StartPage; page <= ch.EndPage; page++ {
 		pageRef := requests.Page{ByIndex: &requests.PageByIndex{Document: doc, Index: page}}
 
@@ -157,17 +158,17 @@ func (p *nativePDFParser) renderChapter(instance pdfium.Pdfium, doc references.F
 		if err != nil {
 			return "", fmt.Errorf("page %d text: %w", page, err)
 		}
-		out += renderChapterHTML(chapterIdx, classifyBlocks(rects))
+		out.WriteString(renderChapterHTML(chapterIdx, classifyBlocks(rects)))
 
 		images, err := pageEmbeddedImages(instance, doc, pageRef)
 		if err != nil {
 			return "", fmt.Errorf("page %d images: %w", page, err)
 		}
 		for _, img := range images {
-			out += renderImageTag(img.pngBytes, "image/png")
+			out.WriteString(renderImageTag(img.pngBytes, "image/png"))
 		}
 	}
-	return out, nil
+	return out.String(), nil
 }
 
 func pageTextRects(instance pdfium.Pdfium, pageRef requests.Page) ([]textRect, error) {
