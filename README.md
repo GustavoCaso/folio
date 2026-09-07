@@ -60,7 +60,18 @@ The `compose.yaml` serves as an example way of configuring Folio.
 | `DB_PATH` | `/data/folio.db` | SQLite path for jobs and highlights |
 | `PARSER_GRPC_ADDR` | `localhost:50051` | Parser gRPC address |
 | `DATA_DIR` | `/data` | Where Markdown files are written and read |
+| `PDF_PIPELINE` | `docling` | PDF backend: `docling` (gRPC to Python) or `native` (in-process pdfium) |
 | `LOG_LEVEL` | `info` | `debug` \| `info` \| `warn` \| `error` |
+| **AI cleanup (native pipeline only)** | | |
+| `AI_PIPELINE_MODEL` | `unsloth/Qwen3-4B-Q8_0` | Kronk model source, downloaded on first use |
+| `AI_PIPELINE_TIMEOUT_BASE` | `120s` | Minimum per-page cleanup call timeout |
+| `AI_PIPELINE_TIMEOUT_PER_BLOCK` | `5s` | Added per block beyond the first 10 |
+| `AI_PIPELINE_KRONK_LIB_PATH` | (empty) | Directory of pre-assembled llama.cpp/ggml dylibs; empty auto-downloads |
+
+The shipped `ui/Dockerfile` is Debian-based (glibc + `libgomp1`), required for
+Kronk's precompiled llama.cpp libraries — see `ui/CLAUDE.md` for details.
+Downloaded libraries and models are cached under `/data` (mount a volume in
+production) so they persist across restarts; the default model is ~4GB.
 
 ### Parser (`parser/`)
 

@@ -9,12 +9,14 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
+	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/raitucarp/epub"
 )
 
@@ -113,6 +115,45 @@ func TestRun_WritesChaptersAndMarksDone(t *testing.T) {
 	}
 	if !sawChapter || !sawTOC {
 		t.Errorf("expected chapter html + toc.json, got %v", entries)
+	}
+}
+
+func TestRun_PublishesPerChapterProgress(t *testing.T) {
+	epubBytes := buildTestEpub(t)
+	dataDir := t.TempDir()
+	store := &fakeStore{}
+	h, err := hub.New(slog.Default())
+	if err != nil {
+		t.Fatalf("hub.New: %v", err)
+	}
+	p := parser.NewEPUB(store, h, dataDir)
+
+	ch := h.Subscribe("job-progress")
+	defer h.Unsubscribe("job-progress", ch)
+
+	if err := p.Convert(context.Background(), "job-progress", "req-1", "book.epub", epubBytes, h); err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+
+	var sawChapterProgress, sawDone bool
+	for {
+		select {
+		case evt := <-ch:
+			if evt.Status == "PROCESSING" && evt.Message == "chapter 1/1" {
+				sawChapterProgress = true
+			}
+			if evt.Status == "DONE" {
+				sawDone = true
+			}
+		default:
+			if !sawChapterProgress {
+				t.Errorf("expected a PROCESSING event with Message %q", "chapter 1/1")
+			}
+			if !sawDone {
+				t.Errorf("expected a terminal DONE event")
+			}
+			return
+		}
 	}
 }
 

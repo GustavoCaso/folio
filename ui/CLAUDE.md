@@ -71,6 +71,7 @@ Browser uploads EPUB
           → epub.NewReader(bytes)     # github.com/raitucarp/epub
           → extract Title/Author/Cover
           → per spine item: epubrender.Render() → data-block-id + base64 images
+              → hub.Publish StatusEvent{PROCESSING, Message: "chapter N/Total"} → SSE → browser
           → write DATA_DIR/{jobID}/chapter-N.html + toc.json
           → store.MarkJobDone(outputPath=dir)
   → hub.Publish DONE → SSE → browser
@@ -82,14 +83,21 @@ Browser uploads PDF, PDF_PIPELINE=native
       → parsers["pdf-native"].Convert()   # parser.NewNativePDF, synchronous, no gRPC
           → pdfium.OpenDocument(bytes)    # github.com/klippa-app/go-pdfium, WASM mode
           → GetBookmarks() → resolveChapters() → page ranges + toc tree
-          → per chapter: classify page text (font-name heuristics) → data-block-id HTML
+          → per chapter: extract raw page text rects (font name, position)
+              → Kronk LLM segmentation pass (groups rects into blocks, classifies prose/code/h1/h2/h3)
+              → data-block-id HTML
           → per page: extract embedded raster images → base64 <img> inline
+          → per page: checkpoint rendered fragment to DATA_DIR/{jobID}/page-N.html.part
+          → per page: hub.Publish StatusEvent{PROCESSING, Message: "page N/Total"} → SSE → browser
           → write DATA_DIR/{jobID}/chapter-N.html + toc.json
+          → delete page-N.html.part checkpoint files
           → store.MarkJobDone(outputPath=dir)
   → hub.Publish DONE → SSE → browser
 ```
 
 `converter.Runner` holds a `map[string]parser.Parser` keyed by `domain.Format`; each `parser.Parser` implementation owns its full job-completion lifecycle (output writes, `MarkJobDone`/`MarkJobFailed`, hub publish). An unregistered format marks the job failed rather than panicking.
+
+**Native PDF page-level resumability**: the AI cleanup pass is the slowest and most failure-prone step of the native PDF pipeline, so each page's rendered HTML fragment is checkpointed to `DATA_DIR/{jobID}/page-{N}.html.part` (`N` is a document-global 0-based page index, independent of chapter boundaries) as soon as it's produced. `handlers.RetryDocument` reuses the same `jobID` (and therefore the same output directory) on retry, so a job that fails partway through a document skips AI cleanup for every page whose checkpoint file already exists, instead of reprocessing the whole document from page 0. Checkpoint files are deleted once the job completes successfully; a failed job's checkpoints are left in place intentionally, as the resume state for the next retry.
 
 `PDF_PIPELINE=native` swaps which `Parser` `handlers.Register` wires up under the PDF format slot at startup — `.pdf` uploads then get `format="pdf-native"` instead of `"pdf"`, and are served by the epub-shaped reader path (`ReadDocument` routes both `"epub"` and `"pdf-native"` to `readEPUBChapter`). URL import (`ConvertFromURL`) always uses the `"pdf"` (Docling/gRPC) pipeline regardless of `PDF_PIPELINE` — native PDF is upload-only.
 
@@ -119,6 +127,32 @@ changes, as long as the block structure is preserved.
 | `DATA_DIR` | `/data` | Where Markdown files are written and read |
 | `PDF_PIPELINE` | `docling` | PDF backend: `docling` (gRPC to Python) or `native` (in-process pdfium) |
 | `LOG_LEVEL` | `info` | Log level: `debug`, `info`, `warn`, `error` |
+| `AI_PIPELINE_MODEL` | `unsloth/Qwen3-4B-Q8_0` | Native PDF pipeline only: Kronk model source used for the mandatory page-segmentation pass (groups raw text rects into blocks and classifies each as prose/code/h1/h2/h3), downloaded on first use via `sdk/tools/models`. On error/timeout the chapter fails — there is no non-AI fallback. |
+| `AI_PIPELINE_TIMEOUT_BASE` | `120s` | Minimum per-page cleanup call timeout (Go duration string). |
+| `AI_PIPELINE_TIMEOUT_PER_BLOCK` | `5s` | Added to the base timeout per block beyond the first 10, since dense pages need more time. |
+| `AI_PIPELINE_TEMPERATURE` | `0.2` | Sampling temperature for the segmentation call. Kronk exposes no repeat-penalty knob, so greedy decoding (`0`) is prone to degenerate repetition loops that burn the `max_tokens` budget before completing the JSON. |
+| `AI_PIPELINE_RETRY_TEMPERATURE_BUMP` | `0.4` | Added to `AI_PIPELINE_TEMPERATURE` for a single retry attempt when a chunk truncates (see above) before completing its JSON. `+0.2` was tried first and was not enough to escape a real repeat-loop; `+0.4` was confirmed to work in a real test. |
+| `AI_PIPELINE_KRONK_LIB_PATH` | `` (empty) | Directory of pre-assembled llama.cpp/ggml dylibs (see FINDINGS.md's macOS arm64 brew workaround). Empty auto-detects the host triple and downloads Kronk's precompiled libs into its default cache. |
+
+**Docker image**: `ui/Dockerfile` is `debian:bookworm-slim` (glibc), not alpine —
+Kronk's precompiled llama.cpp/ggml libraries are only published for
+glibc-based Linux/macOS/Windows (`sdk/tools/libs.SupportedCombinations`),
+not musl. The image also installs `libgomp1`, required by the CPU-backend
+tarball at runtime.
+
+Kronk's downloader resolves its cache dir from `os.UserHomeDir()`, which
+reads `$HOME` — but `entrypoint.sh` execs the app via `gosu folio`, and
+**gosu always resets `HOME` from the target user's `/etc/passwd` entry**,
+discarding any inherited `HOME` env var. An `ENV HOME=...` in the Dockerfile
+is silently clobbered at container start (confirmed: `gosu` ignores the
+parent process's `HOME`). So instead the `folio` user's actual home
+directory is set at image build time via `useradd -d /data/kronk-home`,
+which puts the downloaded libraries and model (`AI_PIPELINE_MODEL`, 4GB+ for
+the default Qwen3-4B) inside the `/data` volume, persisting across container
+restarts. Verified end-to-end (`libs.Download` → `kronk.Init`, run through
+the real `gosu folio` path, not bypassed) on linux/arm64; a prior pass that
+tested `kronk.Init` by overriding `--entrypoint` directly missed this bug
+because it skipped `gosu` entirely.
 
 ## Regenerating gRPC bindings
 

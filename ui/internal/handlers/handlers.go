@@ -1,22 +1,18 @@
 package handlers
 
 import (
-	"context"
 	"embed"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/converter"
 	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
-	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/parser/client"
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/templui/templui/utils"
@@ -67,7 +63,8 @@ func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir stri
 	// docs/plans/2026-08-11-pdf-native-pipeline-design.md.
 	pdfFormat := domain.PdfFormat
 	if os.Getenv("PDF_PIPELINE") == "native" {
-		nativeParser, err := parser.NewNativePDF(store, h, dataDir)
+		aiCfg := parser.AIConfigFromEnv(os.Getenv)
+		nativeParser, err := parser.NewNativePDF(store, h, dataDir, aiCfg)
 		if err != nil {
 			return nil, fmt.Errorf("handlers.Register: init native pdf parser: %w", err)
 		}
@@ -82,7 +79,6 @@ func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir stri
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)
-	mux.HandleFunc("GET /health/parser", hs.ParserHealth)
 	mux.HandleFunc("POST /documents", hs.UploadDocument)
 	mux.HandleFunc("POST /documents/import", hs.ImportDocument)
 	mux.HandleFunc("POST /documents/{id}/cancel", hs.CancelDocument)
@@ -102,24 +98,4 @@ func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir stri
 	utils.SetupScriptRoutes(mux, isDev)
 
 	return mux, nil
-}
-
-func (h *Handlers) ParserHealth(w http.ResponseWriter, r *http.Request) {
-	log := logging.LoggerFrom(r.Context())
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
-
-	status := "unhealthy"
-	if h.parser != nil && h.parser.Health(ctx) {
-		status = "healthy"
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
-
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": status}); err != nil {
-		log.Error("ParserHealth: encode response", "err", err)
-	}
 }

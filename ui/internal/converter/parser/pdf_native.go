@@ -14,7 +14,6 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/klippa-app/go-pdfium"
-	"github.com/klippa-app/go-pdfium/enums"
 	"github.com/klippa-app/go-pdfium/references"
 	"github.com/klippa-app/go-pdfium/requests"
 	"github.com/klippa-app/go-pdfium/responses"
@@ -38,16 +37,38 @@ type nativePDFParser struct {
 	dataDir string
 	logger  *slog.Logger
 	pool    nativePDFPool
+	ai      *aiCleaner
+}
+
+// NativePDFOption configures optional behavior on a nativePDFParser,
+// primarily for test injection.
+type NativePDFOption func(*nativePDFParser)
+
+// WithAIClient overrides the AI cleaner's chat client, bypassing the lazy
+// Kronk model load. For tests only.
+func WithAIClient(client AIClient) NativePDFOption {
+	return func(p *nativePDFParser) {
+		p.ai.client = client
+		p.ai.initOnce.Do(func() {}) // mark loaded, skip ensureLoaded's real download
+	}
 }
 
 // NewNativePDF constructs the pdfium-based PDF Parser. h may be nil, in
 // which case status events are not published (Store is still updated).
-func NewNativePDF(store Store, h *hub.Hub, dataDir string) (Parser, error) {
+// Every page's raw text rects are segmented and classified by a mandatory
+// Kronk-backed AI pass (lazily loading the model on first job) — see
+// ai_cleanup.go and ui/CLAUDE.md's Configuration table.
+func NewNativePDF(store Store, h *hub.Hub, dataDir string, aiCfg AIConfig, opts ...NativePDFOption) (Parser, error) {
 	pool, err := webassembly.Init(webassembly.Config{MinIdle: 1, MaxIdle: 1, MaxTotal: 1})
 	if err != nil {
 		return nil, fmt.Errorf("init pdfium pool: %w", err)
 	}
-	return &nativePDFParser{store: store, hub: h, dataDir: dataDir, logger: slog.Default(), pool: pool}, nil
+	p := &nativePDFParser{store: store, hub: h, dataDir: dataDir, logger: slog.Default(), pool: pool}
+	p.ai = newAICleaner(aiCfg)
+	for _, opt := range opts {
+		opt(p)
+	}
+	return p, nil
 }
 
 func (p *nativePDFParser) Convert(ctx context.Context, jobID, requestID, filename string, data []byte, h *hub.Hub) error {
@@ -93,7 +114,7 @@ func (p *nativePDFParser) Convert(ctx context.Context, jobID, requestID, filenam
 	}
 
 	for i, ch := range chapters {
-		chapterHTML, err := p.renderChapter(instance, doc.Document, ch, i)
+		chapterHTML, err := p.renderChapter(ctx, log, instance, doc.Document, ch, i, jobID, outDir, pageCountResp.PageCount)
 		if err != nil {
 			return p.fail(log, jobID, fmt.Sprintf("render chapter %d: %v", i, err))
 		}
@@ -101,6 +122,7 @@ func (p *nativePDFParser) Convert(ctx context.Context, jobID, requestID, filenam
 			return p.fail(log, jobID, fmt.Sprintf("write chapter %d: %v", i, err))
 		}
 	}
+	removePageFragments(log, outDir, pageCountResp.PageCount)
 
 	tocBytes, err := json.Marshal(tocEntries)
 	if err != nil {
@@ -146,29 +168,89 @@ func (p *nativePDFParser) fail(log *slog.Logger, jobID, msg string) error {
 	return errors.New(msg)
 }
 
-// renderChapter walks every page in ch's range, classifies its text into
-// blocks, inserts embedded raster images inline at their page position, and
-// renders the result as HTML with data-block-id anchoring.
-func (p *nativePDFParser) renderChapter(instance pdfium.Pdfium, doc references.FPDF_DOCUMENT, ch chapterRange, chapterIdx int) (string, error) {
+// renderChapter walks every page in ch's range, sends its raw text rects
+// through AI segmentation/classification, inserts embedded raster images
+// inline at their page position, and renders the result as HTML with
+// data-block-id anchoring. A cleanup error or timeout fails the chapter.
+// After each page, a PROCESSING status event reports progress across the
+// whole document (page is already a document-global 0-based index).
+//
+// Each page's rendered fragment is checkpointed to outDir (see
+// pageFragmentPath) as soon as it's produced, and reused instead of
+// recomputed on a retry -- the AI cleanup pass is the slowest and most
+// failure-prone step.
+func (p *nativePDFParser) renderChapter(ctx context.Context, log *slog.Logger, instance pdfium.Pdfium, doc references.FPDF_DOCUMENT, ch chapterRange, chapterIdx int, jobID, outDir string, totalPages int) (string, error) {
 	var out strings.Builder
 	for page := ch.StartPage; page <= ch.EndPage; page++ {
-		pageRef := requests.Page{ByIndex: &requests.PageByIndex{Document: doc, Index: page}}
+		fragmentPath := pageFragmentPath(outDir, page)
 
-		rects, err := pageTextRects(instance, pageRef)
+		fragment, err := os.ReadFile(fragmentPath)
 		if err != nil {
-			return "", fmt.Errorf("page %d text: %w", page, err)
-		}
-		out.WriteString(renderChapterHTML(chapterIdx, classifyBlocks(rects)))
+			if !os.IsNotExist(err) {
+				return "", fmt.Errorf("page %d: read fragment: %w", page, err)
+			}
 
-		images, err := pageEmbeddedImages(instance, doc, pageRef)
-		if err != nil {
-			return "", fmt.Errorf("page %d images: %w", page, err)
+			pageRef := requests.Page{ByIndex: &requests.PageByIndex{Document: doc, Index: page}}
+
+			rects, err := pageTextRects(instance, pageRef)
+			if err != nil {
+				return "", fmt.Errorf("page %d text: %w", page, err)
+			}
+			blocks, err := p.ai.Clean(ctx, rects)
+			if err != nil {
+				return "", fmt.Errorf("page %d ai cleanup: %w", page, err)
+			}
+
+			var pageHTML strings.Builder
+			pageHTML.WriteString(renderChapterHTML(chapterIdx, blocks))
+
+			images, err := pageEmbeddedImages(instance, doc, pageRef)
+			if err != nil {
+				return "", fmt.Errorf("page %d images: %w", page, err)
+			}
+			for _, img := range images {
+				pageHTML.WriteString(renderImageTag(img.pngBytes, "image/png"))
+			}
+
+			fragment = []byte(pageHTML.String())
+			if err := os.WriteFile(fragmentPath, fragment, 0o644); err != nil {
+				return "", fmt.Errorf("page %d: write fragment: %w", page, err)
+			}
+		} else {
+			log.Info("resuming from checkpointed page", "page", page)
 		}
-		for _, img := range images {
-			out.WriteString(renderImageTag(img.pngBytes, "image/png"))
+
+		out.Write(fragment)
+
+		if p.hub != nil {
+			p.hub.Publish(jobID, hub.StatusEvent{
+				Status:  "PROCESSING",
+				Message: fmt.Sprintf("page %d/%d", page+1, totalPages),
+			})
 		}
 	}
 	return out.String(), nil
+}
+
+// pageFragmentPath is the on-disk checkpoint location for one document-
+// global page's rendered HTML fragment, keyed by page index alone since
+// pages are globally numbered independent of chapter boundaries (see
+// resolveChapters).
+func pageFragmentPath(outDir string, page int) string {
+	return filepath.Join(outDir, fmt.Sprintf("page-%d.html.part", page))
+}
+
+// removePageFragments deletes every page checkpoint file after a
+// successful conversion -- they exist only to make a failed job's retry
+// skip already-cleaned pages, and serve no purpose once the chapter HTML
+// they were assembled into is written. A removal failure is logged, not
+// fatal, since the job has already succeeded.
+func removePageFragments(log *slog.Logger, outDir string, pageCount int) {
+	for page := 0; page < pageCount; page++ {
+		if err := os.Remove(pageFragmentPath(outDir, page)); err != nil && !os.IsNotExist(err) {
+			log.Warn("remove page fragment failed", "page", page, logging.Err(err))
+		}
+	}
 }
 
 func pageTextRects(instance pdfium.Pdfium, pageRef requests.Page) ([]textRect, error) {
@@ -191,70 +273,64 @@ func pageTextRects(instance pdfium.Pdfium, pageRef requests.Page) ([]textRect, e
 			FontName: fontName,
 			Top:      r.PointPosition.Top,
 			Bottom:   r.PointPosition.Bottom,
+			Left:     r.PointPosition.Left,
+			Right:    r.PointPosition.Right,
 		})
 	}
-	return rects, nil
+	return mergeSameLineRects(rects), nil
 }
 
-type pageImage struct {
-	pngBytes []byte
-}
+// sameLineEpsilon is how close a rect's Bottom (baseline, in points) must be
+// to a line run's anchor baseline to be considered part of that line --
+// pdfium sometimes returns per-character rects instead of per-line/word
+// runs (observed on a real PDF: 768 single-letter rects with empty
+// FontName for one page), which starves the AI segmentation model of any
+// real grouping signal and produces garbled, letter-scrambled output
+// regardless of sampling settings. Merging consecutive same-line rects here
+// restores word/line-level granularity before the model ever sees the
+// text. Descender glyphs (p, g, y, j, q) sit below the true line baseline
+// (observed: "p" at Bottom 750.54 vs neighboring "rogram" at ~753.30-753.42
+// on the same visual line, a ~2.9pt dip), so a plain pairwise Bottom
+// comparison breaks the run right at every descender. sameLineEpsilon is
+// wide enough to absorb that dip.
+const sameLineEpsilon = 4.0
 
-// pageEmbeddedImages extracts every FPDF_PAGEOBJ_IMAGE object on the page as
-// a standalone PNG, per-object (not a full-page render) — validated in
-// scripts/pdf-extract-test/FINDINGS.md. Vector-drawn illustrations
-// (FPDF_PAGEOBJ_PATH) are out of scope, see the design doc.
-func pageEmbeddedImages(instance pdfium.Pdfium, doc references.FPDF_DOCUMENT, pageRef requests.Page) ([]pageImage, error) {
-	countResp, err := instance.FPDFPage_CountObjects(&requests.FPDFPage_CountObjects{Page: pageRef})
-	if err != nil {
-		return nil, err
+// mergeSameLineRects concatenates consecutive rects that share the same
+// FontName and whose Bottom is within sameLineEpsilon of the current run's
+// anchor baseline, so a page pdfium extracts at character granularity is
+// normalized back to line-level runs. The anchor is the max Bottom seen so
+// far in the run (the non-descender baseline), compared against -- not the
+// immediately preceding rect -- so a run of descenders can't drift the
+// anchor down one glyph at a time and merge into the next real line.
+// Top/Bottom of the merged rect are taken from the first rect in the run.
+func mergeSameLineRects(rects []textRect) []textRect {
+	if len(rects) == 0 {
+		return rects
 	}
-
-	var images []pageImage
-	for i := 0; i < countResp.Count; i++ {
-		objResp, err := instance.FPDFPage_GetObject(&requests.FPDFPage_GetObject{Page: pageRef, Index: i})
-		if err != nil {
+	merged := make([]textRect, 0, len(rects))
+	cur := rects[0]
+	anchorBottom := cur.Bottom
+	for _, r := range rects[1:] {
+		sameLine := r.FontName == cur.FontName && abs(r.Bottom-anchorBottom) <= sameLineEpsilon
+		if sameLine {
+			cur.Text += r.Text
+			if r.Bottom > anchorBottom {
+				anchorBottom = r.Bottom
+			}
 			continue
 		}
-		typeResp, err := instance.FPDFPageObj_GetType(&requests.FPDFPageObj_GetType{PageObject: objResp.PageObject})
-		if err != nil || typeResp.Type != enums.FPDF_PAGEOBJ_IMAGE {
-			continue
-		}
-
-		png, ok := renderImageObjectPNG(instance, doc, pageRef, objResp.PageObject)
-		if ok {
-			images = append(images, pageImage{pngBytes: png})
-		}
+		merged = append(merged, cur)
+		cur = r
+		anchorBottom = cur.Bottom
 	}
-	return images, nil
+	return append(merged, cur)
 }
 
-func renderImageObjectPNG(instance pdfium.Pdfium, doc references.FPDF_DOCUMENT, pageRef requests.Page, obj references.FPDF_PAGEOBJECT) ([]byte, bool) {
-	bmpResp, err := instance.FPDFImageObj_GetRenderedBitmap(&requests.FPDFImageObj_GetRenderedBitmap{
-		Document: doc, Page: pageRef, ImageObject: obj,
-	})
-	if err != nil {
-		return nil, false
+func abs(f float64) float64 {
+	if f < 0 {
+		return -f
 	}
-	widthResp, err := instance.FPDFBitmap_GetWidth(&requests.FPDFBitmap_GetWidth{Bitmap: bmpResp.Bitmap})
-	if err != nil {
-		return nil, false
-	}
-	heightResp, err := instance.FPDFBitmap_GetHeight(&requests.FPDFBitmap_GetHeight{Bitmap: bmpResp.Bitmap})
-	if err != nil {
-		return nil, false
-	}
-	strideResp, err := instance.FPDFBitmap_GetStride(&requests.FPDFBitmap_GetStride{Bitmap: bmpResp.Bitmap})
-	if err != nil {
-		return nil, false
-	}
-	bufResp, err := instance.FPDFBitmap_GetBuffer(&requests.FPDFBitmap_GetBuffer{Bitmap: bmpResp.Bitmap})
-	if err != nil {
-		return nil, false
-	}
-
-	img := bgraBufferToImage(bufResp.Buffer, widthResp.Width, heightResp.Height, strideResp.Stride)
-	return encodePNG(img)
+	return f
 }
 
 // convertBookmarks maps pdfium's response bookmark tree to the package's own
