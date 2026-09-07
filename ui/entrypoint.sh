@@ -21,4 +21,4 @@ if [ "$(id -u folio)" != "$PUID" ] || [ "$(id -g folio)" != "$PGID" ]; then
     fi
 fi
 
-exec su-exec folio "$@"
+exec gosu folio "$@"

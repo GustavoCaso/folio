@@ -1,21 +1,18 @@
 package handlers
 
 import (
-	"context"
 	"embed"
-	"encoding/json"
 	"errors"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"os"
-	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/converter"
 	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/export"
 	"github.com/GustavoCaso/folio/ui/internal/hub"
-	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/parser/client"
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 	"github.com/templui/templui/utils"
@@ -31,6 +28,7 @@ type Handlers struct {
 	converter *converter.Runner
 	dataDir   string
 	backends  []export.Backend
+	pdfFormat domain.JobFormat
 }
 
 func (h *Handlers) backendByName(name string) export.Backend {
@@ -58,16 +56,29 @@ func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir stri
 	parsers := map[domain.JobFormat]parser.Parser{
 		domain.EpubFormat: parser.NewEPUB(store, h, dataDir),
 	}
-	if pc != nil {
+
+	// PDF_PIPELINE selects which backend handles ".pdf" uploads: "docling"
+	// (default) round-trips to the Python gRPC parser; "native" parses
+	// in-process via pdfium, writing epub-shaped chapter+toc output. See
+	// docs/plans/2026-08-11-pdf-native-pipeline-design.md.
+	pdfFormat := domain.PdfFormat
+	if os.Getenv("PDF_PIPELINE") == "native" {
+		aiCfg := parser.AIConfigFromEnv(os.Getenv)
+		nativeParser, err := parser.NewNativePDF(store, h, dataDir, aiCfg)
+		if err != nil {
+			return nil, fmt.Errorf("handlers.Register: init native pdf parser: %w", err)
+		}
+		parsers[domain.PdfNativeFormat] = nativeParser
+		pdfFormat = domain.PdfNativeFormat
+	} else if pc != nil {
 		parsers[domain.PdfFormat] = parser.NewPDF(store, h, pc, dataDir, logger)
 	}
 	runner := converter.New(store, h, parsers, logger)
 
-	hs := &Handlers{store: store, hub: h, parser: pc, converter: runner, dataDir: dataDir, backends: backends}
+	hs := &Handlers{store: store, hub: h, parser: pc, converter: runner, dataDir: dataDir, backends: backends, pdfFormat: pdfFormat}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)
-	mux.HandleFunc("GET /health/parser", hs.ParserHealth)
 	mux.HandleFunc("POST /documents", hs.UploadDocument)
 	mux.HandleFunc("POST /documents/import", hs.ImportDocument)
 	mux.HandleFunc("POST /documents/{id}/cancel", hs.CancelDocument)
@@ -87,24 +98,4 @@ func Register(store repository.Store, h *hub.Hub, pc client.Client, dataDir stri
 	utils.SetupScriptRoutes(mux, isDev)
 
 	return mux, nil
-}
-
-func (h *Handlers) ParserHealth(w http.ResponseWriter, r *http.Request) {
-	log := logging.LoggerFrom(r.Context())
-	ctx, cancel := context.WithTimeout(r.Context(), 3*time.Second)
-	defer cancel()
-
-	status := "unhealthy"
-	if h.parser != nil && h.parser.Health(ctx) {
-		status = "healthy"
-	}
-
-	w.Header().Set("Content-Type", "application/json")
-	w.Header().Set("Cache-Control", "no-store")
-	w.Header().Set("Pragma", "no-cache")
-	w.Header().Set("Expires", "0")
-
-	if err := json.NewEncoder(w).Encode(map[string]string{"status": status}); err != nil {
-		log.Error("ParserHealth: encode response", "err", err)
-	}
 }

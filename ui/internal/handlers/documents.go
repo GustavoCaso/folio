@@ -80,7 +80,7 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	format := domain.PdfFormat
+	format := h.pdfFormat
 	if strings.HasSuffix(strings.ToLower(header.Filename), ".epub") {
 		format = domain.EpubFormat
 	}

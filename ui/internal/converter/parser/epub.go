@@ -97,6 +97,13 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 			return p.fail(log, jobID, fmt.Sprintf("write chapter %d: %v", i, err))
 		}
 		docByIdx[i] = doc
+
+		if p.hub != nil {
+			p.hub.Publish(jobID, hub.StatusEvent{
+				Status:  "PROCESSING",
+				Message: fmt.Sprintf("chapter %d/%d", i+1, len(spine)),
+			})
+		}
 	}
 
 	tocEntries := buildTOCTree(&reader, spineIdxByHref)
