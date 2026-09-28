@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0007
+---
+
 # Pattern-based code-block detection is the default; VLM enrichment is opt-in
 
 `PDF_POST_PROCESS_CODE_BLOCKS=true` (default) runs regex pattern matching to detect a code block's language, then pipes it through Prettier for formatting where a plugin exists. `PDF_DO_CODE_ENRICHMENT` (default `false`) instead uses Docling's vision-language model to read code directly off the PDF page — more accurate, and able to reconstruct formatting lost during text extraction, but ~100s per image on CPU and impractical without a GPU. The two are mutually exclusive; enabling both wastes the pattern-detection pass since Docling runs VLM first.

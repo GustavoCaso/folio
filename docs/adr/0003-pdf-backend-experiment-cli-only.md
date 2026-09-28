@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0007
+---
+
 # Alternative PDF backends stay CLI-only; gRPC server always uses Docling
 
 `parser convert --backend` supports `docling` (default), `pymupdf4llm`, and `pdfmux` for evaluating faster/lighter PDF→markdown conversion against Docling. This is scoped to the CLI only — the gRPC server keeps using Docling unconditionally, with no `--backend`-equivalent wired through the proto. If an alternative backend wins the comparison, promoting it to the server is separate future work.

@@ -1,3 +1,7 @@
+---
+status: superseded by ADR-0007
+---
+
 # Restore heading hierarchy from the PDF's own TOC, not Docling's output
 
 Docling flattens all headings to H2 in its markdown output, losing the original H1-H6 structure. Rather than fixing this in Docling or accepting flat headings, a second library (PyMuPDF/`fitz`) opens the same PDF, extracts its table of contents via `get_toc()`, builds a normalized-text-to-level map, and rewrites the `#` prefixes in Docling's markdown to match.

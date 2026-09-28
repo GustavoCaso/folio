@@ -1,38 +1,50 @@
-.PHONY: proto test up down lint-check format-check proto-check templ-check css-check
+.PHONY: build test test-js test-race lint lint-check format format-check templ css generate
 
-proto:
-	@cd ui && make proto
-	@cd parser && make proto
+build:
+	go build ./...
 
 test:
-	@cd ui && make test
-	@cd ui && make test-js
-	@cd parser && make test
-	
-up: proto
-	@cd ui && make generate
-	@cd parser && make download-models
-	@docker compose -p folio up --build -d 
-	
-down:
-	@docker compose -p folio down
+	@echo "running tests"
+	@go test ./...
+
+test-js:
+	@echo "running js tests"
+	@mise exec -- pnpm test
+
+test-race:
+	go test ./... -race
+
+lint:
+	golangci-lint run --fix
 
 lint-check:
-	@cd ui && make lint-check
-	@cd parser && make lint-check
+	golangci-lint run
+
+format:
+	golangci-lint fmt .
 
 format-check:
-	@cd ui && make format-check
-	@cd parser && make format-check
+	golangci-lint fmt --diff .
+		
+generate:
+	@make templ
+	@make css
 
-proto-check:
-	@make proto
-	@git diff --exit-code ui/internal/parser/proto/ parser/src/parser/grpc/ || (echo "proto files are out of date; run: make proto" && exit 1)
+templ:
+	templ generate
+
+css:
+	@TEMPLUI_PATH="$$(go list -mod=mod -m -f '{{.Dir}}' github.com/templui/templui)" && \
+	printf '%s\n' '@source "./**/*.templ";' "@source \"$$TEMPLUI_PATH/components/**/*.templ\";" \
+		> internal/handlers/static/tailwind/sources.generated.css
+	@mise exec -- npm exec tailwindcss -- \
+		-i internal/handlers/static/tailwind/input.css \
+		-o internal/handlers/static/tailwind/output.css
 
 templ-check:
-	@cd ui && make templ
-	@git diff --exit-code -- '*_templ.go' || (echo "templ generated files are out of date; run: cd ui && make templ" && exit 1)
+	@make templ
+	@git diff --exit-code -- '*_templ.go' || (echo "templ generated files are out of date; run: make templ" && exit 1)
 
 css-check:
-	@cd ui && make css
-	@git diff --exit-code ui/internal/handlers/static/tailwind/output.css || (echo "tailwind output is out of date; run: cd ui && make css" && exit 1)
+	@make css
+	@git diff --exit-code internal/handlers/static/tailwind/output.css || (echo "tailwind output is out of date; run: make css" && exit 1)

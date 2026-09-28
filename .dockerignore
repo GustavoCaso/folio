@@ -1,0 +1,37 @@
+node_modules/
+.npmrc
+package.json
+pnpm-lock.yaml
+vitest.config.js
+
+*.md
+.claude/
+
+Makefile
+
+**/*_test.go
+
+# secrets and local state
+.env
+.env.*
+*.db
+data/
+
+# VCS, tooling, editor
+.git/
+.github/
+.gitattributes
+.gitignore
+.tokensave/
+graphify-out/
+.vscode/
+.DS_Store
+.mise.toml
+prek.toml
+
+# non-build files
+docs/
+scripts/
+compose.yaml
+Dockerfile
+.dockerignore

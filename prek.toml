@@ -5,23 +5,16 @@ repo = "local"
 
 [[repos.hooks]]
 id = "lint-check"
-name = "Lint (ui + parser)"
+name = "Lint"
 language = "system"
 entry = "make lint-check"
 pass_filenames = false
 
 [[repos.hooks]]
 id = "format-check"
-name = "Format (ui + parser)"
+name = "Format"
 language = "system"
 entry = "make format-check"
-pass_filenames = false
-
-[[repos.hooks]]
-id = "proto-check"
-name = "Proto generated files up to date"
-language = "system"
-entry = "make proto-check"
 pass_filenames = false
 
 [[repos.hooks]]
