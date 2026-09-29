@@ -1,31 +1,12 @@
 services:
-  ui:
-    build: ./ui
+  folio:
+    build: .
     ports:
       - "8080:8080"
     volumes:
       - ./data:/data
     environment:
-      - PARSER_GRPC_ADDR=parser:50051
       - DB_PATH=/data/folio.db
       - DATA_DIR=/data
-    env_file:
-      - .env
-    depends_on:
-      - parser
-
-  parser:
-    build:
-      context: ./parser
-      target: dev
-    environment:
-      - GRPC_PORT=50051
-      - NUM_WORKERS=2
-      - PDF_DO_OCR=false
-      - PDF_DO_TABLE_STRUCTURE=true
-      - PDF_TABLE_STRUCTURE_MODE=accurate
-      - PDF_POST_PROCESS_CODE_BLOCKS=true
-      - HTML_FETCH_IMAGES=true
-      - HTML_POST_PROCESS_CODE_BLOCKS=true
     env_file:
       - .env

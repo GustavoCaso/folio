@@ -24,10 +24,9 @@ done
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
 
 build_and_push() {
-  local name="$1"
-  local context="$2"
+  local context="$1"
   local extra_args="${3:-}"
-  local tag="folio-${name}:${VERSION}"
+  local tag="folio-${VERSION}"
 
   echo "==> Building ${tag}..."
   # shellcheck disable=SC2086
@@ -42,5 +41,4 @@ build_and_push() {
   docker save "$tag" | ssh "$HOST" docker load
 }
 
-build_and_push "parser" "${REPO_ROOT}/parser" "--target release"
-build_and_push "ui"     "${REPO_ROOT}/ui"
+build_and_push "${REPO_ROOT}"
