@@ -175,7 +175,7 @@ func (h *Handlers) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if job.OutputPath != "" {
-		if err := os.Remove(job.OutputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+		if err := os.RemoveAll(job.OutputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
 			log.Error("delete: remove markdown failed", "path", job.OutputPath, logging.Err(err))
 		}
 	}

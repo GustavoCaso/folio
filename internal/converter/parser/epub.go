@@ -2,6 +2,7 @@ package parser
 
 import (
 	"context"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,7 +11,6 @@ import (
 	"path/filepath"
 	"strings"
 	"time"
-	"unicode/utf8"
 
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
@@ -18,16 +18,6 @@ import (
 	"github.com/raitucarp/epub"
 	"golang.org/x/net/html"
 )
-
-// maxFallbackTitleLen is the maximum rune length for a fallback chapter
-// title derived from heading text, before truncation with an ellipsis.
-const maxFallbackTitleLen = 120
-
-// headingTags are the element names considered chapter headings when
-// deriving a fallback title from a chapter's rendered content.
-var headingTags = map[string]bool{
-	"h1": true, "h2": true, "h3": true, "h4": true, "h5": true, "h6": true,
-}
 
 // Store is the subset of repository.Store this package needs — matches
 // the shape converter.Runner depends on for its own Store parameter.
@@ -40,15 +30,14 @@ type Store interface {
 // toc to disk, marking the job done or failed via Store.
 type epubParser struct {
 	store   Store
-	hub     *hub.Hub
 	dataDir string
 	logger  *slog.Logger
 }
 
 // NewEPUB constructs the epub Parser. h may be nil, in which case status
 // events are not published (Store is still updated).
-func NewEPUB(store Store, h *hub.Hub, dataDir string) Parser {
-	return &epubParser{store: store, hub: h, dataDir: dataDir, logger: slog.Default()}
+func NewEPUB(store Store, dataDir string) Parser {
+	return &epubParser{store: store, dataDir: dataDir, logger: slog.Default()}
 }
 
 type tocEntry struct {
@@ -69,12 +58,12 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 
 	reader, err := epub.NewReader(data)
 	if err != nil {
-		return p.fail(log, jobID, fmt.Sprintf("parse epub: %v", err))
+		return p.fail(log, jobID, fmt.Sprintf("parse epub: %v", err), h)
 	}
 
 	outDir := filepath.Join(p.dataDir, jobID)
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return p.fail(log, jobID, fmt.Sprintf("create output dir: %v", err))
+		return p.fail(log, jobID, fmt.Sprintf("create output dir: %v", err), h)
 	}
 
 	spineIdxByHref := spineIndexByHref(&reader)
@@ -91,23 +80,22 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 		}
 		out, err := epubRender.Render(doc, i, resolveImage(&reader))
 		if err != nil {
-			return p.fail(log, jobID, fmt.Sprintf("render chapter %d: %v", i, err))
+			return p.fail(log, jobID, fmt.Sprintf("render chapter %d: %v", i, err), h)
 		}
 		if err := os.WriteFile(filepath.Join(outDir, fmt.Sprintf("chapter-%d.html", i)), []byte(out), 0o644); err != nil {
-			return p.fail(log, jobID, fmt.Sprintf("write chapter %d: %v", i, err))
+			return p.fail(log, jobID, fmt.Sprintf("write chapter %d: %v", i, err), h)
 		}
 		docByIdx[i] = doc
 	}
 
 	tocEntries := buildTOCTree(&reader, spineIdxByHref)
-	tocEntries = appendFallbackEntries(tocEntries, spine, docByIdx)
 
 	tocBytes, err := json.Marshal(tocEntries)
 	if err != nil {
-		return p.fail(log, jobID, fmt.Sprintf("marshal toc: %v", err))
+		return p.fail(log, jobID, fmt.Sprintf("marshal toc: %v", err), h)
 	}
 	if err := os.WriteFile(filepath.Join(outDir, "toc.json"), tocBytes, 0o644); err != nil {
-		return p.fail(log, jobID, fmt.Sprintf("write toc: %v", err))
+		return p.fail(log, jobID, fmt.Sprintf("write toc: %v", err), h)
 	}
 
 	title := reader.Title()
@@ -125,23 +113,24 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 		"toc_entries", len(tocEntries),
 		"dur_ms", time.Since(start).Milliseconds(),
 	)
-	if p.hub != nil {
-		p.hub.Publish(jobID, hub.StatusEvent{
+	if h != nil {
+		h.Publish(jobID, hub.StatusEvent{
 			Status: "DONE",
 			Title:  title,
 			Author: author,
+			Cover:  base64.StdEncoding.EncodeToString(cover),
 		})
 	}
 	return nil
 }
 
-func (p *epubParser) fail(log *slog.Logger, jobID, msg string) error {
+func (p *epubParser) fail(log *slog.Logger, jobID, msg string, h *hub.Hub) error {
 	log.Error("epub conversion failed", "error", msg)
 	if err := p.store.MarkJobFailed(context.Background(), jobID, msg); err != nil {
 		log.Error("mark job failed errored", logging.Err(err))
 	}
-	if p.hub != nil {
-		p.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: msg})
+	if h != nil {
+		h.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: msg})
 	}
 	return errors.New(msg)
 }
@@ -209,42 +198,6 @@ func buildTOCTree(reader *epub.Reader, spineIdxByHref map[string]int) []tocEntry
 	return walk(toc.Items)
 }
 
-// appendFallbackEntries determines which spine indices got zero TOC
-// coverage at any depth of tocEntries (neither as a top-level entry nor as
-// a nested subsection), and appends a synthetic top-level tocEntry for each
-// such index, in spine order. Title is derived via firstHeadingText, falling
-// back to "Chapter {i+1}" if the chapter has no heading. This preserves the
-// original behavior of guaranteeing every spine item appears somewhere in
-// the TOC, now checked against tree coverage instead of a flat href map.
-func appendFallbackEntries(tocEntries []tocEntry, spine []epub.PublicationResource, docByIdx map[int]*html.Node) []tocEntry {
-	covered := make(map[int]bool)
-	var mark func(entries []tocEntry)
-	mark = func(entries []tocEntry) {
-		for _, e := range entries {
-			covered[e.ChapterIdx] = true
-			mark(e.Items)
-		}
-	}
-	mark(tocEntries)
-
-	for i := range spine {
-		if covered[i] {
-			continue
-		}
-		doc, ok := docByIdx[i]
-		if !ok {
-			continue
-		}
-		title := firstHeadingText(doc)
-		if title == "" {
-			title = fmt.Sprintf("Chapter %d", i+1)
-		}
-		tocEntries = append(tocEntries, tocEntry{Title: title, ChapterIdx: i})
-	}
-
-	return tocEntries
-}
-
 // anchorFromHref returns the fragment portion of href (the substring after
 // "#"), or "" if href has no fragment.
 func anchorFromHref(href string) string {
@@ -260,67 +213,6 @@ func normalizeHref(href string) string {
 	return base
 }
 
-// firstHeadingText walks doc depth-first in document order and returns the
-// normalized, truncated text content of the first h1-h6 element found, or
-// "" if the document has no heading. Used as a fallback chapter title when
-// no TOC entry matches the spine item's href.
-func firstHeadingText(doc *html.Node) string {
-	var heading *html.Node
-	var walk func(n *html.Node)
-	walk = func(n *html.Node) {
-		if heading != nil {
-			return
-		}
-		if n.Type == html.ElementNode && headingTags[n.Data] {
-			heading = n
-			return
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-			if heading != nil {
-				return
-			}
-		}
-	}
-	walk(doc)
-
-	if heading == nil {
-		return ""
-	}
-
-	text := strings.Join(strings.Fields(textContent(heading)), " ")
-	return truncateTitle(text, maxFallbackTitleLen)
-}
-
-// textContent concatenates the text of all descendant text nodes of n, so
-// headings containing nested inline elements (e.g. <em>) are captured in
-// full.
-func textContent(n *html.Node) string {
-	var buf strings.Builder
-	var walk func(n *html.Node)
-	walk = func(n *html.Node) {
-		if n.Type == html.TextNode {
-			buf.WriteString(n.Data)
-		}
-		for c := n.FirstChild; c != nil; c = c.NextSibling {
-			walk(c)
-		}
-	}
-	walk(n)
-	return buf.String()
-}
-
-// truncateTitle truncates s to at most maxRunes runes on a rune boundary,
-// appending an ellipsis if truncation occurred. s is assumed already
-// whitespace-normalized.
-func truncateTitle(s string, maxRunes int) string {
-	if utf8.RuneCountInString(s) <= maxRunes {
-		return s
-	}
-	runes := []rune(s)
-	return string(runes[:maxRunes]) + "…"
-}
-
 // resolveImage returns an epubrender.ImageResolver backed by the epub's
 // manifest resources, keyed by href.
 func resolveImage(reader *epub.Reader) epubRender.ImageResolver {
@@ -333,17 +225,17 @@ func resolveImage(reader *epub.Reader) epubRender.ImageResolver {
 	}
 }
 
-// coverBytes returns the epub's cover image bytes, or nil if the
+// coverBytes returns the epub's cover image bytes, or empty []byte if the
 // publication has no discoverable cover. epub.Reader.CoverBytes panics
 // internally (nil pointer deref) when no cover is found, so guard with a
 // pre-check via Cover().
 func coverBytes(reader *epub.Reader) []byte {
 	if reader.Cover() == nil {
-		return nil
+		return []byte{}
 	}
 	data, err := reader.CoverBytes()
 	if err != nil {
-		return nil
+		return []byte{}
 	}
 	return data
 }

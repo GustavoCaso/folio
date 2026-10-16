@@ -38,7 +38,7 @@ func (h *Handlers) backendByName(name string) export.Backend {
 
 func Register(store repository.Store, h *hub.Hub, dataDir string, logger *slog.Logger, backends []export.Backend) (*http.ServeMux, error) {
 	parsers := map[domain.JobFormat]parser.Parser{
-		domain.EpubFormat: parser.NewEPUB(store, h, dataDir),
+		domain.EpubFormat: parser.NewEPUB(store, dataDir),
 	}
 	return register(store, h, dataDir, logger, backends, parsers)
 }

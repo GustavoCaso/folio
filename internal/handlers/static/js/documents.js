@@ -13,6 +13,10 @@ function readButtonHTML(jobID) {
   return `<a href="/read/${jobID}" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground">Read</a>`;
 }
 
+function editButtonHTML(jobID) {
+  return `<a href="/documents/${jobID}/edit" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Edit</a>`;
+}
+
 function deleteFormButton(jobID, filename) {
   return `<button type="button" data-delete-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Delete</button>`
 }
@@ -46,8 +50,8 @@ export function watchJob(jobID) {
 
     if (d.Status === "DONE") {
       if (statusText) statusText.textContent = "";
-      if (actions && !actions.querySelector("a[href]")) {
-        actions.innerHTML = readButtonHTML(jobID) + deleteFormButton(jobID, filename);
+      if (actions) {
+        actions.innerHTML = readButtonHTML(jobID) + editButtonHTML(jobID) + deleteFormButton(jobID, filename);
       }
       const meta = card.querySelector("[data-metadata]");
       if (meta && (d.Cover || d.Title || d.Author)) {
@@ -77,7 +81,7 @@ export function watchJob(jobID) {
       es.close();
     } else if (d.Status === "FAILED") {
       if (statusText) statusText.textContent = d.Error || "";
-      if (actions && !actions.querySelector("form.retry-form")) {
+      if (actions) {
         actions.innerHTML = retryFormHTML(jobID) + deleteFormButton(jobID, filename);
       }
       es.close();
