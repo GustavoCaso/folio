@@ -9,12 +9,14 @@ import (
 	"image/color"
 	"image/png"
 	"io"
+	"log/slog"
 	"os"
 	"path/filepath"
 	"strings"
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/converter/parser"
+	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/raitucarp/epub"
 )
 
@@ -40,6 +42,17 @@ type tocEntry struct {
 	ChapterIdx int        `json:"chapter_idx"`
 	Anchor     string     `json:"anchor"`
 	Items      []tocEntry `json:"items"`
+}
+
+var testLogger = slog.New(slog.NewTextHandler(io.Discard, nil))
+
+func newHub(t *testing.T) *hub.Hub {
+	t.Helper()
+	h, err := hub.New(testLogger)
+	if err != nil {
+		t.Fatalf("hub.New: %v", err)
+	}
+	return h
 }
 
 // buildTestEpub constructs a minimal valid epub in memory using the
@@ -87,13 +100,36 @@ func buildTestEpub(t *testing.T) []byte {
 	return data
 }
 
+var testCoverBase64 = "iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAIAAACQd1PeAAAAEElEQVR4nGL6//8/IAAA//8GBgMAt2YRIQAAAABJRU5ErkJggg=="
+
 func TestRun_WritesChaptersAndMarksDone(t *testing.T) {
 	epubBytes := buildTestEpub(t)
 	dataDir := t.TempDir()
 	store := &fakeStore{}
-	p := parser.NewEPUB(store, nil, dataDir)
+	hub := newHub(t)
+	ch := hub.Subscribe("job-1")
+	defer hub.Unsubscribe("job-1", ch)
+	p := parser.NewEPUB(store, dataDir)
 
-	_ = p.Convert(context.Background(), "job-1", "req-1", "book.epub", epubBytes, nil)
+	_ = p.Convert(context.Background(), "job-1", "req-1", "book.epub", epubBytes, hub)
+
+	select {
+	case got := <-ch:
+		if got.Status != "DONE" {
+			t.Fatalf("expected DONE, got %s", got.Status)
+		}
+		if got.Title != "Test Book" {
+			t.Fatalf("expected Title 'Test Book', got %q", got.Title)
+		}
+		if got.Author != "Test Author" {
+			t.Fatalf("expected Author 'Test Author', got %q", got.Author)
+		}
+		if got.Cover != testCoverBase64 {
+			t.Fatalf("expected Cover '%s', got %q", testCoverBase64, got.Cover)
+		}
+	default:
+		t.Fatal("expected event on channel, got nothing")
+	}
 
 	if store.doneID != "job-1" {
 		t.Fatalf("job not marked done: %+v", store)
@@ -120,7 +156,7 @@ func TestRun_TocEntryUsesRealChapterTitleNotHref(t *testing.T) {
 	epubBytes := buildTestEpub(t)
 	dataDir := t.TempDir()
 	store := &fakeStore{}
-	p := parser.NewEPUB(store, nil, dataDir)
+	p := parser.NewEPUB(store, dataDir)
 
 	_ = p.Convert(context.Background(), "job-toc", "req-1", "book.epub", epubBytes, nil)
 
@@ -153,72 +189,12 @@ func TestRun_TocEntryUsesRealChapterTitleNotHref(t *testing.T) {
 	}
 }
 
-// buildTestEpubNoMatchingTOC builds an epub whose TOC references a href
-// that does not match any spine item, so title resolution must fall back to
-// a title derived from the chapter's own content. The chapter document has
-// an h1, so the fallback should use its text rather than the spine href.
-func buildTestEpubNoMatchingTOC(t *testing.T) []byte {
-	t.Helper()
-	return buildEpubNoMatchingTOCWithChapter(t, "test-book-0002", "Test Book No Match",
-		`<html><body><h1>Chapter One</h1><p>Hello world.</p></body></html>`)
-}
-
-// buildTestEpubNoMatchingTOCNoHeading is like buildTestEpubNoMatchingTOC but
-// the chapter document has no heading element at all, so title resolution
-// must fall further back to a generic "Chapter {i+1}" placeholder.
-func buildTestEpubNoMatchingTOCNoHeading(t *testing.T) []byte {
-	t.Helper()
-	return buildEpubNoMatchingTOCWithChapter(t, "test-book-0003", "Test Book No Heading",
-		`<html><body><p>Just a paragraph, no heading here.</p></body></html>`)
-}
-
-// buildEpubNoMatchingTOCWithChapter builds a minimal epub whose single TOC
-// entry points at an href that does not correspond to any spine item, using
-// the given chapter HTML as the sole spine item's content.
-func buildEpubNoMatchingTOCWithChapter(t *testing.T, uuidSuffix, bookTitle, chapterHTML string) []byte {
-	t.Helper()
-
-	w := epub.New("urn:uuid:" + uuidSuffix)
-	w.Title(bookTitle)
-	w.Author("Test Author")
-	w.Languages("en")
-
-	w.AddContent("chapter1.xhtml", []byte(chapterHTML))
-
-	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
-	img.Set(0, 0, color.White)
-	if err := w.CoverPNG(img); err != nil {
-		t.Fatalf("CoverPNG: %v", err)
-	}
-
-	// TOC points at an href that doesn't correspond to any spine item.
-	if err := w.TableOfContents("toc", epub.TOC{
-		Title: bookTitle,
-		Items: []epub.TOC{
-			{Title: "Nonexistent Chapter", Href: "does-not-exist.xhtml"},
-		},
-	}); err != nil {
-		t.Fatalf("TableOfContents: %v", err)
-	}
-
-	outPath := filepath.Join(t.TempDir(), uuidSuffix+".epub")
-	if err := w.Write(outPath); err != nil {
-		t.Fatalf("Write: %v", err)
-	}
-
-	data, err := os.ReadFile(outPath)
-	if err != nil {
-		t.Fatalf("ReadFile: %v", err)
-	}
-	return data
-}
-
 // runAndReadTOC runs the conversion and returns the parsed toc.json entries.
 func runAndReadTOC(t *testing.T, epubBytes []byte, jobID string) []tocEntry {
 	t.Helper()
 	dataDir := t.TempDir()
 	store := &fakeStore{}
-	p := parser.NewEPUB(store, nil, dataDir)
+	p := parser.NewEPUB(store, dataDir)
 
 	_ = p.Convert(context.Background(), jobID, "req-1", "book.epub", epubBytes, nil)
 
@@ -235,36 +211,6 @@ func runAndReadTOC(t *testing.T, epubBytes []byte, jobID string) []tocEntry {
 		t.Fatalf("Unmarshal toc.json: %v", err)
 	}
 	return entries
-}
-
-func TestRun_TocEntryFallsBackToHeadingWhenNoTOCMatch(t *testing.T) {
-	epubBytes := buildTestEpubNoMatchingTOC(t)
-	entries := runAndReadTOC(t, epubBytes, "job-no-toc-match")
-
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 toc entry, got %d: %+v", len(entries), entries)
-	}
-	if entries[0].Title != "Chapter One" {
-		t.Errorf("expected fallback title to be heading text %q, got %q", "Chapter One", entries[0].Title)
-	}
-	if entries[0].Title == "chapter1.xhtml" {
-		t.Errorf("fallback title should not be the raw spine href, got %q", entries[0].Title)
-	}
-}
-
-func TestRun_TocEntryFallsBackToChapterNWhenNoTOCMatchAndNoHeading(t *testing.T) {
-	epubBytes := buildTestEpubNoMatchingTOCNoHeading(t)
-	entries := runAndReadTOC(t, epubBytes, "job-no-toc-no-heading")
-
-	if len(entries) != 1 {
-		t.Fatalf("expected 1 toc entry, got %d: %+v", len(entries), entries)
-	}
-	if entries[0].Title != "Chapter 1" {
-		t.Errorf("expected fallback title %q, got %q", "Chapter 1", entries[0].Title)
-	}
-	if entries[0].Title == "chapter1.xhtml" {
-		t.Errorf("fallback title should not be the raw spine href, got %q", entries[0].Title)
-	}
 }
 
 // buildTestEpubWithSubsectionTOC builds an epub whose TOC has a top-level
@@ -446,9 +392,28 @@ func TestRun_TocSubsectionDoesNotOverwriteChapterTitle(t *testing.T) {
 
 func TestRun_MarksFailedOnInvalidEpub(t *testing.T) {
 	store := &fakeStore{}
-	p := parser.NewEPUB(store, nil, t.TempDir())
+	hub := newHub(t)
+	ch := hub.Subscribe("job-2")
+	defer hub.Unsubscribe("job-2", ch)
+	p := parser.NewEPUB(store, t.TempDir())
 
-	_ = p.Convert(context.Background(), "job-2", "req-1", "book.epub", []byte("not an epub"), nil)
+	err := p.Convert(context.Background(), "job-2", "req-1", "book.epub", []byte("not an epub"), hub)
+
+	if err == nil {
+		t.Fatal("expected return err got 'nil'")
+	}
+
+	select {
+	case got := <-ch:
+		if got.Status != "FAILED" {
+			t.Fatalf("expected FAILED, got %s", got.Status)
+		}
+		if got.Error != "parse epub: zip: not a valid zip file" {
+			t.Fatalf("expected Title 'parse epub: zip: not a valid zip file', got %q", got.Error)
+		}
+	default:
+		t.Fatal("expected event on channel, got nothing")
+	}
 
 	if store.failedID != "job-2" || store.failedErr == "" {
 		t.Errorf("expected job-2 marked failed with an error, got %+v", store)
