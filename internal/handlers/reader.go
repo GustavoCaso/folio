@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"os"
 	"path/filepath"
+	"regexp"
 	"strconv"
 	"strings"
 
@@ -194,9 +195,11 @@ func concatChapters(outputDir string, chapterCount int) (string, error) {
 	return b.String(), nil
 }
 
+var readingProgressRe = regexp.MustCompile(`^ch(?P<idx>\d+)-[^-]+-[^-]+$`)
+
 // parseChapterParam resolves the chapter index to render. It prefers a
 // valid non-negative integer chapterParam. Failing that, it falls back to
-// the chapter index encoded in readingProgress ("{chapterIdx}:{blockID}").
+// the chapter index encoded in readingProgress ("ch{chapterIdx}-{element}-{elementID}").
 // If neither is usable, it returns 0. Never panics on malformed input.
 func parseChapterParam(chapterParam, readingProgress string) int {
 	if chapterParam != "" {
@@ -204,11 +207,13 @@ func parseChapterParam(chapterParam, readingProgress string) int {
 			return idx
 		}
 	}
-	if colon := strings.IndexByte(readingProgress, ':'); colon > 0 {
-		if idx, err := strconv.Atoi(readingProgress[:colon]); err == nil && idx >= 0 {
+
+	if match := readingProgressRe.FindStringSubmatch(readingProgress); match != nil {
+		if idx, err := strconv.Atoi(match[readingProgressRe.SubexpIndex("idx")]); err == nil {
 			return idx
 		}
 	}
+
 	return 0
 }
 
