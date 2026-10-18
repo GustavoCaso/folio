@@ -47,9 +47,14 @@ CREATE TABLE highlights_new
 INSERT INTO highlights_new (id, document_id, start_block_id, end_block_id, chapter, start_pos, end_pos, text, tag, note, created_at)
 SELECT id, job_id, start_block_id, end_block_id, chapter, start_pos, end_pos, text, tag, note, created_at FROM highlights;
 
+CREATE TEMP TABLE highlight_exports_backup AS SELECT * FROM highlight_exports;
 DROP TABLE highlights;
 DROP TABLE jobs;
 
 ALTER TABLE highlights_new RENAME TO highlights;
+DELETE FROM highlight_exports;
+INSERT INTO highlight_exports SELECT * FROM highlight_exports_backup;
+DROP TABLE highlight_exports_backup;
+
 
 CREATE INDEX IF NOT EXISTS highlights_document_chapter ON highlights (document_id, chapter);
