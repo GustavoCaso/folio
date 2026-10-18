@@ -581,7 +581,7 @@ func Exports(records []domain.ExportRecord) templ.Component {
 											return templ_7745c5c3_Err
 										}
 									}
-									for _, tag := range rec.JobTags {
+									for _, tag := range rec.DocumentTags {
 										templ_7745c5c3_Var28 := templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 											templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 											templ_7745c5c3_Buffer, templ_7745c5c3_IsBuffer := templruntime.GetBuffer(templ_7745c5c3_W)
@@ -610,7 +610,7 @@ func Exports(records []domain.ExportRecord) templ.Component {
 											return templ_7745c5c3_Err
 										}
 									}
-									if rec.HighlightTag == "" && len(rec.JobTags) == 0 {
+									if rec.HighlightTag == "" && len(rec.DocumentTags) == 0 {
 										templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 29, "<span class=\"text-muted-foreground\">--</span>")
 										if templ_7745c5c3_Err != nil {
 											return templ_7745c5c3_Err
@@ -647,9 +647,9 @@ func Exports(records []domain.ExportRecord) templ.Component {
 										return templ_7745c5c3_Err
 									}
 									var templ_7745c5c3_Var31 string
-									templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(rec.JobFilename)
+									templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(rec.DocumentFilename)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 105, Col: 86}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/exports.templ`, Line: 105, Col: 91}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 									if templ_7745c5c3_Err != nil {

@@ -73,15 +73,15 @@ func TestListExports_ShowsExportedRecord(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "paper.epub", []byte{}, "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(ctx, "paper.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(ctx, job.ID, "/data/paper.md", "", "", nil); err != nil {
+	if err := store.MarkDocumentDone(ctx, document.ID, "/data/paper.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := store.CreateHighlight(ctx, domain.Highlight{
-		JobID:        job.ID,
+		DocumentID:   document.ID,
 		StartBlockID: "p-1",
 		EndBlockID:   "p-1",
 		StartPos:     0,
@@ -131,15 +131,15 @@ func TestListExports_ShowsFailedRecord(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "doc.epub", []byte{}, "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(ctx, "doc.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(ctx, job.ID, "/data/doc.md", "", "", nil); err != nil {
+	if err := store.MarkDocumentDone(ctx, document.ID, "/data/doc.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := store.CreateHighlight(ctx, domain.Highlight{
-		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
+		DocumentID: document.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 4, Text: "highlight text",
 	})
 	if err != nil {
@@ -178,7 +178,7 @@ func TestDeleteHighlight_CallsBackendDelete(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	_, h := seedJobAndHighlight(t, store)
+	_, h := seedDocumentAndHighlight(t, store)
 
 	// Record that this highlight was exported to a fake backend.
 	if err := store.CreateHighlightExport(ctx, h.ID, "fake"); err != nil {

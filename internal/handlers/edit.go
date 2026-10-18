@@ -17,7 +17,7 @@ import (
 
 func (h *Handlers) EditDocumentForm(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	log := logging.LoggerFrom(r.Context()).With("job_id", id)
+	log := logging.LoggerFrom(r.Context()).With("document_id", id)
 
 	renderErr := func(status int, msg string) {
 		w.WriteHeader(status)
@@ -26,28 +26,28 @@ func (h *Handlers) EditDocumentForm(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	job, err := h.store.GetJob(r.Context(), id)
+	document, err := h.store.GetDocument(r.Context(), id)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
 			renderErr(http.StatusNotFound, "Document not found.")
 		} else {
-			log.Error("get job failed", logging.Err(err))
+			log.Error("get document failed", logging.Err(err))
 			renderErr(http.StatusInternalServerError, "Failed to load document.")
 		}
 		return
 	}
 
-	if err := templates.EditDocument(job, "").Render(r.Context(), w); err != nil {
+	if err := templates.EditDocument(document, "").Render(r.Context(), w); err != nil {
 		log.Error("render edit page failed", logging.Err(err))
 	}
 }
 
 func (h *Handlers) EditDocument(w http.ResponseWriter, r *http.Request) {
 	id := r.PathValue("id")
-	log := logging.LoggerFrom(r.Context()).With("job_id", id)
+	log := logging.LoggerFrom(r.Context()).With("document_id", id)
 
 	renderFormErr := func(status int, msg string) {
-		job, getErr := h.store.GetJob(r.Context(), id)
+		document, getErr := h.store.GetDocument(r.Context(), id)
 		if getErr != nil {
 			w.WriteHeader(http.StatusInternalServerError)
 			if err := templates.ErrorPage("Failed to load document.").Render(r.Context(), w); err != nil {
@@ -56,7 +56,7 @@ func (h *Handlers) EditDocument(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 		w.WriteHeader(status)
-		if err := templates.EditDocument(job, msg).Render(r.Context(), w); err != nil {
+		if err := templates.EditDocument(document, msg).Render(r.Context(), w); err != nil {
 			log.Error("render edit page failed", logging.Err(err))
 		}
 	}
@@ -97,7 +97,7 @@ func (h *Handlers) EditDocument(w http.ResponseWriter, r *http.Request) {
 
 	// If no new cover was uploaded, keep the existing one.
 	if coverBytes == nil {
-		job, getErr := h.store.GetJob(r.Context(), id)
+		document, getErr := h.store.GetDocument(r.Context(), id)
 		if getErr != nil {
 			if errors.Is(getErr, sql.ErrNoRows) {
 				w.WriteHeader(http.StatusNotFound)
@@ -106,15 +106,15 @@ func (h *Handlers) EditDocument(w http.ResponseWriter, r *http.Request) {
 				}
 				return
 			}
-			log.Error("get job failed", logging.Err(getErr))
+			log.Error("get document failed", logging.Err(getErr))
 			renderFormErr(http.StatusInternalServerError, "Failed to load document.")
 			return
 		}
-		coverBytes = job.Cover
+		coverBytes = document.Cover
 	}
 
-	if err := h.store.UpdateJob(r.Context(), id, title, author, tags, coverBytes); err != nil {
-		log.Error("update job failed", logging.Err(err))
+	if err := h.store.UpdateDocument(r.Context(), id, title, author, tags, coverBytes); err != nil {
+		log.Error("update document failed", logging.Err(err))
 		renderFormErr(http.StatusInternalServerError, "Failed to save changes.")
 		return
 	}

@@ -193,7 +193,7 @@ func TestReadwiseExport_BatchPreservesOrder(t *testing.T) {
 	}
 }
 
-func TestReadwiseExport_NoDuplicateTags_HighlightTagMatchesJobTag(t *testing.T) {
+func TestReadwiseExport_NoDuplicateTags_HighlightTagMatchesDocumentTag(t *testing.T) {
 	tagsSent := []string{}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -217,9 +217,9 @@ func TestReadwiseExport_NoDuplicateTags_HighlightTagMatchesJobTag(t *testing.T) 
 
 	b, _ := newTestReadwise(t, handler)
 
-	// "science" appears as both the highlight tag and a job tag — should be sent once.
+	// "science" appears as both the highlight tag and a document tag — should be sent once.
 	records := []*export.ExportRecord{
-		{ExportID: "exp-1", HighlightText: "text", Title: "book.pdf", Tag: "science", JobTags: []string{"science", "physics"}},
+		{ExportID: "exp-1", HighlightText: "text", Title: "book.pdf", Tag: "science", DocumentTags: []string{"science", "physics"}},
 	}
 	if err := b.Export(context.Background(), records); err != nil {
 		t.Fatal(err)
@@ -238,7 +238,7 @@ func TestReadwiseExport_NoDuplicateTags_HighlightTagMatchesJobTag(t *testing.T) 
 	}
 }
 
-func TestReadwiseExport_NoDuplicateTags_DuplicateJobTags(t *testing.T) {
+func TestReadwiseExport_NoDuplicateTags_DuplicateDocumentTags(t *testing.T) {
 	tagsSent := []string{}
 
 	handler := http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -262,9 +262,9 @@ func TestReadwiseExport_NoDuplicateTags_DuplicateJobTags(t *testing.T) {
 
 	b, _ := newTestReadwise(t, handler)
 
-	// "fiction" appears twice in JobTags — should be sent once.
+	// "fiction" appears twice in DocumentTags — should be sent once.
 	records := []*export.ExportRecord{
-		{ExportID: "exp-1", HighlightText: "text", Title: "book.pdf", JobTags: []string{"fiction", "fiction", "novel"}},
+		{ExportID: "exp-1", HighlightText: "text", Title: "book.pdf", DocumentTags: []string{"fiction", "fiction", "novel"}},
 	}
 	if err := b.Export(context.Background(), records); err != nil {
 		t.Fatal(err)

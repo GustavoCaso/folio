@@ -58,7 +58,7 @@ func newTestMuxWithParser(t *testing.T, store repository.Store, p parser.Parser)
 	if err != nil {
 		t.Fatal(err)
 	}
-	parsers := map[domain.JobFormat]parser.Parser{domain.EpubFormat: p}
+	parsers := map[domain.DocumentFormat]parser.Parser{domain.EpubFormat: p}
 	mux, err := handlers.RegisterWithParsers(store, h, t.TempDir(), logger, []export.Backend{}, parsers)
 	if err != nil {
 		t.Fatal(err)
@@ -66,7 +66,7 @@ func newTestMuxWithParser(t *testing.T, store repository.Store, p parser.Parser)
 	return mux
 }
 
-// errorParser fails without touching the job, leaving its status as-is.
+// errorParser fails without touching the document, leaving its status as-is.
 type errorParser struct{}
 
 func (errorParser) Convert(_ context.Context, _, _, _ string, _ []byte, _ *hub.Hub) error {
@@ -106,9 +106,9 @@ func emptyMultipartRequest(t *testing.T) *http.Request {
 	return req
 }
 
-func TestUploadDocumentError_ShowsExistingJobs(t *testing.T) {
+func TestUploadDocumentError_ShowsExistingDocuments(t *testing.T) {
 	store := newTestStore(t)
-	if _, err := store.CreateJob(context.Background(), "existing.epub", []byte{}, "req-seed", domain.EpubFormat); err != nil {
+	if _, err := store.CreateDocument(context.Background(), "existing.epub", []byte{}, "req-seed", domain.EpubFormat); err != nil {
 		t.Fatal(err)
 	}
 
@@ -118,7 +118,7 @@ func TestUploadDocumentError_ShowsExistingJobs(t *testing.T) {
 
 	got := rec.Body.String()
 	if !strings.Contains(got, "existing.epub") {
-		t.Errorf("expected existing job 'existing.epub' in error response, got:\n%s", got)
+		t.Errorf("expected existing document 'existing.epub' in error response, got:\n%s", got)
 	}
 }
 
@@ -146,15 +146,15 @@ func TestUploadDocument_EPUBSetsFormat(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 
-	jobs, err := store.ListJobs(context.Background())
+	documents, err := store.ListDocuments(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(jobs) != 1 {
-		t.Fatalf("expected 1 job, got %d", len(jobs))
+	if len(documents) != 1 {
+		t.Fatalf("expected 1 document, got %d", len(documents))
 	}
-	if jobs[0].Format != domain.EpubFormat {
-		t.Errorf("Format = %q, want %q", jobs[0].Format, domain.EpubFormat)
+	if documents[0].Format != domain.EpubFormat {
+		t.Errorf("Format = %q, want %q", documents[0].Format, domain.EpubFormat)
 	}
 }
 
@@ -168,23 +168,23 @@ func TestUploadDocument_RejectsNonEPUB(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
-	jobs, err := store.ListJobs(context.Background())
+	documents, err := store.ListDocuments(context.Background())
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(jobs) != 0 {
-		t.Errorf("expected no jobs, got %d", len(jobs))
+	if len(documents) != 0 {
+		t.Errorf("expected no documents, got %d", len(documents))
 	}
 }
 
 func TestDeleteDocument_RejectsPending(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "pending.epub", []byte{}, "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "pending.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/documents/"+job.ID, nil)
+	req := httptest.NewRequest(http.MethodDelete, "/documents/"+document.ID, nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -194,17 +194,17 @@ func TestDeleteDocument_RejectsPending(t *testing.T) {
 	}
 }
 
-func TestDeleteDocument_DeletesFailedJob(t *testing.T) {
+func TestDeleteDocument_DeletesFailedDocument(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "failed.epub", []byte{}, "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "failed.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobFailed(context.Background(), job.ID, "parse error"); err != nil {
+	if err := store.MarkDocumentFailed(context.Background(), document.ID, "parse error"); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/documents/"+job.ID, nil)
+	req := httptest.NewRequest(http.MethodDelete, "/documents/"+document.ID, nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -213,13 +213,13 @@ func TestDeleteDocument_DeletesFailedJob(t *testing.T) {
 		t.Errorf("expected 200, got %d", rec.Code)
 	}
 
-	_, err = store.GetJob(context.Background(), job.ID)
+	_, err = store.GetDocument(context.Background(), document.ID)
 	if err == nil {
-		t.Error("expected job to be deleted")
+		t.Error("expected document to be deleted")
 	}
 }
 
-func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
+func TestDeleteDocument_DeletesDoneDocumentAndFile(t *testing.T) {
 	store := newTestStore(t)
 	dir := t.TempDir()
 	mdPath := filepath.Join(dir, "out.md")
@@ -227,15 +227,15 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	job, err := store.CreateJob(context.Background(), "done.epub", []byte{}, "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "done.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, mdPath, "", "", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, mdPath, "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodDelete, "/documents/"+job.ID, nil)
+	req := httptest.NewRequest(http.MethodDelete, "/documents/"+document.ID, nil)
 	rec := httptest.NewRecorder()
 
 	logger := slog.New(slog.NewTextHandler(io.Discard, nil))
@@ -251,9 +251,9 @@ func TestDeleteDocument_DeletesDoneJobAndFile(t *testing.T) {
 		t.Error("expected markdown file to be deleted")
 	}
 
-	_, err = store.GetJob(context.Background(), job.ID)
+	_, err = store.GetDocument(context.Background(), document.ID)
 	if err == nil {
-		t.Error("expected job to be deleted")
+		t.Error("expected document to be deleted")
 	}
 }
 
@@ -281,12 +281,12 @@ func TestRetryDocument_NotFound(t *testing.T) {
 
 func TestRetryDocument_RejectsNonFailed(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "pending.epub", []byte{}, "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "pending.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/retry", nil)
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+document.ID+"/retry", nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -298,15 +298,15 @@ func TestRetryDocument_RejectsNonFailed(t *testing.T) {
 
 func TestRetryDocument_HappyPath(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "broken.epub", []byte("epub"), "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "broken.epub", []byte("epub"), "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobFailed(context.Background(), job.ID, "parse error"); err != nil {
+	if err := store.MarkDocumentFailed(context.Background(), document.ID, "parse error"); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/retry", nil)
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+document.ID+"/retry", nil)
 	rec := httptest.NewRecorder()
 	newTestMuxWithParser(t, store, errorParser{}).ServeHTTP(rec, req)
 
@@ -314,7 +314,7 @@ func TestRetryDocument_HappyPath(t *testing.T) {
 		t.Errorf("expected 303, got %d", rec.Code)
 	}
 
-	got, err := store.GetJob(context.Background(), job.ID)
+	got, err := store.GetDocument(context.Background(), document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -339,16 +339,16 @@ func TestCancelDocument_UnknownID(t *testing.T) {
 
 func TestCancelDocument_InvalidState(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "stuck.epub", []byte("epub"), "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "stuck.epub", []byte("epub"), "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	err = store.MarkJobDone(context.Background(), job.ID, "fake/path", "", "", nil)
+	err = store.MarkDocumentDone(context.Background(), document.ID, "fake/path", "", "", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
-	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/cancel", nil)
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+document.ID+"/cancel", nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -360,14 +360,14 @@ func TestCancelDocument_InvalidState(t *testing.T) {
 
 func TestCancelDocument_ParserNotRunnig(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "stuck.epub", []byte("epub"), "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "stuck.epub", []byte("epub"), "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	// Job exists in DB but no goroutine is running it (not in cancels map).
+	// Document exists in DB but no goroutine is running it (not in cancels map).
 	mux, hub := newTestMux(t, store)
-	ch := hub.Subscribe(job.ID)
-	req := httptest.NewRequest(http.MethodPost, "/documents/"+job.ID+"/cancel", nil)
+	ch := hub.Subscribe(document.ID)
+	req := httptest.NewRequest(http.MethodPost, "/documents/"+document.ID+"/cancel", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 
@@ -375,13 +375,13 @@ func TestCancelDocument_ParserNotRunnig(t *testing.T) {
 		t.Fatalf("expected 409, got %d", rec.Code)
 	}
 
-	// Even when returnig a 409 we mark the jobs as failed so user can retry
-	job, err = store.GetJob(context.Background(), job.ID)
+	// Even when returnig a 409 we mark the documents as failed so user can retry
+	document, err = store.GetDocument(context.Background(), document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if job.Status != "FAILED" || job.Error != "cancelled by user" {
-		t.Fatal("job must be mark as FAILED and the error message must by 'cancelled by user'")
+	if document.Status != "FAILED" || document.Error != "cancelled by user" {
+		t.Fatal("document must be mark as FAILED and the error message must by 'cancelled by user'")
 	}
 
 	select {
@@ -395,21 +395,21 @@ func TestCancelDocument_ParserNotRunnig(t *testing.T) {
 	case <-time.After(3 * time.Second):
 		t.Fatal("hub message never received")
 	}
-	hub.Unsubscribe(job.ID, ch)
+	hub.Unsubscribe(document.ID, ch)
 }
 
 // blockingParser blocks Convert until its context is cancelled.
-// On cancel it marks the job failed, as real parsers own the job lifecycle.
+// On cancel it marks the document failed, as real parsers own the document lifecycle.
 type blockingParser struct {
 	store   repository.Store
 	started chan struct{}
 }
 
-func (p *blockingParser) Convert(ctx context.Context, jobID, _, _ string, _ []byte, h *hub.Hub) error {
+func (p *blockingParser) Convert(ctx context.Context, documentID, _, _ string, _ []byte, h *hub.Hub) error {
 	close(p.started)
 	<-ctx.Done()
-	_ = p.store.MarkJobFailed(context.Background(), jobID, "cancelled by user")
-	h.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: "cancelled by user"})
+	_ = p.store.MarkDocumentFailed(context.Background(), documentID, "cancelled by user")
+	h.Publish(documentID, hub.StatusEvent{Status: "FAILED", Error: "cancelled by user"})
 	return ctx.Err()
 }
 
@@ -432,52 +432,52 @@ func TestCancelDocument_OK(t *testing.T) {
 		t.Fatal("parser goroutine never started")
 	}
 
-	// Find the job ID.
-	jobs, err := store.GetPendingJobs(context.Background())
-	if err != nil || len(jobs) == 0 {
-		t.Fatalf("expected a pending job, err=%v jobs=%v", err, jobs)
+	// Find the document ID.
+	documents, err := store.GetPendingDocuments(context.Background())
+	if err != nil || len(documents) == 0 {
+		t.Fatalf("expected a pending document, err=%v documents=%v", err, documents)
 	}
-	jobID := jobs[0].ID
+	documentID := documents[0].ID
 
 	// Cancel it.
-	cancelReq := httptest.NewRequest(http.MethodPost, "/documents/"+jobID+"/cancel", nil)
+	cancelReq := httptest.NewRequest(http.MethodPost, "/documents/"+documentID+"/cancel", nil)
 	cancelRec := httptest.NewRecorder()
 	mux.ServeHTTP(cancelRec, cancelReq)
 	if cancelRec.Code != http.StatusOK {
 		t.Fatalf("cancel: expected 200, got %d", cancelRec.Code)
 	}
 
-	// Wait for the goroutine to finish and mark the job FAILED.
+	// Wait for the goroutine to finish and mark the document FAILED.
 	deadline := time.Now().Add(3 * time.Second)
 	for time.Now().Before(deadline) {
-		job, err := store.GetJob(context.Background(), jobID)
+		document, err := store.GetDocument(context.Background(), documentID)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if job.Status == "FAILED" {
-			if job.Error != "cancelled by user" {
-				t.Errorf("expected error 'cancelled by user', got %q", job.Error)
+		if document.Status == "FAILED" {
+			if document.Error != "cancelled by user" {
+				t.Errorf("expected error 'cancelled by user', got %q", document.Error)
 			}
 			return
 		}
 		time.Sleep(10 * time.Millisecond)
 	}
-	t.Fatal("job never transitioned to FAILED after cancel")
+	t.Fatal("document never transitioned to FAILED after cancel")
 }
 
-func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
+func TestListDocuments_RendersDocuments_And_PendingDocuments(t *testing.T) {
 	store := newTestStore(t)
-	job1, err := store.CreateJob(t.Context(), "report.epub", []byte{}, "", domain.EpubFormat)
+	document1, err := store.CreateDocument(t.Context(), "report.epub", []byte{}, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	job2, err := store.CreateJob(t.Context(), "pending-report.epub", []byte{}, "", domain.EpubFormat)
+	document2, err := store.CreateDocument(t.Context(), "pending-report.epub", []byte{}, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	if err := store.MarkJobDone(t.Context(), job1.ID, "./whatever", "", "", nil); err != nil {
+	if err := store.MarkDocumentDone(t.Context(), document1.ID, "./whatever", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -496,8 +496,8 @@ func TestListDocuments_RendersJobs_And_PendingJobs(t *testing.T) {
 	if !strings.Contains(body, "pending-report.epub") {
 		t.Errorf("expected 'pending-report.epub' in response, got:\n%s", body)
 	}
-	if !strings.Contains(body, fmt.Sprintf(`data-job-ids="%s"`, job2.ID)) {
-		t.Errorf("expected data-job-ids attribute with job id, got: %s", body)
+	if !strings.Contains(body, fmt.Sprintf(`data-document-ids="%s"`, document2.ID)) {
+		t.Errorf("expected data-document-ids attribute with document id, got: %s", body)
 	}
 	if strings.Contains(body, `class="error-banner"`) {
 		t.Errorf("unexpected error-banner on successful list, got:\n%s", body)

@@ -10,19 +10,19 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/templates"
 )
 
-func renderReader(t *testing.T, job domain.Job, html string, hls []domain.Highlight) string {
+func renderReader(t *testing.T, document domain.Document, html string, hls []domain.Highlight) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.Reader(job, html, hls, nil, 0, 0, false).Render(context.Background(), &buf); err != nil {
+	if err := templates.Reader(document, html, hls, nil, 0, 0, false).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()
 }
 
-func renderReaderEpub(t *testing.T, job domain.Job, html string, hls []domain.Highlight, toc []templates.EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) string {
+func renderReaderEpub(t *testing.T, document domain.Document, html string, hls []domain.Highlight, toc []templates.EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.Reader(job, html, hls, toc, currentChapterIdx, lastChapterIdx, full).Render(context.Background(), &buf); err != nil {
+	if err := templates.Reader(document, html, hls, toc, currentChapterIdx, lastChapterIdx, full).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()
@@ -30,7 +30,7 @@ func renderReaderEpub(t *testing.T, job domain.Job, html string, hls []domain.Hi
 
 func TestReaderEmbedsHighlightsJSON(t *testing.T) {
 	hls := []domain.Highlight{{ID: "h1", StartBlockID: "paragraph-1", EndBlockID: "paragraph-1"}}
-	got := renderReader(t, domain.Job{ID: "j1", Filename: "doc.pdf"}, "<p>x</p>", hls)
+	got := renderReader(t, domain.Document{ID: "j1", Filename: "doc.pdf"}, "<p>x</p>", hls)
 
 	if !strings.Contains(got, `id="highlights-data"`) {
 		t.Errorf("expected highlights-data script tag, got: %s", got)
@@ -44,7 +44,7 @@ func TestReaderEmbedsHighlightsJSON(t *testing.T) {
 }
 
 func TestReaderScriptHasNoUnrenderedTemplExpression(t *testing.T) {
-	got := renderReader(t, domain.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, domain.Document{ID: "j1"}, "", nil)
 
 	// Regression: templ does NOT interpolate { ... } inside raw <script>.
 	// Previous code shipped `window.__highlights = { templ.Raw(...) };` literally,
@@ -56,11 +56,11 @@ func TestReaderScriptHasNoUnrenderedTemplExpression(t *testing.T) {
 	}
 }
 
-func TestReaderRendersHTMLAndJobID(t *testing.T) {
-	got := renderReader(t, domain.Job{ID: "abc", Filename: "doc.pdf"}, "<h1>Title</h1>", nil)
+func TestReaderRendersHTMLAndDocumentID(t *testing.T) {
+	got := renderReader(t, domain.Document{ID: "abc", Filename: "doc.pdf"}, "<h1>Title</h1>", nil)
 
-	if !strings.Contains(got, `data-job-id="abc"`) {
-		t.Errorf("expected job ID data attr, got: %s", got)
+	if !strings.Contains(got, `data-document-id="abc"`) {
+		t.Errorf("expected document ID data attr, got: %s", got)
 	}
 	if !strings.Contains(got, "<h1>Title</h1>") {
 		t.Errorf("expected raw rendered HTML, got: %s", got)
@@ -68,7 +68,7 @@ func TestReaderRendersHTMLAndJobID(t *testing.T) {
 }
 
 func TestReaderRendersPopover(t *testing.T) {
-	got := renderReader(t, domain.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, domain.Document{ID: "j1"}, "", nil)
 
 	if !strings.Contains(got, `id="hl-popover"`) {
 		t.Errorf("expected popover root id, got: %s", got)
@@ -91,14 +91,14 @@ func TestReaderRendersPopover(t *testing.T) {
 }
 
 func TestReaderRendersPopoverErrorElement(t *testing.T) {
-	got := renderReader(t, domain.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, domain.Document{ID: "j1"}, "", nil)
 
 	if !strings.Contains(got, `id="hl-error" class="hidden`) {
 		t.Errorf("expected error element id, got: %s", got)
 	}
 }
 func TestReaderRendersTooltip(t *testing.T) {
-	got := renderReader(t, domain.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, domain.Document{ID: "j1"}, "", nil)
 
 	if !strings.Contains(got, `id="hl-tooltip"`) {
 		t.Errorf("expected tooltip container, got: %s", got)
@@ -112,7 +112,7 @@ func TestReaderRendersTooltip(t *testing.T) {
 }
 
 func TestReaderHighlightsPanelEmpty(t *testing.T) {
-	got := renderReader(t, domain.Job{ID: "j1"}, "", nil)
+	got := renderReader(t, domain.Document{ID: "j1"}, "", nil)
 
 	if !strings.Contains(got, `id="highlights-panel"`) {
 		t.Errorf("expected highlights panel, got: %s", got)
@@ -129,10 +129,10 @@ func TestReaderEpubSidebarRendersTOC(t *testing.T) {
 		}},
 		{Title: "Chapter Two", ChapterIdx: 1},
 	}
-	got := renderReaderEpub(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 1, false)
+	got := renderReaderEpub(t, domain.Document{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 1, false)
 
 	if !strings.Contains(got, "data-tui-sidebar-layout") {
-		t.Errorf("expected sidebar layout wrapper for epub job, got: %s", got)
+		t.Errorf("expected sidebar layout wrapper for epub document, got: %s", got)
 	}
 	if !strings.Contains(got, "Chapter One") || !strings.Contains(got, "Chapter Two") {
 		t.Errorf("expected chapter titles in sidebar, got: %s", got)
@@ -157,7 +157,7 @@ func TestReaderEpubSidebarRendersTOC(t *testing.T) {
 // This test extracts both rendered attribute values and asserts they match.
 func TestReaderEpubSidebarTriggerTargetsSidebarID(t *testing.T) {
 	toc := []templates.EpubTOCEntry{{Title: "Chapter One", ChapterIdx: 0}}
-	got := renderReaderEpub(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 0, false)
+	got := renderReaderEpub(t, domain.Document{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 0, false)
 
 	target := extractAttr(t, got, "data-tui-sidebar-target")
 	sidebarID := extractAttr(t, got, "data-tui-sidebar-id")
@@ -187,7 +187,7 @@ func extractAttr(t *testing.T, html, attr string) string {
 }
 
 func TestReaderWithoutTOCHasNoSidebar(t *testing.T) {
-	got := renderReader(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>x</p>", nil)
+	got := renderReader(t, domain.Document{ID: "j1", Filename: "book.epub"}, "<p>x</p>", nil)
 
 	if strings.Contains(got, "data-tui-sidebar-layout") {
 		t.Errorf("did not expect sidebar layout wrapper without a TOC, got: %s", got)
@@ -200,7 +200,7 @@ func TestReaderWithoutTOCHasNoSidebar(t *testing.T) {
 }
 
 func TestReaderWithoutTOCRendersChapterNavigation(t *testing.T) {
-	got := renderReaderEpub(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>x</p>", nil, nil, 1, 2, false)
+	got := renderReaderEpub(t, domain.Document{ID: "j1", Filename: "book.epub"}, "<p>x</p>", nil, nil, 1, 2, false)
 
 	for _, want := range []string{`href="?chapter=0"`, `href="?chapter=2"`, `data-current-chapter="1"`} {
 		if !strings.Contains(got, want) {
@@ -211,10 +211,10 @@ func TestReaderWithoutTOCRendersChapterNavigation(t *testing.T) {
 
 func TestReaderEpubHasSidebarScript(t *testing.T) {
 	toc := []templates.EpubTOCEntry{{Title: "Chapter One", ChapterIdx: 0}}
-	got := renderReaderEpub(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 0, false)
+	got := renderReaderEpub(t, domain.Document{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 0, false)
 
 	if !strings.Contains(got, "/templui/js/sidebar") {
-		t.Errorf("expected sidebar.Script() tag for epub job, got: %s", got)
+		t.Errorf("expected sidebar.Script() tag for epub document, got: %s", got)
 	}
 }
 
@@ -223,7 +223,7 @@ func TestReaderHighlightsPanelWithHighlights(t *testing.T) {
 		{ID: "h1", Text: "selected text", Tag: "important", Note: "a note"},
 		{ID: "h2", Text: "another selection", Tag: "", Note: ""},
 	}
-	got := renderReader(t, domain.Job{ID: "j1"}, "", hls)
+	got := renderReader(t, domain.Document{ID: "j1"}, "", hls)
 
 	if strings.Contains(got, "No highlights yet") {
 		t.Errorf("unexpected empty-state message when highlights are present")

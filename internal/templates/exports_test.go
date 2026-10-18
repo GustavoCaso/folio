@@ -34,11 +34,11 @@ func TestExports_EmptyState(t *testing.T) {
 func TestExports_ShowsHighlightTextAndFilename(t *testing.T) {
 	got := renderExports(t, []domain.ExportRecord{
 		{
-			HighlightText: "some important text",
-			JobFilename:   "paper.pdf",
-			BackendName:   "readwise",
-			Status:        "EXPORTED",
-			ExportedAt:    time.Now(),
+			HighlightText:    "some important text",
+			DocumentFilename: "paper.pdf",
+			BackendName:      "readwise",
+			Status:           "EXPORTED",
+			ExportedAt:       time.Now(),
 		},
 	})
 
@@ -49,17 +49,17 @@ func TestExports_ShowsHighlightTextAndFilename(t *testing.T) {
 	}
 }
 
-func TestExports_ShowsNoteTagsAndJobTags(t *testing.T) {
+func TestExports_ShowsNoteTagsAndDocumentTags(t *testing.T) {
 	got := renderExports(t, []domain.ExportRecord{
 		{
-			HighlightText: "highlighted passage",
-			HighlightNote: "important finding",
-			HighlightTag:  "key-insight",
-			JobFilename:   "thesis.pdf",
-			JobTags:       []string{"science", "research"},
-			BackendName:   "readwise",
-			Status:        "EXPORTED",
-			ExportedAt:    time.Now(),
+			HighlightText:    "highlighted passage",
+			HighlightNote:    "important finding",
+			HighlightTag:     "key-insight",
+			DocumentFilename: "thesis.pdf",
+			DocumentTags:     []string{"science", "research"},
+			BackendName:      "readwise",
+			Status:           "EXPORTED",
+			ExportedAt:       time.Now(),
 		},
 	})
 
@@ -80,11 +80,11 @@ func TestExports_ShowsNoteTagsAndJobTags(t *testing.T) {
 func TestExports_EmptyNoteAndTagsShowDash(t *testing.T) {
 	got := renderExports(t, []domain.ExportRecord{
 		{
-			HighlightText: "some text",
-			JobFilename:   "doc.pdf",
-			BackendName:   "readwise",
-			Status:        "EXPORTED",
-			ExportedAt:    time.Now(),
+			HighlightText:    "some text",
+			DocumentFilename: "doc.pdf",
+			BackendName:      "readwise",
+			Status:           "EXPORTED",
+			ExportedAt:       time.Now(),
 		},
 	})
 
@@ -96,11 +96,11 @@ func TestExports_EmptyNoteAndTagsShowDash(t *testing.T) {
 func TestExports_ShowsFailedStatus(t *testing.T) {
 	got := renderExports(t, []domain.ExportRecord{
 		{
-			HighlightText: "highlight text",
-			JobFilename:   "doc.pdf",
-			BackendName:   "readwise",
-			Status:        "FAILED",
-			Error:         "connection refused",
+			HighlightText:    "highlight text",
+			DocumentFilename: "doc.pdf",
+			BackendName:      "readwise",
+			Status:           "FAILED",
+			Error:            "connection refused",
 		},
 	})
 

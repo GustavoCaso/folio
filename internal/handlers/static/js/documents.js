@@ -9,33 +9,33 @@ function badgeHTML(status) {
   return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}">${label}</span>`;
 }
 
-function readButtonHTML(jobID) {
-  return `<a href="/read/${jobID}" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground">Read</a>`;
+function readButtonHTML(documentID) {
+  return `<a href="/read/${documentID}" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground">Read</a>`;
 }
 
-function editButtonHTML(jobID) {
-  return `<a href="/documents/${jobID}/edit" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Edit</a>`;
+function editButtonHTML(documentID) {
+  return `<a href="/documents/${documentID}/edit" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Edit</a>`;
 }
 
-function deleteFormButton(jobID, filename) {
-  return `<button type="button" data-delete-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Delete</button>`
+function deleteFormButton(documentID, filename) {
+  return `<button type="button" data-delete-document="${documentID}" data-document-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Delete</button>`
 }
 
-function cancelButtonHTML(jobID, filename) {
-  return `<button type="button" data-cancel-job="${jobID}" data-job-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Cancel</button>`;
+function cancelButtonHTML(documentID, filename) {
+  return `<button type="button" data-cancel-document="${documentID}" data-document-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Cancel</button>`;
 }
 
-function retryFormHTML(jobID) {
-  return `<form class="retry-form" method="POST" action="/documents/${jobID}/retry">` +
-    `<button type="submit" data-retry-job="${jobID}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Retry</button>` +
+function retryFormHTML(documentID) {
+  return `<form class="retry-form" method="POST" action="/documents/${documentID}/retry">` +
+    `<button type="submit" data-retry-document="${documentID}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Retry</button>` +
     `</form>`;
 }
 
-export function watchJob(jobID) {
-  const card = document.getElementById("job-" + jobID);
+export function watchDocument(documentID) {
+  const card = document.getElementById("document-" + documentID);
   if (!card) return;
 
-  const es = new EventSource("/jobs/" + jobID + "/watch");
+  const es = new EventSource("/documents/" + documentID + "/watch");
   es.addEventListener("status", function (e) {
     const d = JSON.parse(e.data);
 
@@ -51,7 +51,7 @@ export function watchJob(jobID) {
     if (d.Status === "DONE") {
       if (statusText) statusText.textContent = "";
       if (actions) {
-        actions.innerHTML = readButtonHTML(jobID) + editButtonHTML(jobID) + deleteFormButton(jobID, filename);
+        actions.innerHTML = readButtonHTML(documentID) + editButtonHTML(documentID) + deleteFormButton(documentID, filename);
       }
       const meta = card.querySelector("[data-metadata]");
       if (meta && (d.Cover || d.Title || d.Author)) {
@@ -82,13 +82,13 @@ export function watchJob(jobID) {
     } else if (d.Status === "FAILED") {
       if (statusText) statusText.textContent = d.Error || "";
       if (actions) {
-        actions.innerHTML = retryFormHTML(jobID) + deleteFormButton(jobID, filename);
+        actions.innerHTML = retryFormHTML(documentID) + deleteFormButton(documentID, filename);
       }
       es.close();
     } else if (d.Message && statusText) {
       statusText.textContent = d.Message;
-      if (actions && !actions.querySelector("[data-cancel-job]")) {
-        actions.innerHTML = cancelButtonHTML(jobID);
+      if (actions && !actions.querySelector("[data-cancel-document]")) {
+        actions.innerHTML = cancelButtonHTML(documentID);
       }
     }
   });
@@ -141,14 +141,14 @@ function initDropZone() {
 function bootstrap() {
   initDropZone();
   const cfg = document.getElementById("watch-config");
-  if (cfg) cfg.dataset.jobIds.split(",").forEach(watchJob);
+  if (cfg) cfg.dataset.documentIds.split(",").forEach(watchDocument);
 
   document.addEventListener("click", async (e) => {
     // Cancel button
-    const cancelBtn = e.target.closest("[data-cancel-job]");
+    const cancelBtn = e.target.closest("[data-cancel-document]");
     if (cancelBtn) {
-      if (confirm(`Cancel Job ?`)) {
-        const id = cancelBtn.dataset.cancelJob;
+      if (confirm(`Cancel document?`)) {
+        const id = cancelBtn.dataset.cancelDocument;
         const resp = await fetch(`/documents/${id}/cancel`, { method: "POST", headers: { "Accept": "text/html" } });
 
         if (!resp.ok) {
@@ -162,17 +162,17 @@ function bootstrap() {
     }
 
     // Delete button
-    const deleteBtn = e.target.closest("[data-delete-job]");
+    const deleteBtn = e.target.closest("[data-delete-document]");
     if (deleteBtn) {
-      const id = deleteBtn.dataset.deleteJob;
-      const jobName = deleteBtn.dataset.jobName;
-      if (confirm(`Delete ${jobName} ?`)) {
+      const id = deleteBtn.dataset.deleteDocument;
+      const documentName = deleteBtn.dataset.documentName;
+      if (confirm(`Delete ${documentName} ?`)) {
         const resp = await fetch(`/documents/${id}`, { method: "DELETE", headers: { "Accept": "text/html" } });
         const html = await resp.text();
         document.body.insertAdjacentHTML("beforeend", html);
         if (resp.ok) {
-          const jobCard = document.getElementById(`job-${id}`)
-          if (jobCard) jobCard.remove();
+          const documentCard = document.getElementById(`document-${id}`)
+          if (documentCard) documentCard.remove();
         }
         return;
       }

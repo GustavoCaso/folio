@@ -69,11 +69,11 @@ func (w *Worker) RunOnce(ctx context.Context) {
 		for _, record := range records {
 			exports = append(exports, &ExportRecord{
 				ExportID:      record.ID,
-				Title:         record.JobFilename,
+				Title:         record.DocumentFilename,
 				HighlightText: record.HighlightText,
 				Note:          record.HighlightNote,
 				Tag:           record.HighlightTag,
-				JobTags:       record.JobTags,
+				DocumentTags:  record.DocumentTags,
 			})
 		}
 

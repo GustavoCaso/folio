@@ -1193,7 +1193,7 @@ func highlightsPopover(highlights []domain.Highlight) templ.Component {
 	})
 }
 
-func readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Highlight, currentChapterIdx, lastChapterIdx int, full bool) templ.Component {
+func readerEpubBody(document domain.Document, renderedHTML string, highlights []domain.Highlight, currentChapterIdx, lastChapterIdx int, full bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -1238,14 +1238,14 @@ func readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Hig
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<article class=\"w-full max-w-[68ch] py-4 pb-24 overflow-x-auto\"><div id=\"reader\" data-job-id=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 56, "<article class=\"w-full max-w-[68ch] py-4 pb-24 overflow-x-auto\"><div id=\"reader\" data-document-id=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var46 string
-		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(job.ID)
+		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(document.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1256,9 +1256,9 @@ func readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Hig
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var47 string
-		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(job.ReadingProgress)
+		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(document.ReadingProgress)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
@@ -1271,7 +1271,7 @@ func readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Hig
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(currentChapterAttr(currentChapterIdx, full))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 155}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 170}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -1339,7 +1339,7 @@ func readerHeadExtra() templ.Component {
 // When epubTOC is non-empty, the page content is wrapped in a
 // sidebar.Layout/sidebar.Sidebar/sidebar.Inset composition; with an empty
 // TOC (the epub has no usable nav/NCX) no sidebar DOM/JS is emitted.
-func Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight, epubTOC []EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) templ.Component {
+func Reader(document domain.Document, renderedHTML string, highlights []domain.Highlight, epubTOC []EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -1405,7 +1405,7 @@ func Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight, 
 							}()
 						}
 						ctx = templ.InitializeContext(ctx)
-						templ_7745c5c3_Err = readerEpubBody(job, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full).Render(ctx, templ_7745c5c3_Buffer)
+						templ_7745c5c3_Err = readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full).Render(ctx, templ_7745c5c3_Buffer)
 						if templ_7745c5c3_Err != nil {
 							return templ_7745c5c3_Err
 						}
@@ -1423,7 +1423,7 @@ func Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight, 
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = Layout(job.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded").Render(templ.WithChildren(ctx, templ_7745c5c3_Var51), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Layout(document.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded").Render(templ.WithChildren(ctx, templ_7745c5c3_Var51), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1440,13 +1440,13 @@ func Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight, 
 					}()
 				}
 				ctx = templ.InitializeContext(ctx)
-				templ_7745c5c3_Err = readerEpubBody(job, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = Layout(job.Filename, NoAction(), headerActions(highlights), NoAction(), "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var54), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Layout(document.Filename, NoAction(), headerActions(highlights), NoAction(), "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var54), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

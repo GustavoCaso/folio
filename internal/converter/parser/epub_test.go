@@ -26,11 +26,11 @@ type fakeStore struct {
 	failedID, failedErr               string
 }
 
-func (f *fakeStore) MarkJobDone(ctx context.Context, id, outputPath, title, author string, cover []byte) error {
+func (f *fakeStore) MarkDocumentDone(ctx context.Context, id, outputPath, title, author string, cover []byte) error {
 	f.doneID, f.outputPath, f.title, f.author, f.cover = id, outputPath, title, author, cover
 	return nil
 }
-func (f *fakeStore) MarkJobFailed(ctx context.Context, id, errMsg string) error {
+func (f *fakeStore) MarkDocumentFailed(ctx context.Context, id, errMsg string) error {
 	f.failedID, f.failedErr = id, errMsg
 	return nil
 }
@@ -107,11 +107,11 @@ func TestRun_WritesChaptersAndMarksDone(t *testing.T) {
 	dataDir := t.TempDir()
 	store := &fakeStore{}
 	hub := newHub(t)
-	ch := hub.Subscribe("job-1")
-	defer hub.Unsubscribe("job-1", ch)
+	ch := hub.Subscribe("document-1")
+	defer hub.Unsubscribe("document-1", ch)
 	p := parser.NewEPUB(store, dataDir)
 
-	_ = p.Convert(context.Background(), "job-1", "req-1", "book.epub", epubBytes, hub)
+	_ = p.Convert(context.Background(), "document-1", "req-1", "book.epub", epubBytes, hub)
 
 	select {
 	case got := <-ch:
@@ -131,10 +131,10 @@ func TestRun_WritesChaptersAndMarksDone(t *testing.T) {
 		t.Fatal("expected event on channel, got nothing")
 	}
 
-	if store.doneID != "job-1" {
-		t.Fatalf("job not marked done: %+v", store)
+	if store.doneID != "document-1" {
+		t.Fatalf("document not marked done: %+v", store)
 	}
-	entries, err := os.ReadDir(filepath.Join(dataDir, "job-1"))
+	entries, err := os.ReadDir(filepath.Join(dataDir, "document-1"))
 	if err != nil {
 		t.Fatalf("ReadDir: %v", err)
 	}
@@ -158,13 +158,13 @@ func TestRun_TocEntryUsesRealChapterTitleNotHref(t *testing.T) {
 	store := &fakeStore{}
 	p := parser.NewEPUB(store, dataDir)
 
-	_ = p.Convert(context.Background(), "job-toc", "req-1", "book.epub", epubBytes, nil)
+	_ = p.Convert(context.Background(), "document-toc", "req-1", "book.epub", epubBytes, nil)
 
-	if store.doneID != "job-toc" {
-		t.Fatalf("job not marked done: %+v", store)
+	if store.doneID != "document-toc" {
+		t.Fatalf("document not marked done: %+v", store)
 	}
 
-	tocBytes, err := os.ReadFile(filepath.Join(dataDir, "job-toc", "toc.json"))
+	tocBytes, err := os.ReadFile(filepath.Join(dataDir, "document-toc", "toc.json"))
 	if err != nil {
 		t.Fatalf("ReadFile toc.json: %v", err)
 	}
@@ -190,19 +190,19 @@ func TestRun_TocEntryUsesRealChapterTitleNotHref(t *testing.T) {
 }
 
 // runAndReadTOC runs the conversion and returns the parsed toc.json entries.
-func runAndReadTOC(t *testing.T, epubBytes []byte, jobID string) []tocEntry {
+func runAndReadTOC(t *testing.T, epubBytes []byte, documentID string) []tocEntry {
 	t.Helper()
 	dataDir := t.TempDir()
 	store := &fakeStore{}
 	p := parser.NewEPUB(store, dataDir)
 
-	_ = p.Convert(context.Background(), jobID, "req-1", "book.epub", epubBytes, nil)
+	_ = p.Convert(context.Background(), documentID, "req-1", "book.epub", epubBytes, nil)
 
-	if store.doneID != jobID {
-		t.Fatalf("job not marked done: %+v", store)
+	if store.doneID != documentID {
+		t.Fatalf("document not marked done: %+v", store)
 	}
 
-	tocBytes, err := os.ReadFile(filepath.Join(dataDir, jobID, "toc.json"))
+	tocBytes, err := os.ReadFile(filepath.Join(dataDir, documentID, "toc.json"))
 	if err != nil {
 		t.Fatalf("ReadFile toc.json: %v", err)
 	}
@@ -359,7 +359,7 @@ func rewriteNavXHTMLWithNestedTOC(t *testing.T, epubBytes []byte) []byte {
 
 func TestRun_TocSubsectionDoesNotOverwriteChapterTitle(t *testing.T) {
 	epubBytes := buildTestEpubWithSubsectionTOC(t)
-	entries := runAndReadTOC(t, epubBytes, "job-subsection-toc")
+	entries := runAndReadTOC(t, epubBytes, "document-subsection-toc")
 
 	if len(entries) != 1 {
 		t.Fatalf("expected 1 top-level toc entry, got %d: %+v", len(entries), entries)
@@ -393,11 +393,11 @@ func TestRun_TocSubsectionDoesNotOverwriteChapterTitle(t *testing.T) {
 func TestRun_MarksFailedOnInvalidEpub(t *testing.T) {
 	store := &fakeStore{}
 	hub := newHub(t)
-	ch := hub.Subscribe("job-2")
-	defer hub.Unsubscribe("job-2", ch)
+	ch := hub.Subscribe("document-2")
+	defer hub.Unsubscribe("document-2", ch)
 	p := parser.NewEPUB(store, t.TempDir())
 
-	err := p.Convert(context.Background(), "job-2", "req-1", "book.epub", []byte("not an epub"), hub)
+	err := p.Convert(context.Background(), "document-2", "req-1", "book.epub", []byte("not an epub"), hub)
 
 	if err == nil {
 		t.Fatal("expected return err got 'nil'")
@@ -415,7 +415,7 @@ func TestRun_MarksFailedOnInvalidEpub(t *testing.T) {
 		t.Fatal("expected event on channel, got nothing")
 	}
 
-	if store.failedID != "job-2" || store.failedErr == "" {
-		t.Errorf("expected job-2 marked failed with an error, got %+v", store)
+	if store.failedID != "document-2" || store.failedErr == "" {
+		t.Errorf("expected document-2 marked failed with an error, got %+v", store)
 	}
 }

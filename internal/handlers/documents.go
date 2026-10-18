@@ -18,26 +18,26 @@ import (
 
 func (h *Handlers) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	log := logging.LoggerFrom(r.Context())
-	jobs, err := h.store.ListJobs(r.Context())
+	documents, err := h.store.ListDocuments(r.Context())
 	if err != nil {
-		log.Error("list jobs failed", logging.Err(err))
+		log.Error("list documents failed", logging.Err(err))
 		w.WriteHeader(http.StatusInternalServerError)
 		if renderErr := templates.Documents(nil, nil, "Failed to load documents. Please try again.").Render(r.Context(), w); renderErr != nil {
 			log.Error("render error page failed", logging.Err(renderErr))
 		}
 		return
 	}
-	watchJobs := []string{}
-	pendingJobs, err := h.store.GetPendingJobs(r.Context())
+	watchDocuments := []string{}
+	pendingDocuments, err := h.store.GetPendingDocuments(r.Context())
 	if err != nil {
-		log.Error("get pending jobs failed", logging.Err(err))
+		log.Error("get pending documents failed", logging.Err(err))
 	} else {
-		for _, pendingJob := range pendingJobs {
-			watchJobs = append(watchJobs, pendingJob.ID)
+		for _, pendingDocument := range pendingDocuments {
+			watchDocuments = append(watchDocuments, pendingDocument.ID)
 		}
 	}
 
-	if err := templates.Documents(jobs, watchJobs, "").Render(r.Context(), w); err != nil {
+	if err := templates.Documents(documents, watchDocuments, "").Render(r.Context(), w); err != nil {
 		log.Error("render documents failed", logging.Err(err))
 	}
 }
@@ -46,12 +46,12 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	log := logging.LoggerFrom(r.Context())
 
 	renderErr := func(status int, msg string) {
-		jobs, listErr := h.store.ListJobs(r.Context())
+		documents, listErr := h.store.ListDocuments(r.Context())
 		if listErr != nil {
-			log.Error("list jobs failed during error render", logging.Err(listErr))
+			log.Error("list documents failed during error render", logging.Err(listErr))
 		}
 		w.WriteHeader(status)
-		if err := templates.Documents(jobs, nil, msg).Render(r.Context(), w); err != nil {
+		if err := templates.Documents(documents, nil, msg).Render(r.Context(), w); err != nil {
 			log.Error("render error page failed", logging.Err(err))
 		}
 	}
@@ -85,21 +85,21 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	format := domain.EpubFormat
 
 	reqID := logging.RequestIDFrom(r.Context())
-	job, err := h.store.CreateJob(r.Context(), header.Filename, documentBytes, reqID, format)
+	document, err := h.store.CreateDocument(r.Context(), header.Filename, documentBytes, reqID, format)
 	if err != nil {
-		log.Error("create job failed", logging.Err(err), "filename", header.Filename)
-		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store job. %v", err))
+		log.Error("create document failed", logging.Err(err), "filename", header.Filename)
+		renderErr(http.StatusInternalServerError, fmt.Sprintf("Failed to store document. %v", err))
 		return
 	}
 
 	log.Info("upload accepted",
-		"job_id", job.ID,
+		"document_id", document.ID,
 		"filename", header.Filename,
 		"bytes", len(documentBytes),
 		"format", format,
 	)
 
-	go h.converter.Run(job.ID, reqID, format, header.Filename, documentBytes)
+	go h.converter.Run(document.ID, reqID, format, header.Filename, documentBytes)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -115,26 +115,26 @@ func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	job, err := h.store.GetJob(r.Context(), id)
+	document, err := h.store.GetDocument(r.Context(), id)
 	if err != nil {
-		log.Warn("retry: job not found", "id", id, logging.Err(err))
-		renderErr(http.StatusNotFound, "job not found")
+		log.Warn("retry: document not found", "id", id, logging.Err(err))
+		renderErr(http.StatusNotFound, "document not found")
 		return
 	}
 
-	if job.Status != "FAILED" {
-		log.Warn("retry: job not in terminal state", "id", id, "status", job.Status)
-		renderErr(http.StatusConflict, "retry: job not in terminal state")
+	if document.Status != "FAILED" {
+		log.Warn("retry: document not in terminal state", "id", id, "status", document.Status)
+		renderErr(http.StatusConflict, "retry: document not in terminal state")
 		return
 	}
 
-	if err := h.store.RetryJob(r.Context(), id); err != nil {
-		log.Warn("retry: fail to update job", "id", id, logging.Err(err))
-		renderErr(http.StatusInternalServerError, "retry: failed to update job")
+	if err := h.store.RetryDocument(r.Context(), id); err != nil {
+		log.Warn("retry: fail to update document", "id", id, logging.Err(err))
+		renderErr(http.StatusInternalServerError, "retry: failed to update document")
 		return
 	}
 
-	go h.converter.Run(job.ID, job.RequestID, job.Format, job.Filename, job.Content)
+	go h.converter.Run(document.ID, document.RequestID, document.Format, document.Filename, document.Content)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }
@@ -155,28 +155,28 @@ func (h *Handlers) DeleteDocument(w http.ResponseWriter, r *http.Request) {
 		}).Render(r.Context(), w) //nolint:errcheck
 	}
 
-	job, err := h.store.GetJob(r.Context(), id)
+	document, err := h.store.GetDocument(r.Context(), id)
 	if err != nil {
-		log.Warn("delete: job not found", "id", id, logging.Err(err))
-		renderErr(http.StatusNotFound, "job not found")
+		log.Warn("delete: document not found", "id", id, logging.Err(err))
+		renderErr(http.StatusNotFound, "document not found")
 		return
 	}
 
-	if job.Status == "PENDING" || job.Status == "PROCESSING" {
-		log.Warn("delete: job not in terminal state", "id", id, "status", job.Status)
-		renderErr(http.StatusConflict, "delete: job not in terminal state")
+	if document.Status == "PENDING" || document.Status == "PROCESSING" {
+		log.Warn("delete: document not in terminal state", "id", id, "status", document.Status)
+		renderErr(http.StatusConflict, "delete: document not in terminal state")
 		return
 	}
 
-	if err := h.store.DeleteJob(r.Context(), id); err != nil {
+	if err := h.store.DeleteDocument(r.Context(), id); err != nil {
 		log.Error("delete: db delete failed", "id", id, logging.Err(err))
 		renderErr(http.StatusInternalServerError, fmt.Sprintf("delete: db delete failed. %v", err))
 		return
 	}
 
-	if job.OutputPath != "" {
-		if err := os.RemoveAll(job.OutputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
-			log.Error("delete: remove markdown failed", "path", job.OutputPath, logging.Err(err))
+	if document.OutputPath != "" {
+		if err := os.RemoveAll(document.OutputPath); err != nil && !errors.Is(err, os.ErrNotExist) {
+			log.Error("delete: remove markdown failed", "path", document.OutputPath, logging.Err(err))
 		}
 	}
 
@@ -207,29 +207,29 @@ func (h *Handlers) CancelDocument(w http.ResponseWriter, r *http.Request) {
 
 	id := r.PathValue("id")
 
-	job, err := h.store.GetJob(r.Context(), id)
+	document, err := h.store.GetDocument(r.Context(), id)
 	if err != nil {
-		log.Warn("cancel: job not found", "id", id, logging.Err(err))
-		renderErr(http.StatusNotFound, "job not found")
+		log.Warn("cancel: document not found", "id", id, logging.Err(err))
+		renderErr(http.StatusNotFound, "document not found")
 		return
 	}
 
-	status := job.Status
+	status := document.Status
 	if status != "PROCESSING" && status != "PENDING" {
-		log.Warn("cancel: job not in correct state", "id", id)
-		renderErr(http.StatusBadRequest, "job in invalid state")
+		log.Warn("cancel: document not in correct state", "id", id)
+		renderErr(http.StatusBadRequest, "document in invalid state")
 		return
 	}
 
 	if h.converter == nil || !h.converter.HasCancel(id) {
-		if markErr := h.store.MarkJobFailed(context.Background(), id, "cancelled by user"); markErr != nil {
-			log.Error("mark job failed errored", logging.Err(markErr))
+		if markErr := h.store.MarkDocumentFailed(context.Background(), id, "cancelled by user"); markErr != nil {
+			log.Error("mark document failed errored", logging.Err(markErr))
 		}
 		h.hub.Publish(id, hub.StatusEvent{
 			Status: "FAILED",
 			Error:  "cancelled by user",
 		})
-		renderErr(http.StatusConflict, "could not cancel safely. Mark job as failed, reload and try again")
+		renderErr(http.StatusConflict, "could not cancel safely. Mark document as failed, reload and try again")
 		return
 	}
 	h.converter.Cancel(id)

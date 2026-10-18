@@ -5,7 +5,7 @@ Folio used to run two services: the Go UI, and a stateless Python gRPC server wr
 ## Consequences
 
 - `converter.Runner` still dispatches through a format-keyed parser map ([ADR 0002](0002-format-keyed-parser-dispatch.md)), with only EPUB registered. We can add a format again by registering a new `parser.Parser` without reshaping the Runner.
-- Existing PDF jobs remain readable. `domain.PdfFormat` and `renderer/markdown/` stay so already-converted Markdown still renders, and highlights anchored to it still work ([ADR 0001](0001-highlight-anchoring-via-block-id.md)). Retrying a failed PDF job fails with "no parser registered". Superseded by [ADR 0008](0008-remove-markdown-renderer.md).
+- Existing PDF documents remain readable. `domain.PdfFormat` and `renderer/markdown/` stay so already-converted Markdown still renders, and highlights anchored to it still work ([ADR 0001](0001-highlight-anchoring-via-block-id.md)). Retrying a failed PDF document fails with "no parser registered". Superseded by [ADR 0008](0008-remove-markdown-renderer.md).
 - ADRs 0003–0006 describe the Python PDF pipeline and are historical only.
 
 ## Considered options

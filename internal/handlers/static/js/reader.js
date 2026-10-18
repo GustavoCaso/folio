@@ -255,7 +255,7 @@ export function calcPopoverPosition(rect, popoverWidth, viewportWidth) {
   };
 }
 
-export function buildPendingSelection(reader, jobID, sel) {
+export function buildPendingSelection(reader, documentID, sel) {
   if (!sel || sel.isCollapsed || sel.rangeCount === 0) return null;
   const range = sel.getRangeAt(0);
   if (!reader.contains(range.startContainer) || !reader.contains(range.endContainer)) return null;
@@ -266,7 +266,7 @@ export function buildPendingSelection(reader, jobID, sel) {
     return null;
   }
   return {
-    job_id: jobID,
+    document_id: documentID,
     start_block_id: startBlock.dataset.blockId,
     end_block_id: endBlock.dataset.blockId,
     start_pos: offsetWithinBlock(startBlock, range.startContainer, range.startOffset),
@@ -454,7 +454,7 @@ function bootstrap() {
   const cancelBtn = document.getElementById("hl-cancel");
   const errorEl = document.getElementById("hl-error");
   if (!popoverContent || !saveBtn || !cancelBtn) return;
-  const jobID = reader.dataset.jobId;
+  const documentID = reader.dataset.documentId;
 
   let pendingSelection = null;
   let popoverOpen = false;
@@ -483,7 +483,7 @@ function bootstrap() {
     const blockID = firstVisibleBlockID(allBlocks);
     if (!blockID) return;
     navigator.sendBeacon(
-      `/read/${jobID}/progress`,
+      `/read/${documentID}/progress`,
       new Blob([JSON.stringify({ block_id: blockID })], { type: "application/json" })
     );
   }
@@ -578,7 +578,7 @@ function bootstrap() {
 
   function captureSelection(fromTouch) {
     const sel = window.getSelection();
-    const built = buildPendingSelection(reader, jobID, sel);
+    const built = buildPendingSelection(reader, documentID, sel);
 
     if (!built) return;
 

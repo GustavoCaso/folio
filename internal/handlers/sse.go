@@ -8,9 +8,9 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 )
 
-func (h *Handlers) WatchJob(w http.ResponseWriter, r *http.Request) {
-	jobID := r.PathValue("jobID")
-	log := logging.LoggerFrom(r.Context()).With("job_id", jobID)
+func (h *Handlers) WatchDocument(w http.ResponseWriter, r *http.Request) {
+	documentID := r.PathValue("documentID")
+	log := logging.LoggerFrom(r.Context()).With("document_id", documentID)
 
 	w.Header().Set("Content-Type", "text/event-stream")
 	w.Header().Set("Cache-Control", "no-cache")
@@ -23,8 +23,8 @@ func (h *Handlers) WatchJob(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	ch := h.hub.Subscribe(jobID)
-	defer h.hub.Unsubscribe(jobID, ch)
+	ch := h.hub.Subscribe(documentID)
+	defer h.hub.Unsubscribe(documentID, ch)
 	log.Debug("sse subscribed")
 
 	for {

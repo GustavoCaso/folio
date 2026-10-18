@@ -15,10 +15,10 @@ func TestCreateAndListHighlights(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, _ := database.CreateJob(context.Background(), "book.epub", content, "", domain.EpubFormat)
+	document, _ := database.CreateDocument(context.Background(), "book.epub", content, "", domain.EpubFormat)
 
 	h := domain.Highlight{
-		JobID:        job.ID,
+		DocumentID:   document.ID,
 		StartBlockID: "introduction",
 		EndBlockID:   "introduction",
 		StartPos:     10,
@@ -36,7 +36,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 		t.Fatal("expected non-empty highlight ID")
 	}
 
-	highlights, err := database.ListHighlights(context.Background(), job.ID)
+	highlights, err := database.ListHighlights(context.Background(), document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -55,12 +55,12 @@ func TestDeleteHighlight(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, err := database.CreateJob(context.Background(), "book.epub", content, "", domain.EpubFormat)
+	document, err := database.CreateDocument(context.Background(), "book.epub", content, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 	h, err := database.CreateHighlight(context.Background(), domain.Highlight{
-		JobID: job.ID, StartBlockID: "intro", EndBlockID: "intro", StartPos: 0, EndPos: 10, Text: "text",
+		DocumentID: document.ID, StartBlockID: "intro", EndBlockID: "intro", StartPos: 0, EndPos: 10, Text: "text",
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -70,7 +70,7 @@ func TestDeleteHighlight(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	highlights, _ := database.ListHighlights(context.Background(), job.ID)
+	highlights, _ := database.ListHighlights(context.Background(), document.ID)
 	if len(highlights) != 0 {
 		t.Fatalf("expected 0 highlights, got %d", len(highlights))
 	}
@@ -97,21 +97,21 @@ func TestListChapterHighlights(t *testing.T) {
 	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
-	job, err := database.CreateJob(ctx, "book.epub", content, "", domain.EpubFormat)
+	document, err := database.CreateDocument(ctx, "book.epub", content, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 	for _, h := range []domain.Highlight{
-		{JobID: job.ID, StartBlockID: "ch0-p-1", EndBlockID: "ch0-p-1", Chapter: 0, Text: "zero"},
-		{JobID: job.ID, StartBlockID: "ch1-p-1", EndBlockID: "ch1-p-1", Chapter: 1, Text: "one"},
-		{JobID: job.ID, StartBlockID: "ch1-p-4", EndBlockID: "ch1-p-5", Chapter: 1, Text: "one again"},
+		{DocumentID: document.ID, StartBlockID: "ch0-p-1", EndBlockID: "ch0-p-1", Chapter: 0, Text: "zero"},
+		{DocumentID: document.ID, StartBlockID: "ch1-p-1", EndBlockID: "ch1-p-1", Chapter: 1, Text: "one"},
+		{DocumentID: document.ID, StartBlockID: "ch1-p-4", EndBlockID: "ch1-p-5", Chapter: 1, Text: "one again"},
 	} {
 		if _, err := database.CreateHighlight(ctx, h); err != nil {
 			t.Fatal(err)
 		}
 	}
 
-	got, err := database.ListChapterHighlights(ctx, job.ID, 1)
+	got, err := database.ListChapterHighlights(ctx, document.ID, 1)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -124,7 +124,7 @@ func TestListChapterHighlights(t *testing.T) {
 		}
 	}
 
-	all, err := database.ListHighlights(ctx, job.ID)
+	all, err := database.ListHighlights(ctx, document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}

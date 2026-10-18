@@ -111,7 +111,7 @@ func (r *ReadwiseBackend) Export(ctx context.Context, exports []*export.ExportRe
 			continue
 		}
 		seen := make(map[string]struct{})
-		for _, tag := range append([]string{rec.Tag}, rec.JobTags...) {
+		for _, tag := range append([]string{rec.Tag}, rec.DocumentTags...) {
 			if tag == "" {
 				continue
 			}

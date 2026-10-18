@@ -20,11 +20,11 @@ import (
 	"github.com/templui/templui/components/icon"
 )
 
-func coverBase64(j domain.Job) string {
+func coverBase64(j domain.Document) string {
 	return base64.StdEncoding.EncodeToString(j.Cover)
 }
 
-func jobCard(j domain.Job) templ.Component {
+func documentCard(j domain.Document) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -86,7 +86,7 @@ func jobCard(j domain.Job) templ.Component {
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
-				templ_7745c5c3_Err = jobBadge(j.Status).Render(ctx, templ_7745c5c3_Buffer)
+				templ_7745c5c3_Err = documentBadge(j.Status).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -220,7 +220,7 @@ func jobCard(j domain.Job) templ.Component {
 					})
 					templ_7745c5c3_Err = button.Button(button.Props{
 						Variant:    button.VariantGhost,
-						Attributes: map[string]any{"data-cancel-job": j.ID, "data-job-name": j.Filename},
+						Attributes: map[string]any{"data-cancel-document": j.ID, "data-document-name": j.Filename},
 						Size:       button.SizeSm,
 						Class:      "text-destructive hover:text-destructive",
 						Type:       button.TypeButton,
@@ -320,7 +320,7 @@ func jobCard(j domain.Job) templ.Component {
 						return nil
 					})
 					templ_7745c5c3_Err = button.Button(button.Props{
-						Attributes: map[string]any{"data-retry-job": j.ID, "data-job-name": j.Filename},
+						Attributes: map[string]any{"data-retry-document": j.ID, "data-document-name": j.Filename},
 						Variant:    button.VariantGhost,
 						Size:       button.SizeSm,
 						Type:       button.TypeSubmit,
@@ -354,7 +354,7 @@ func jobCard(j domain.Job) templ.Component {
 					})
 					templ_7745c5c3_Err = button.Button(button.Props{
 						Variant:    button.VariantGhost,
-						Attributes: map[string]any{"data-delete-job": j.ID, "data-job-name": j.Filename},
+						Attributes: map[string]any{"data-delete-document": j.ID, "data-document-name": j.Filename},
 						Size:       button.SizeSm,
 						Class:      "text-destructive hover:text-destructive",
 						Type:       button.TypeButton,
@@ -375,7 +375,7 @@ func jobCard(j domain.Job) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = card.Card(card.Props{ID: "job-" + j.ID}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = card.Card(card.Props{ID: "document-" + j.ID}).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -383,7 +383,7 @@ func jobCard(j domain.Job) templ.Component {
 	})
 }
 
-func jobBadge(status string) templ.Component {
+func documentBadge(status string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -480,7 +480,7 @@ func jobBadge(status string) templ.Component {
 	})
 }
 
-func DocumentList(jobs []domain.Job) templ.Component {
+func DocumentList(documents []domain.Document) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -501,13 +501,13 @@ func DocumentList(jobs []domain.Job) templ.Component {
 			templ_7745c5c3_Var20 = templ.NopComponent
 		}
 		ctx = templ.ClearChildren(ctx)
-		if len(jobs) > 0 {
+		if len(documents) > 0 {
 			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 28, "<div class=\"grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			for _, j := range jobs {
-				templ_7745c5c3_Err = jobCard(j).Render(ctx, templ_7745c5c3_Buffer)
+			for _, j := range documents {
+				templ_7745c5c3_Err = documentCard(j).Render(ctx, templ_7745c5c3_Buffer)
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
@@ -521,7 +521,7 @@ func DocumentList(jobs []domain.Job) templ.Component {
 	})
 }
 
-func Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) templ.Component {
+func Documents(documents []domain.Document, watchDocumentIDs []string, errMsg string) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -747,7 +747,7 @@ func Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) templ.Com
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = DocumentList(jobs).Render(ctx, templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = DocumentList(documents).Render(ctx, templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -755,15 +755,15 @@ func Documents(jobs []domain.Job, watchJobIDs []string, errMsg string) templ.Com
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			if len(watchJobIDs) > 0 {
-				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<div id=\"watch-config\" data-job-ids=\"")
+			if len(watchDocumentIDs) > 0 {
+				templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 43, "<div id=\"watch-config\" data-document-ids=\"")
 				if templ_7745c5c3_Err != nil {
 					return templ_7745c5c3_Err
 				}
 				var templ_7745c5c3_Var30 string
-				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(watchJobIDs, ","))
+				templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinStringErrs(strings.Join(watchDocumentIDs, ","))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 212, Col: 71}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/documents.templ`, Line: 212, Col: 81}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 				if templ_7745c5c3_Err != nil {

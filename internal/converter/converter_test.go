@@ -42,30 +42,30 @@ func newLogger() *slog.Logger {
 	return slog.New(slog.NewTextHandler(io.Discard, nil))
 }
 
-// successParser marks the job done immediately.
+// successParser marks the document done immediately.
 type successParser struct{ store repository.Store }
 
-func (p *successParser) Convert(ctx context.Context, jobID, _, _ string, _ []byte, h *hub.Hub) error {
-	if err := p.store.MarkJobDone(ctx, jobID, "/tmp/out", "Title", "Author", nil); err != nil {
+func (p *successParser) Convert(ctx context.Context, documentID, _, _ string, _ []byte, h *hub.Hub) error {
+	if err := p.store.MarkDocumentDone(ctx, documentID, "/tmp/out", "Title", "Author", nil); err != nil {
 		return err
 	}
-	h.Publish(jobID, hub.StatusEvent{Status: "DONE"})
+	h.Publish(documentID, hub.StatusEvent{Status: "DONE"})
 	return nil
 }
 
-// failParser always fails the job.
+// failParser always fails the document.
 type failParser struct {
 	store repository.Store
 	err   error
 }
 
-func (p *failParser) Convert(ctx context.Context, jobID, _, _ string, _ []byte, h *hub.Hub) error {
-	_ = p.store.MarkJobFailed(ctx, jobID, p.err.Error())
-	h.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: p.err.Error()})
+func (p *failParser) Convert(ctx context.Context, documentID, _, _ string, _ []byte, h *hub.Hub) error {
+	_ = p.store.MarkDocumentFailed(ctx, documentID, p.err.Error())
+	h.Publish(documentID, hub.StatusEvent{Status: "FAILED", Error: p.err.Error()})
 	return p.err
 }
 
-// blockingParser blocks until its context is cancelled, then marks the job
+// blockingParser blocks until its context is cancelled, then marks the document
 // failed with "cancelled by user" — mirrors what a real parser must do on
 // context.Canceled, since converter.Runner no longer does this itself.
 type blockingParser struct {
@@ -73,26 +73,26 @@ type blockingParser struct {
 	started chan struct{}
 }
 
-func (p *blockingParser) Convert(ctx context.Context, jobID, _, _ string, _ []byte, h *hub.Hub) error {
+func (p *blockingParser) Convert(ctx context.Context, documentID, _, _ string, _ []byte, h *hub.Hub) error {
 	close(p.started)
 	<-ctx.Done()
-	_ = p.store.MarkJobFailed(context.Background(), jobID, "cancelled by user")
-	h.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: "cancelled by user"})
+	_ = p.store.MarkDocumentFailed(context.Background(), documentID, "cancelled by user")
+	h.Publish(documentID, hub.StatusEvent{Status: "FAILED", Error: "cancelled by user"})
 	return ctx.Err()
 }
 
 func TestRun_MarksDone(t *testing.T) {
 	store := newStore(t)
-	job, err := store.CreateJob(context.Background(), "test.epub", []byte("epub"), "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "test.epub", []byte("epub"), "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	parsers := map[domain.JobFormat]parser.Parser{domain.EpubFormat: &successParser{store: store}}
+	parsers := map[domain.DocumentFormat]parser.Parser{domain.EpubFormat: &successParser{store: store}}
 	r := converter.New(store, newHub(t), parsers, newLogger())
-	r.Run(job.ID, "req-1", domain.EpubFormat, "test.epub", []byte("epub"))
+	r.Run(document.ID, "req-1", domain.EpubFormat, "test.epub", []byte("epub"))
 
-	got, err := store.GetJob(context.Background(), job.ID)
+	got, err := store.GetDocument(context.Background(), document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -104,18 +104,18 @@ func TestRun_MarksDone(t *testing.T) {
 	}
 }
 
-func TestRun_ParserError_MarksJobFailed(t *testing.T) {
+func TestRun_ParserError_MarksDocumentFailed(t *testing.T) {
 	store := newStore(t)
-	job, err := store.CreateJob(context.Background(), "fail.epub", []byte("epub"), "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "fail.epub", []byte("epub"), "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	parsers := map[domain.JobFormat]parser.Parser{domain.EpubFormat: &failParser{store: store, err: errors.New("parser exploded")}}
+	parsers := map[domain.DocumentFormat]parser.Parser{domain.EpubFormat: &failParser{store: store, err: errors.New("parser exploded")}}
 	r := converter.New(store, newHub(t), parsers, newLogger())
-	r.Run(job.ID, "req-1", domain.EpubFormat, "fail.epub", []byte("epub"))
+	r.Run(document.ID, "req-1", domain.EpubFormat, "fail.epub", []byte("epub"))
 
-	got, err := store.GetJob(context.Background(), job.ID)
+	got, err := store.GetDocument(context.Background(), document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -127,25 +127,25 @@ func TestRun_ParserError_MarksJobFailed(t *testing.T) {
 	}
 }
 
-func TestRun_CancelledContext_MarksJobCancelledByUser(t *testing.T) {
+func TestRun_CancelledContext_MarksDocumentCancelledByUser(t *testing.T) {
 	store := newStore(t)
-	job, err := store.CreateJob(context.Background(), "cancel.epub", []byte("epub"), "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "cancel.epub", []byte("epub"), "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	bp := &blockingParser{store: store, started: make(chan struct{})}
-	parsers := map[domain.JobFormat]parser.Parser{domain.EpubFormat: bp}
+	parsers := map[domain.DocumentFormat]parser.Parser{domain.EpubFormat: bp}
 	r := converter.New(store, newHub(t), parsers, newLogger())
 
 	done := make(chan struct{})
 	go func() {
 		defer close(done)
-		r.Run(job.ID, "req-1", domain.EpubFormat, "cancel.epub", []byte("epub"))
+		r.Run(document.ID, "req-1", domain.EpubFormat, "cancel.epub", []byte("epub"))
 	}()
 
 	<-bp.started
-	r.Cancel(job.ID)
+	r.Cancel(document.ID)
 
 	select {
 	case <-done:
@@ -153,7 +153,7 @@ func TestRun_CancelledContext_MarksJobCancelledByUser(t *testing.T) {
 		t.Fatal("Run never returned after cancel")
 	}
 
-	got, err := store.GetJob(context.Background(), job.ID)
+	got, err := store.GetDocument(context.Background(), document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -165,18 +165,18 @@ func TestRun_CancelledContext_MarksJobCancelledByUser(t *testing.T) {
 	}
 }
 
-func TestRun_UnknownFormat_MarksJobFailed(t *testing.T) {
+func TestRun_UnknownFormat_MarksDocumentFailed(t *testing.T) {
 	store := newStore(t)
-	job, err := store.CreateJob(context.Background(), "test.mobi", []byte("x"), "req-1", "mobi")
+	document, err := store.CreateDocument(context.Background(), "test.mobi", []byte("x"), "req-1", "mobi")
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	parsers := map[domain.JobFormat]parser.Parser{domain.EpubFormat: &successParser{store: store}}
+	parsers := map[domain.DocumentFormat]parser.Parser{domain.EpubFormat: &successParser{store: store}}
 	r := converter.New(store, newHub(t), parsers, newLogger())
-	r.Run(job.ID, "req-1", "mobi", "test.mobi", []byte("x"))
+	r.Run(document.ID, "req-1", "mobi", "test.mobi", []byte("x"))
 
-	got, err := store.GetJob(context.Background(), job.ID)
+	got, err := store.GetDocument(context.Background(), document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
