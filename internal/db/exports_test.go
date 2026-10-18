@@ -9,18 +9,18 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
-// seedJobAndHighlightForExport creates a DONE job, one highlight, and a PENDING export row for backendName.
-func seedJobAndHighlightForExport(t *testing.T, store repository.Store, backendName string) (domain.Job, domain.Highlight) {
+// seedDocumentAndHighlightForExport creates a DONE document, one highlight, and a PENDING export row for backendName.
+func seedDocumentAndHighlightForExport(t *testing.T, store repository.Store, backendName string) (domain.Document, domain.Highlight) {
 	t.Helper()
-	job, err := store.CreateJob(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, "/data/book.md", "", "", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, "/data/book.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := store.CreateHighlight(context.Background(), domain.Highlight{
-		JobID:        job.ID,
+		DocumentID:   document.ID,
 		StartBlockID: "p-1",
 		EndBlockID:   "p-1",
 		StartPos:     0,
@@ -34,7 +34,7 @@ func seedJobAndHighlightForExport(t *testing.T, store repository.Store, backendN
 	if err := store.CreateHighlightExport(context.Background(), h.ID, backendName); err != nil {
 		t.Fatal(err)
 	}
-	return job, h
+	return document, h
 }
 
 // pendingExportID fetches the single PENDING export row ID for a highlight+backend.
@@ -57,7 +57,7 @@ func TestListUnexportedHighlights_AllUnexported(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	_, h := seedDocumentAndHighlightForExport(t, database, "readwise")
 
 	records, err := database.ListUnexportedHighlights(context.Background(), "readwise")
 	if err != nil {
@@ -69,8 +69,8 @@ func TestListUnexportedHighlights_AllUnexported(t *testing.T) {
 	if records[0].HighlightID != h.ID {
 		t.Errorf("expected highlight %s, got %s", h.ID, records[0].HighlightID)
 	}
-	if records[0].JobFilename != "book.epub" {
-		t.Errorf("expected book.epub, got %s", records[0].JobFilename)
+	if records[0].DocumentFilename != "book.epub" {
+		t.Errorf("expected book.epub, got %s", records[0].DocumentFilename)
 	}
 	if records[0].HighlightText != "hello world" {
 		t.Errorf("expected text %q, got %q", "hello world", records[0].HighlightText)
@@ -87,7 +87,7 @@ func TestListUnexportedHighlights_MarkedExportedIsExcluded(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	seedJobAndHighlightForExport(t, database, "readwise")
+	seedDocumentAndHighlightForExport(t, database, "readwise")
 	exportID := pendingExportID(t, database, "readwise")
 
 	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
@@ -110,7 +110,7 @@ func TestListUnexportedHighlights_FailedIsNotRetried(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	seedJobAndHighlightForExport(t, database, "readwise")
+	seedDocumentAndHighlightForExport(t, database, "readwise")
 	exportID := pendingExportID(t, database, "readwise")
 
 	if err := database.MarkHighlightExportFailed(context.Background(), exportID, "timeout"); err != nil {
@@ -134,7 +134,7 @@ func TestListUnexportedHighlights_IsolatedByBackend(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	_, h := seedDocumentAndHighlightForExport(t, database, "readwise")
 
 	// Also create a PENDING row for other-backend.
 	if err := database.CreateHighlightExport(context.Background(), h.ID, "other-backend"); err != nil {
@@ -163,7 +163,7 @@ func TestMarkHighlightExported(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	_, h := seedDocumentAndHighlightForExport(t, database, "readwise")
 	exportID := pendingExportID(t, database, "readwise")
 
 	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-999"); err != nil {
@@ -202,7 +202,7 @@ func TestMarkHighlightExportFailed(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	_, h := seedDocumentAndHighlightForExport(t, database, "readwise")
 	exportID := pendingExportID(t, database, "readwise")
 
 	if err := database.MarkHighlightExportFailed(context.Background(), exportID, "connection refused"); err != nil {
@@ -228,14 +228,14 @@ func TestMarkHighlightExportFailed(t *testing.T) {
 	}
 }
 
-func TestListAllExports_JoinsHighlightAndJob(t *testing.T) {
+func TestListAllExports_JoinsHighlightAndDocument(t *testing.T) {
 	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	_, h := seedDocumentAndHighlightForExport(t, database, "readwise")
 	exportID := pendingExportID(t, database, "readwise")
 
 	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {
@@ -253,8 +253,8 @@ func TestListAllExports_JoinsHighlightAndJob(t *testing.T) {
 	if rec.HighlightText != "hello world" {
 		t.Errorf("expected highlight text %q, got %q", "hello world", rec.HighlightText)
 	}
-	if rec.JobFilename != "book.epub" {
-		t.Errorf("expected job filename book.epub, got %s", rec.JobFilename)
+	if rec.DocumentFilename != "book.epub" {
+		t.Errorf("expected document filename book.epub, got %s", rec.DocumentFilename)
 	}
 	if rec.Status != "EXPORTED" {
 		t.Errorf("expected status exported, got %s", rec.Status)
@@ -269,12 +269,12 @@ func TestListAllExports_ReturnsAllRecords(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	_, h1 := seedJobAndHighlightForExport(t, database, "readwise")
+	_, h1 := seedDocumentAndHighlightForExport(t, database, "readwise")
 	exportID1 := pendingExportID(t, database, "readwise")
 
-	// Second highlight on the same job.
+	// Second highlight on the same document.
 	h2, err := database.CreateHighlight(context.Background(), domain.Highlight{
-		JobID: h1.JobID, StartBlockID: "p-2", EndBlockID: "p-2",
+		DocumentID: h1.DocumentID, StartBlockID: "p-2", EndBlockID: "p-2",
 		StartPos: 0, EndPos: 3, Text: "bye",
 	})
 	if err != nil {
@@ -321,15 +321,15 @@ func TestListAllExports_ReturnsAllRecords(t *testing.T) {
 	}
 }
 
-func TestListUnexportedHighlights_DecodesJobTagsFromJSON(t *testing.T) {
+func TestListUnexportedHighlights_DecodesDocumentTagsFromJSON(t *testing.T) {
 	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = database.Close() }()
 
-	job, _ := seedJobAndHighlightForExport(t, database, "readwise")
-	if err := database.UpdateJob(context.Background(), job.ID, "Title", "", []string{"science", "research"}, nil); err != nil {
+	document, _ := seedDocumentAndHighlightForExport(t, database, "readwise")
+	if err := database.UpdateDocument(context.Background(), document.ID, "Title", "", []string{"science", "research"}, nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -340,21 +340,21 @@ func TestListUnexportedHighlights_DecodesJobTagsFromJSON(t *testing.T) {
 	if len(records) == 0 {
 		t.Fatal("expected at least one record")
 	}
-	got := records[0].JobTags
+	got := records[0].DocumentTags
 	if len(got) != 2 || got[0] != "science" || got[1] != "research" {
-		t.Errorf("expected JobTags [science research], got %v", got)
+		t.Errorf("expected DocumentTags [science research], got %v", got)
 	}
 }
 
-func TestListAllExports_DecodesJobTagsFromJSON(t *testing.T) {
+func TestListAllExports_DecodesDocumentTagsFromJSON(t *testing.T) {
 	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer func() { _ = database.Close() }()
 
-	job, _ := seedJobAndHighlightForExport(t, database, "readwise")
-	if err := database.UpdateJob(context.Background(), job.ID, "Title", "", []string{"fiction", "novel"}, nil); err != nil {
+	document, _ := seedDocumentAndHighlightForExport(t, database, "readwise")
+	if err := database.UpdateDocument(context.Background(), document.ID, "Title", "", []string{"fiction", "novel"}, nil); err != nil {
 		t.Fatal(err)
 	}
 	exportID := pendingExportID(t, database, "readwise")
@@ -369,9 +369,9 @@ func TestListAllExports_DecodesJobTagsFromJSON(t *testing.T) {
 	if len(records) == 0 {
 		t.Fatal("expected at least one record")
 	}
-	got := records[0].JobTags
+	got := records[0].DocumentTags
 	if len(got) != 2 || got[0] != "fiction" || got[1] != "novel" {
-		t.Errorf("expected JobTags [fiction novel], got %v", got)
+		t.Errorf("expected DocumentTags [fiction novel], got %v", got)
 	}
 }
 
@@ -382,7 +382,7 @@ func TestExportRecord_CascadesOnHighlightDelete(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	_, h := seedJobAndHighlightForExport(t, database, "readwise")
+	_, h := seedDocumentAndHighlightForExport(t, database, "readwise")
 	exportID := pendingExportID(t, database, "readwise")
 
 	if err := database.MarkHighlightExported(context.Background(), exportID, "ext-1"); err != nil {

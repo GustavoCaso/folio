@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Self-hosted EPUB reader with persistent highlights. Single Go binary: owns all job + highlight state in a SQLite DB and parses EPUB bytes in-process. User-facing setup and env vars live in `README.md`.
+Self-hosted EPUB reader with persistent highlights. Single Go binary: owns all document + highlight state in a SQLite DB and parses EPUB bytes in-process. User-facing setup and env vars live in `README.md`.
 
 ## Commands
 
@@ -30,9 +30,9 @@ make format      # golangci-lint fmt
 main.go      entry point → cmd.Execute()
 cmd/         server entry, flag/env parsing, export backend wiring
 internal/
-  db/                SQLite store, migrations, jobs + highlights + exports
-  hub/               in-memory pub/sub: conversion status events → SSE per job
-  converter/         Runner: dispatches conversions to a map[JobFormat]parser.Parser, owns cancel tracking
+  db/                SQLite store, migrations, documents + highlights + exports
+  hub/               in-memory pub/sub: conversion status events → SSE per document
+  converter/         Runner: dispatches conversions to a map[DocumentFormat]parser.Parser, owns cancel tracking
   converter/parser/  Parser interface + NewEPUB implementation
   renderer/epub/     HTML-tree walker: data-block-id injection + image data-URI rewriting per chapter
   export/            highlight export worker + backends (Readwise)
@@ -49,22 +49,22 @@ internal/
 ```
 Browser uploads EPUB
   → POST /documents              # non-.epub uploads rejected with 400
-  → store.CreateJob(..., format="epub")
+  → store.CreateDocument(..., format="epub")
   → go converter.Run(..., format)
       → parsers["epub"].Convert()     # parser.NewEPUB, synchronous
           → epub.NewReader(bytes), extract Title/Author/Cover
           → per spine item: renderer/epub.Render() → data-block-id + base64 images
-          → write DATA_DIR/{jobID}/chapter-N.html + toc.json
-          → store.MarkJobDone(outputPath=dir)
+          → write DATA_DIR/{documentID}/chapter-N.html + toc.json
+          → store.MarkDocumentDone(outputPath=dir)
           → hub.Publish(DONE) → SSE → browser
 ```
 
-`GET /read/{jobID}?chapter=N&full=1` serves one chapter or the whole book concatenated. Jobs with any other `Job.Format` get a 422 "Unsupported document format" page.
+`GET /read/{documentID}?chapter=N&full=1` serves one chapter or the whole book concatenated. Documents with any other `Document.Format` get a 422 "Unsupported document format" page.
 
 ## Rules
 
-- **Only EPUB is converted.** Only `NewEPUB` is registered in the Runner. An unregistered format marks the job failed rather than panicking. See ADR 0007 and ADR 0008.
-- **Parsers own the job lifecycle.** Each `parser.Parser` writes output, calls `MarkJobDone`/`MarkJobFailed`, publishes hub events, and must mark the job failed on `context.Canceled`. See ADR 0002.
+- **Only EPUB is converted.** Only `NewEPUB` is registered in the Runner. An unregistered format marks the document failed rather than panicking. See ADR 0007 and ADR 0008.
+- **Parsers own the document lifecycle.** Each `parser.Parser` writes output, calls `MarkDocumentDone`/`MarkDocumentFailed`, publishes hub events, and must mark the document failed on `context.Canceled`. See ADR 0002.
 - **Highlights anchor to `data-block-id`.** IDs: `ch{N}-{tag}-{M}` (e.g. `ch0-p-1`). `StartPos`/`EndPos` are character offsets within the block (each `<img>` counts as 1 char). Multi-block highlights use `start_block_id`/`end_block_id`. Don't change ID shape without a migration plan. See ADR 0001.
 - **Generated files are checked in.** After editing `.templ` run `make templ`; after class changes run `make css`. Don't hand-edit `*_templ.go` or `static/tailwind/output.css`.
 - **Static assets are embedded.** After editing JS, rebuild the binary/image. Browsers cache module scripts aggressively; hard reload after restart.

@@ -12,7 +12,7 @@ import (
 	"github.com/templui/templui/components/separator"
 )
 
-templ EditDocument(j domain.Job, errMsg string) {
+templ EditDocument(j domain.Document, errMsg string) {
 	@Layout("Edit Document", NoAction(), NoAction(), NoAction(), "") {
 		@ErrorBanner(errMsg)
 		<div class="flex flex-col gap-6">

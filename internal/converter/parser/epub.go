@@ -22,12 +22,12 @@ import (
 // Store is the subset of repository.Store this package needs — matches
 // the shape converter.Runner depends on for its own Store parameter.
 type Store interface {
-	MarkJobDone(ctx context.Context, id, outputPath, title, author string, cover []byte) error
-	MarkJobFailed(ctx context.Context, id, errMsg string) error
+	MarkDocumentDone(ctx context.Context, id, outputPath, title, author string, cover []byte) error
+	MarkDocumentFailed(ctx context.Context, id, errMsg string) error
 }
 
 // epubParser parses epub bytes in-process and writes rendered chapters +
-// toc to disk, marking the job done or failed via Store.
+// toc to disk, marking the document done or failed via Store.
 type epubParser struct {
 	store   Store
 	dataDir string
@@ -48,22 +48,22 @@ type tocEntry struct {
 }
 
 // Convert parses data as epub bytes and writes one chapter-N.html per
-// spine item plus toc.json under dataDir/jobID, then marks the job done or
+// spine item plus toc.json under dataDir/documentID, then marks the document done or
 // failed. requestID, filename, and h are accepted for interface uniformity
 // but unused — epubParser uses its own stored hub.
-func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename string, data []byte, h *hub.Hub) error {
-	log := p.logger.With("job_id", jobID)
+func (p *epubParser) Convert(ctx context.Context, documentID, requestID, filename string, data []byte, h *hub.Hub) error {
+	log := p.logger.With("document_id", documentID)
 	start := time.Now()
 	log.Info("epub conversion start", "bytes", len(data))
 
 	reader, err := epub.NewReader(data)
 	if err != nil {
-		return p.fail(log, jobID, fmt.Sprintf("parse epub: %v", err), h)
+		return p.fail(log, documentID, fmt.Sprintf("parse epub: %v", err), h)
 	}
 
-	outDir := filepath.Join(p.dataDir, jobID)
+	outDir := filepath.Join(p.dataDir, documentID)
 	if err := os.MkdirAll(outDir, 0o755); err != nil {
-		return p.fail(log, jobID, fmt.Sprintf("create output dir: %v", err), h)
+		return p.fail(log, documentID, fmt.Sprintf("create output dir: %v", err), h)
 	}
 
 	spineIdxByHref := spineIndexByHref(&reader)
@@ -78,10 +78,10 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 		}
 		out, err := epubRender.Render(doc, i, resolveImage(&reader))
 		if err != nil {
-			return p.fail(log, jobID, fmt.Sprintf("render chapter %d: %v", i, err), h)
+			return p.fail(log, documentID, fmt.Sprintf("render chapter %d: %v", i, err), h)
 		}
 		if err := os.WriteFile(filepath.Join(outDir, fmt.Sprintf("chapter-%d.html", i)), []byte(out), 0o644); err != nil {
-			return p.fail(log, jobID, fmt.Sprintf("write chapter %d: %v", i, err), h)
+			return p.fail(log, documentID, fmt.Sprintf("write chapter %d: %v", i, err), h)
 		}
 		docByIdx[i] = doc
 	}
@@ -90,18 +90,18 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 
 	tocBytes, err := json.Marshal(tocEntries)
 	if err != nil {
-		return p.fail(log, jobID, fmt.Sprintf("marshal toc: %v", err), h)
+		return p.fail(log, documentID, fmt.Sprintf("marshal toc: %v", err), h)
 	}
 	if err := os.WriteFile(filepath.Join(outDir, "toc.json"), tocBytes, 0o644); err != nil {
-		return p.fail(log, jobID, fmt.Sprintf("write toc: %v", err), h)
+		return p.fail(log, documentID, fmt.Sprintf("write toc: %v", err), h)
 	}
 
 	title := reader.Title()
 	author := reader.Author()
 	cover := coverBytes(&reader)
 
-	if err := p.store.MarkJobDone(ctx, jobID, outDir, title, author, cover); err != nil {
-		log.Error("mark job done failed", logging.Err(err))
+	if err := p.store.MarkDocumentDone(ctx, documentID, outDir, title, author, cover); err != nil {
+		log.Error("mark document done failed", logging.Err(err))
 		return err
 	}
 
@@ -112,7 +112,7 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 		"dur_ms", time.Since(start).Milliseconds(),
 	)
 	if h != nil {
-		h.Publish(jobID, hub.StatusEvent{
+		h.Publish(documentID, hub.StatusEvent{
 			Status: "DONE",
 			Title:  title,
 			Author: author,
@@ -122,13 +122,13 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 	return nil
 }
 
-func (p *epubParser) fail(log *slog.Logger, jobID, msg string, h *hub.Hub) error {
+func (p *epubParser) fail(log *slog.Logger, documentID, msg string, h *hub.Hub) error {
 	log.Error("epub conversion failed", "error", msg)
-	if err := p.store.MarkJobFailed(context.Background(), jobID, msg); err != nil {
-		log.Error("mark job failed errored", logging.Err(err))
+	if err := p.store.MarkDocumentFailed(context.Background(), documentID, msg); err != nil {
+		log.Error("mark document failed errored", logging.Err(err))
 	}
 	if h != nil {
-		h.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: msg})
+		h.Publish(documentID, hub.StatusEvent{Status: "FAILED", Error: msg})
 	}
 	return errors.New(msg)
 }

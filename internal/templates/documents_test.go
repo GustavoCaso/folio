@@ -10,32 +10,32 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/templates"
 )
 
-func renderDocuments(t *testing.T, jobs []domain.Job, watchJobIDs ...string) string {
+func renderDocuments(t *testing.T, documents []domain.Document, watchDocumentIDs ...string) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.Documents(jobs, watchJobIDs, "").Render(context.Background(), &buf); err != nil {
+	if err := templates.Documents(documents, watchDocumentIDs, "").Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()
 }
 
-func renderDocumentList(t *testing.T, jobs []domain.Job) string {
+func renderDocumentList(t *testing.T, documents []domain.Document) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.DocumentList(jobs).Render(context.Background(), &buf); err != nil {
+	if err := templates.DocumentList(documents).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()
 }
 
 func TestDocumentList_RendersIDAndFilename(t *testing.T) {
-	jobs := []domain.Job{
+	documents := []domain.Document{
 		{ID: "j1", Filename: "alpha.pdf", Status: "PENDING"},
 		{ID: "j2", Filename: "beta.pdf", Status: "PENDING"},
 	}
-	got := renderDocumentList(t, jobs)
+	got := renderDocumentList(t, documents)
 
-	for _, want := range []string{`id="job-j1"`, "alpha.pdf", `id="job-j2"`, "beta.pdf"} {
+	for _, want := range []string{`id="document-j1"`, "alpha.pdf", `id="document-j2"`, "beta.pdf"} {
 		if !strings.Contains(got, want) {
 			t.Errorf("expected %q in output, got: %s", want, got)
 		}
@@ -43,7 +43,7 @@ func TestDocumentList_RendersIDAndFilename(t *testing.T) {
 }
 
 func TestDocumentList_ProcessingOmitsPageCountWhenZero(t *testing.T) {
-	got := renderDocumentList(t, []domain.Job{
+	got := renderDocumentList(t, []domain.Document{
 		{ID: "j1", Filename: "doc.pdf", Status: "PROCESSING"},
 	})
 
@@ -53,7 +53,7 @@ func TestDocumentList_ProcessingOmitsPageCountWhenZero(t *testing.T) {
 }
 
 func TestDocumentList_DoneShowsReadLink(t *testing.T) {
-	got := renderDocumentList(t, []domain.Job{
+	got := renderDocumentList(t, []domain.Document{
 		{ID: "j2", Filename: "beta.pdf", Status: "DONE"},
 	})
 
@@ -63,7 +63,7 @@ func TestDocumentList_DoneShowsReadLink(t *testing.T) {
 }
 
 func TestDocumentList_FailedShowsErrorMessage(t *testing.T) {
-	got := renderDocumentList(t, []domain.Job{
+	got := renderDocumentList(t, []domain.Document{
 		{ID: "j3", Filename: "bad.pdf", Status: "FAILED", Error: "parser timeout"},
 	})
 
@@ -76,44 +76,44 @@ func TestDocumentList_EmptyRendersNothing(t *testing.T) {
 	got := renderDocumentList(t, nil)
 
 	if strings.Contains(got, "<ul>") {
-		t.Errorf("expected no <ul> for empty job list, got: %s", got)
+		t.Errorf("expected no <ul> for empty document list, got: %s", got)
 	}
 }
 
-func TestDocumentsEmbedsJobIDInDataAttribute(t *testing.T) {
-	got := renderDocuments(t, nil, "job-abc-123")
+func TestDocumentsEmbedsDocumentIDInDataAttribute(t *testing.T) {
+	got := renderDocuments(t, nil, "document-abc-123")
 
-	if !strings.Contains(got, `data-job-ids="job-abc-123"`) {
-		t.Errorf("expected data-job-ids attribute with job id, got: %s", got)
+	if !strings.Contains(got, `data-document-ids="document-abc-123"`) {
+		t.Errorf("expected data-document-ids attribute with document id, got: %s", got)
 	}
 }
 
 func TestDocumentsScriptHasNoUnrenderedTemplExpression(t *testing.T) {
-	got := renderDocuments(t, nil, "job-1")
+	got := renderDocuments(t, nil, "document-1")
 
 	// Regression: templ does NOT interpolate { ... } inside raw <script>.
-	// Previous code shipped `const jobID = { templ.JSONString(watchJobID) };`
+	// Previous code shipped `const documentID = { templ.JSONString(watchDocumentID) };`
 	// to the browser, causing a JS SyntaxError on the `.`.
 	if strings.Contains(got, "templ.JSONString") {
 		t.Errorf("script contains unrendered templ expression: %s", got)
 	}
 }
 
-func TestDocumentsOmitsScriptWhenNoWatchJobID(t *testing.T) {
+func TestDocumentsOmitsScriptWhenNoWatchDocumentID(t *testing.T) {
 	got := renderDocuments(t, nil)
 
 	if strings.Contains(got, "EventSource") {
-		t.Errorf("expected no EventSource script when watchJobIDs empty, got: %s", got)
+		t.Errorf("expected no EventSource script when watchDocumentIDs empty, got: %s", got)
 	}
 }
 
 func TestDocumentsIncludesDocumentList(t *testing.T) {
-	jobs := []domain.Job{
+	documents := []domain.Document{
 		{ID: "j1", Filename: "alpha.pdf", Status: "DONE"},
 	}
-	got := renderDocuments(t, jobs)
+	got := renderDocuments(t, documents)
 
-	if !strings.Contains(got, `id="job-j1"`) {
+	if !strings.Contains(got, `id="document-j1"`) {
 		t.Errorf("expected DocumentList output inside Documents, got: %s", got)
 	}
 }
@@ -142,89 +142,89 @@ func TestDocumentsOmitsErrorBannerWhenNoError(t *testing.T) {
 }
 
 func TestDocumentsLoadsScript(t *testing.T) {
-	got := renderDocuments(t, nil, "job-1")
+	got := renderDocuments(t, nil, "document-1")
 	if !strings.Contains(got, `<script type="module" src="/static/js/documents.js">`) {
 		t.Errorf("expected documents.js script tag, got:\n%s", got)
 	}
 }
 
 func TestDocumentList_ShowsDeleteForDone(t *testing.T) {
-	body := renderDocumentList(t, []domain.Job{
+	body := renderDocumentList(t, []domain.Document{
 		{ID: "abc123", Filename: "done.pdf", Status: "DONE"},
 	})
-	if !strings.Contains(body, `data-delete-job="abc123"`) {
-		t.Errorf("expected delete button for DONE job, got:\n%s", body)
+	if !strings.Contains(body, `data-delete-document="abc123"`) {
+		t.Errorf("expected delete button for DONE document, got:\n%s", body)
 	}
 }
 
 func TestDocumentList_ShowsDeleteForFailed(t *testing.T) {
-	body := renderDocumentList(t, []domain.Job{
+	body := renderDocumentList(t, []domain.Document{
 		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
 	})
-	if !strings.Contains(body, `data-delete-job="def456"`) {
-		t.Errorf("expected delete button for FAILED job, got:\n%s", body)
+	if !strings.Contains(body, `data-delete-document="def456"`) {
+		t.Errorf("expected delete button for FAILED document, got:\n%s", body)
 	}
 }
 
 func TestDocumentList_ShowsRetryForFailed(t *testing.T) {
-	body := renderDocumentList(t, []domain.Job{
+	body := renderDocumentList(t, []domain.Document{
 		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
 	})
 	if !strings.Contains(body, `/documents/def456/retry`) {
-		t.Errorf("expected retry link for FAILED job, got:\n%s", body)
+		t.Errorf("expected retry link for FAILED document, got:\n%s", body)
 	}
 }
 
 func TestDocumentList_ShowsCancelForPending(t *testing.T) {
-	body := renderDocumentList(t, []domain.Job{
+	body := renderDocumentList(t, []domain.Document{
 		{ID: "ghi789", Filename: "pending.pdf", Status: "PENDING"},
 	})
-	if !strings.Contains(body, `data-cancel-job="ghi789"`) {
-		t.Errorf("expected cancel button for PENDING job, got:\n%s", body)
+	if !strings.Contains(body, `data-cancel-document="ghi789"`) {
+		t.Errorf("expected cancel button for PENDING document, got:\n%s", body)
 	}
 }
 
 func TestDocumentList_NoCancelForDone(t *testing.T) {
-	body := renderDocumentList(t, []domain.Job{
+	body := renderDocumentList(t, []domain.Document{
 		{ID: "abc123", Filename: "done.pdf", Status: "DONE"},
 	})
-	if strings.Contains(body, `data-cancel-job=`) {
-		t.Errorf("expected no cancel button for DONE job, got:\n%s", body)
+	if strings.Contains(body, `data-cancel-document=`) {
+		t.Errorf("expected no cancel button for DONE document, got:\n%s", body)
 	}
 }
 
 func TestDocumentList_NoCancelForFailed(t *testing.T) {
-	body := renderDocumentList(t, []domain.Job{
+	body := renderDocumentList(t, []domain.Document{
 		{ID: "def456", Filename: "failed.pdf", Status: "FAILED", Error: "parse error"},
 	})
-	if strings.Contains(body, `data-cancel-job=`) {
-		t.Errorf("expected no cancel button for FAILED job, got:\n%s", body)
+	if strings.Contains(body, `data-cancel-document=`) {
+		t.Errorf("expected no cancel button for FAILED document, got:\n%s", body)
 	}
 }
 
 func TestDocumentList_NoDeleteForPending(t *testing.T) {
-	body := renderDocumentList(t, []domain.Job{
+	body := renderDocumentList(t, []domain.Document{
 		{ID: "ghi789", Filename: "pending.pdf", Status: "PENDING"},
 	})
 	if strings.Contains(body, `/documents/ghi789/delete`) {
-		t.Errorf("expected no delete link for PENDING job, got:\n%s", body)
+		t.Errorf("expected no delete link for PENDING document, got:\n%s", body)
 	}
 }
 
 func TestDocumentList_NoDeleteForProcessing(t *testing.T) {
-	body := renderDocumentList(t, []domain.Job{
+	body := renderDocumentList(t, []domain.Document{
 		{ID: "jkl012", Filename: "processing.pdf", Status: "PROCESSING"},
 	})
 	if strings.Contains(body, `/documents/jkl012/delete`) {
-		t.Errorf("expected no delete link for PROCESSING job, got:\n%s", body)
+		t.Errorf("expected no delete link for PROCESSING document, got:\n%s", body)
 	}
 }
 
-func TestDocumentsEmbedsMultipleJobIDs(t *testing.T) {
-	got := renderDocuments(t, nil, "job-1", "job-2")
+func TestDocumentsEmbedsMultipleDocumentIDs(t *testing.T) {
+	got := renderDocuments(t, nil, "document-1", "document-2")
 
-	if !strings.Contains(got, `data-job-ids="job-1,job-2"`) {
-		t.Errorf("expected joined data-job-ids attribute, got: %s", got)
+	if !strings.Contains(got, `data-document-ids="document-1,document-2"`) {
+		t.Errorf("expected joined data-document-ids attribute, got: %s", got)
 	}
 }
 

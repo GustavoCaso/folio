@@ -18,8 +18,8 @@ import (
 )
 
 func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
-	jobID := r.PathValue("jobID")
-	log := logging.LoggerFrom(r.Context()).With("job_id", jobID)
+	documentID := r.PathValue("documentID")
+	log := logging.LoggerFrom(r.Context()).With("document_id", documentID)
 
 	renderErr := func(status int, msg string) {
 		w.WriteHeader(status)
@@ -28,37 +28,37 @@ func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
-	job, err := h.store.GetJob(r.Context(), jobID)
+	document, err := h.store.GetDocument(r.Context(), documentID)
 	if err != nil {
 		if errors.Is(err, sql.ErrNoRows) {
-			log.Warn("document not found", "job_id", jobID)
+			log.Warn("document not found", "document_id", documentID)
 			renderErr(http.StatusNotFound, "Document not found.")
 		} else {
-			log.Error("get job failed", logging.Err(err))
+			log.Error("get document failed", logging.Err(err))
 			renderErr(http.StatusInternalServerError, "Failed to load document. Please try again.")
 		}
 		return
 	}
 
-	if job.OutputPath == "" {
-		log.Warn("document not ready", "status", job.Status)
+	if document.OutputPath == "" {
+		log.Warn("document not ready", "status", document.Status)
 		msg := "Document is not ready yet."
-		if job.Status == "FAILED" {
+		if document.Status == "FAILED" {
 			msg = "Document conversion failed."
 		}
 		renderErr(http.StatusNotFound, msg)
 		return
 	}
-	if job.Format != domain.EpubFormat {
-		log.Warn("unsupported document format", "format", job.Format)
+	if document.Format != domain.EpubFormat {
+		log.Warn("unsupported document format", "format", document.Format)
 		renderErr(http.StatusUnprocessableEntity, "Unsupported document format.")
 		return
 	}
-	h.readEPUBChapter(w, r, job)
+	h.readEPUBChapter(w, r, document)
 }
 
-func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, job domain.Job) {
-	log := logging.LoggerFrom(r.Context()).With("job_id", job.ID)
+func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, document domain.Document) {
+	log := logging.LoggerFrom(r.Context()).With("document_id", document.ID)
 	renderErr := func(status int, msg string) {
 		w.WriteHeader(status)
 		if err := templates.ErrorPage(msg).Render(r.Context(), w); err != nil {
@@ -66,24 +66,24 @@ func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, job d
 		}
 	}
 
-	tocEntries, err := loadTOC(job.OutputPath)
+	tocEntries, err := loadTOC(document.OutputPath)
 	if err != nil {
 		log.Error("load toc failed", logging.Err(err))
 		renderErr(http.StatusInternalServerError, "Failed to load table of contents.")
 		return
 	}
-	chapterCount := countChapterFiles(job.OutputPath)
+	chapterCount := countChapterFiles(document.OutputPath)
 
 	full := r.URL.Query().Get("full") == "1"
 
 	var html string
 	var chapterIdx int
 	if full {
-		html, err = concatChapters(job.OutputPath, chapterCount)
+		html, err = concatChapters(document.OutputPath, chapterCount)
 		chapterIdx = -1
 	} else {
-		chapterIdx = parseChapterParam(r.URL.Query().Get("chapter"), job.ReadingProgress)
-		html, err = readChapterFile(job.OutputPath, chapterIdx)
+		chapterIdx = parseChapterParam(r.URL.Query().Get("chapter"), document.ReadingProgress)
+		html, err = readChapterFile(document.OutputPath, chapterIdx)
 	}
 	if err != nil {
 		log.Error("read chapter failed", logging.Err(err))
@@ -93,9 +93,9 @@ func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, job d
 
 	var highlights []domain.Highlight
 	if full {
-		highlights, err = h.store.ListHighlights(r.Context(), job.ID)
+		highlights, err = h.store.ListHighlights(r.Context(), document.ID)
 	} else {
-		highlights, err = h.store.ListChapterHighlights(r.Context(), job.ID, chapterIdx)
+		highlights, err = h.store.ListChapterHighlights(r.Context(), document.ID, chapterIdx)
 	}
 	if err != nil {
 		log.Error("list highlights failed", logging.Err(err))
@@ -103,7 +103,7 @@ func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, job d
 		return
 	}
 
-	if err := templates.Reader(job, html, highlights, tocEntries, chapterIdx, chapterCount-1, full).Render(r.Context(), w); err != nil {
+	if err := templates.Reader(document, html, highlights, tocEntries, chapterIdx, chapterCount-1, full).Render(r.Context(), w); err != nil {
 		log.Error("render reader failed", logging.Err(err))
 	}
 }
@@ -191,7 +191,7 @@ func parseChapterParam(chapterParam, readingProgress string) int {
 }
 
 func (h *Handlers) UpdateReadingProgress(w http.ResponseWriter, r *http.Request) {
-	jobID := r.PathValue("jobID")
+	documentID := r.PathValue("documentID")
 	log := logging.LoggerFrom(r.Context())
 
 	var body struct {
@@ -202,8 +202,8 @@ func (h *Handlers) UpdateReadingProgress(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	if err := h.store.UpdateReadingProgress(r.Context(), jobID, body.BlockID); err != nil {
-		log.Error("update reading progress failed", logging.Err(err), "job_id", jobID)
+	if err := h.store.UpdateReadingProgress(r.Context(), documentID, body.BlockID); err != nil {
+		log.Error("update reading progress failed", logging.Err(err), "document_id", documentID)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}

@@ -13,7 +13,7 @@ type ExportRecord struct {
 	Title         string
 	Note          string
 	Tag           string   // highlight-level tag
-	JobTags       []string // document-level tags
+	DocumentTags  []string // document-level tags
 	ExternalID    string   // ID assigned by the external service; "" on failure
 	Err           error
 }

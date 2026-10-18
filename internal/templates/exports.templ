@@ -91,18 +91,18 @@ templ Exports(records []domain.ExportRecord) {
 												{ rec.HighlightTag }
 											}
 										}
-										for _, tag := range rec.JobTags {
+										for _, tag := range rec.DocumentTags {
 											@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-xs"}) {
 												{ tag }
 											}
 										}
-										if rec.HighlightTag == "" && len(rec.JobTags) == 0 {
+										if rec.HighlightTag == "" && len(rec.DocumentTags) == 0 {
 											<span class="text-muted-foreground">--</span>
 										}
 									</div>
 								}
 								@table.Cell() {
-									<span class="text-muted-foreground truncate max-w-xs block">{ rec.JobFilename }</span>
+									<span class="text-muted-foreground truncate max-w-xs block">{ rec.DocumentFilename }</span>
 								}
 								@table.Cell() {
 									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {

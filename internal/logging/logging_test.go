@@ -14,7 +14,7 @@ import (
 func TestInitEmitsJSON(t *testing.T) {
 	var buf bytes.Buffer
 	l := initTo(&buf, "info")
-	l.Info("hello", "job_id", "abc")
+	l.Info("hello", "document_id", "abc")
 
 	var out map[string]any
 	if err := json.Unmarshal(buf.Bytes(), &out); err != nil {
@@ -26,8 +26,8 @@ func TestInitEmitsJSON(t *testing.T) {
 	if out["level"] != "info" {
 		t.Errorf("want level=info, got %v", out["level"])
 	}
-	if out["job_id"] != "abc" {
-		t.Errorf("want job_id=abc, got %v", out["job_id"])
+	if out["document_id"] != "abc" {
+		t.Errorf("want document_id=abc, got %v", out["document_id"])
 	}
 	if _, ok := out["ts"]; !ok {
 		t.Errorf("want ts field, got %v", out)

@@ -12,7 +12,7 @@ import (
 )
 
 type createHighlightRequest struct {
-	JobID        string `json:"job_id"`
+	DocumentID   string `json:"document_id"`
 	StartBlockID string `json:"start_block_id"`
 	EndBlockID   string `json:"end_block_id"`
 	StartPos     int    `json:"start_pos"`
@@ -53,7 +53,7 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 	}
 
 	created, err := h.store.CreateHighlight(r.Context(), domain.Highlight{
-		JobID:        req.JobID,
+		DocumentID:   req.DocumentID,
 		StartBlockID: req.StartBlockID,
 		EndBlockID:   req.EndBlockID,
 		Chapter:      chapterFromBlockID(req.StartBlockID),
@@ -64,7 +64,7 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 		Note:         req.Note,
 	})
 	if err != nil {
-		log.Error("create highlight failed", logging.Err(err), "job_id", req.JobID)
+		log.Error("create highlight failed", logging.Err(err), "document_id", req.DocumentID)
 		w.WriteHeader(http.StatusInternalServerError)
 		json.NewEncoder(w).Encode(ErrorMessage{Error: "failed to save highlight"}) //nolint:errcheck
 		return
@@ -77,7 +77,7 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 	}
 
 	log.Info("highlight created",
-		"job_id", req.JobID,
+		"document_id", req.DocumentID,
 		"highlight_id", created.ID,
 		"start_block_id", req.StartBlockID,
 		"end_block_id", req.EndBlockID,

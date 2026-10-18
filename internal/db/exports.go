@@ -15,7 +15,7 @@ func (d *db) ListUnexportedHighlights(ctx context.Context, backendName string) (
 		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename, COALESCE(j.tags, '')
 		FROM highlight_exports he
 		JOIN highlights h ON he.highlight_id = h.id
-		JOIN jobs j ON h.job_id = j.id
+		JOIN documents j ON h.document_id = j.id
 		WHERE he.backend_name = ? AND he.status = 'PENDING'
 		ORDER BY he.created_at ASC`, backendName)
 	if err != nil {
@@ -30,13 +30,13 @@ func (d *db) ListUnexportedHighlights(ctx context.Context, backendName string) (
 		if err := rows.Scan(
 			&rec.ID, &rec.HighlightID, &rec.BackendName, &rec.ExternalID,
 			&rec.Status, &rec.Error, &exportedAt,
-			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.JobFilename, &tagsStr,
+			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.DocumentFilename, &tagsStr,
 		); err != nil {
 			return nil, err
 		}
 		rec.ExportedAt, _ = time.Parse(time.RFC3339, exportedAt)
 		if tagsStr != "" {
-			_ = json.Unmarshal([]byte(tagsStr), &rec.JobTags)
+			_ = json.Unmarshal([]byte(tagsStr), &rec.DocumentTags)
 		}
 		out = append(out, rec)
 	}
@@ -107,7 +107,7 @@ func (d *db) ListAllExports(ctx context.Context) ([]domain.ExportRecord, error) 
 		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename, COALESCE(j.tags, '')
 		FROM highlight_exports he
 		JOIN highlights h ON he.highlight_id = h.id
-		JOIN jobs j ON h.job_id = j.id
+		JOIN documents j ON h.document_id = j.id
 		ORDER BY he.exported_at DESC`)
 	if err != nil {
 		return nil, err
@@ -121,13 +121,13 @@ func (d *db) ListAllExports(ctx context.Context) ([]domain.ExportRecord, error) 
 		if err := rows.Scan(
 			&rec.ID, &rec.HighlightID, &rec.BackendName, &rec.ExternalID,
 			&rec.Status, &rec.Error, &exportedAt,
-			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.JobFilename, &tagsStr,
+			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.DocumentFilename, &tagsStr,
 		); err != nil {
 			return nil, err
 		}
 		rec.ExportedAt, _ = time.Parse(time.RFC3339, exportedAt)
 		if tagsStr != "" {
-			_ = json.Unmarshal([]byte(tagsStr), &rec.JobTags)
+			_ = json.Unmarshal([]byte(tagsStr), &rec.DocumentTags)
 		}
 		out = append(out, rec)
 	}

@@ -323,7 +323,7 @@ templ highlightsPopover(highlights []domain.Highlight) {
 	<script type="module" src="/static/js/reader.js"></script>
 }
 
-templ readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Highlight, currentChapterIdx, lastChapterIdx int, full bool) {
+templ readerEpubBody(document domain.Document, renderedHTML string, highlights []domain.Highlight, currentChapterIdx, lastChapterIdx int, full bool) {
 	<div id="progress-bar"></div>
 	@highlightsPanel(highlights)
 	<div class="mx-auto max-w-[68ch] px-2 pt-4">
@@ -332,7 +332,7 @@ templ readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Hi
 	<div class="mx-auto flex max-w-[calc(68ch+2*(2.25rem+1rem))] items-start justify-center gap-4 px-2">
 		@epubPrevNextRail("prev", currentChapterIdx-1, !full && currentChapterIdx > 0)
 		<article class="w-full max-w-[68ch] py-4 pb-24 overflow-x-auto">
-			<div id="reader" data-job-id={ job.ID } data-reading-progress={ job.ReadingProgress } data-current-chapter={ currentChapterAttr(currentChapterIdx, full) }>
+			<div id="reader" data-document-id={ document.ID } data-reading-progress={ document.ReadingProgress } data-current-chapter={ currentChapterAttr(currentChapterIdx, full) }>
 				@templ.Raw(renderedHTML)
 			</div>
 		</article>
@@ -350,19 +350,19 @@ templ readerHeadExtra() {
 // When epubTOC is non-empty, the page content is wrapped in a
 // sidebar.Layout/sidebar.Sidebar/sidebar.Inset composition; with an empty
 // TOC (the epub has no usable nav/NCX) no sidebar DOM/JS is emitted.
-templ Reader(job domain.Job, renderedHTML string, highlights []domain.Highlight, epubTOC []EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) {
+templ Reader(document domain.Document, renderedHTML string, highlights []domain.Highlight, epubTOC []EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) {
 	if len(epubTOC) > 0 {
-		@Layout(job.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded") {
+		@Layout(document.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded") {
 			@sidebar.Layout() {
 				@epubSidebar(epubTOC, currentChapterIdx, full)
 				@sidebar.Inset() {
-					@readerEpubBody(job, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full)
+					@readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full)
 				}
 			}
 		}
 	} else {
-		@Layout(job.Filename, NoAction(), headerActions(highlights), NoAction(), "") {
-			@readerEpubBody(job, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full)
+		@Layout(document.Filename, NoAction(), headerActions(highlights), NoAction(), "") {
+			@readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full)
 		}
 	}
 }

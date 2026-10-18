@@ -45,7 +45,7 @@ func (f *fakeBackend) Delete(_ context.Context, externalID string) error {
 	return nil
 }
 
-// newWorkerStore creates an in-memory store seeded with a DONE job and one highlight with a PENDING export row.
+// newWorkerStore creates an in-memory store seeded with a DONE document and one highlight with a PENDING export row.
 func newWorkerStore(t *testing.T, backendName string) (repository.Store, domain.Highlight) {
 	t.Helper()
 	database, err := db.New(":memory:")
@@ -54,15 +54,15 @@ func newWorkerStore(t *testing.T, backendName string) (repository.Store, domain.
 	}
 	t.Cleanup(func() { _ = database.Close() })
 
-	job, err := database.CreateJob(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
+	document, err := database.CreateDocument(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md", "", "", nil); err != nil {
+	if err := database.MarkDocumentDone(context.Background(), document.ID, "/data/book.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := database.CreateHighlight(context.Background(), domain.Highlight{
-		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
+		DocumentID: document.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 5, Text: "hello",
 	})
 	if err != nil {
@@ -237,15 +237,15 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 
-	job, err := database.CreateJob(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
+	document, err := database.CreateDocument(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := database.MarkJobDone(context.Background(), job.ID, "/data/book.md", "", "", nil); err != nil {
+	if err := database.MarkDocumentDone(context.Background(), document.ID, "/data/book.md", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := database.CreateHighlight(context.Background(), domain.Highlight{
-		JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
+		DocumentID: document.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 		StartPos: 0, EndPos: 5, Text: "hello",
 	})
 	if err != nil {

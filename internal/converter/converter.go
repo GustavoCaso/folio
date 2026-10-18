@@ -15,16 +15,16 @@ import (
 )
 
 // Runner dispatches document conversions to a format-specific parser.Parser
-// and manages per-job cancellation, independent of which parser handles it.
+// and manages per-document cancellation, independent of which parser handles it.
 type Runner struct {
 	store   repository.Store
 	hub     *hub.Hub
-	parsers map[domain.JobFormat]parser.Parser
+	parsers map[domain.DocumentFormat]parser.Parser
 	logger  *slog.Logger
-	cancels sync.Map // jobID → context.CancelFunc
+	cancels sync.Map // documentID → context.CancelFunc
 }
 
-func New(store repository.Store, h *hub.Hub, parsers map[domain.JobFormat]parser.Parser, logger *slog.Logger) *Runner {
+func New(store repository.Store, h *hub.Hub, parsers map[domain.DocumentFormat]parser.Parser, logger *slog.Logger) *Runner {
 	return &Runner{
 		store:   store,
 		hub:     h,
@@ -33,36 +33,36 @@ func New(store repository.Store, h *hub.Hub, parsers map[domain.JobFormat]parser
 	}
 }
 
-// Cancel cancels a running conversion for jobID. No-op if not running.
-func (r *Runner) Cancel(jobID string) {
-	if val, ok := r.cancels.Load(jobID); ok {
+// Cancel cancels a running conversion for documentID. No-op if not running.
+func (r *Runner) Cancel(documentID string) {
+	if val, ok := r.cancels.Load(documentID); ok {
 		if cancel, ok := val.(context.CancelFunc); ok {
 			cancel()
 		}
 	}
 }
 
-// HasCancel reports whether an active cancel func exists for jobID.
-func (r *Runner) HasCancel(jobID string) bool {
-	_, ok := r.cancels.Load(jobID)
+// HasCancel reports whether an active cancel func exists for documentID.
+func (r *Runner) HasCancel(documentID string) bool {
+	_, ok := r.cancels.Load(documentID)
 	return ok
 }
 
-func (r *Runner) Run(jobID, requestID string, format domain.JobFormat, filename string, data []byte) {
-	log := r.logger.With("job_id", jobID, "request_id", requestID, "filename", filename, "format", format)
+func (r *Runner) Run(documentID, requestID string, format domain.DocumentFormat, filename string, data []byte) {
+	log := r.logger.With("document_id", documentID, "request_id", requestID, "filename", filename, "format", format)
 	start := time.Now()
 	log.Info("conversion start", "bytes", len(data))
 
 	p, ok := r.parsers[format]
 	if !ok {
-		r.handleUnknownFormat(log, jobID, format)
+		r.handleUnknownFormat(log, documentID, format)
 		return
 	}
 
 	convertCtx, convertCancel := context.WithCancel(context.Background())
-	r.cancels.Store(jobID, convertCancel)
-	err := p.Convert(convertCtx, jobID, requestID, filename, data, r.hub)
-	r.cancels.Delete(jobID)
+	r.cancels.Store(documentID, convertCancel)
+	err := p.Convert(convertCtx, documentID, requestID, filename, data, r.hub)
+	r.cancels.Delete(documentID)
 	convertCancel()
 
 	if err != nil {
@@ -72,11 +72,11 @@ func (r *Runner) Run(jobID, requestID string, format domain.JobFormat, filename 
 	log.Info("conversion done", "dur_ms", time.Since(start).Milliseconds())
 }
 
-func (r *Runner) handleUnknownFormat(log *slog.Logger, jobID string, format domain.JobFormat) {
+func (r *Runner) handleUnknownFormat(log *slog.Logger, documentID string, format domain.DocumentFormat) {
 	errMsg := fmt.Sprintf("no parser registered for format %q", format)
 	log.Error(errMsg)
-	if markErr := r.store.MarkJobFailed(context.Background(), jobID, errMsg); markErr != nil {
-		log.Error("mark job failed errored", logging.Err(markErr))
+	if markErr := r.store.MarkDocumentFailed(context.Background(), documentID, errMsg); markErr != nil {
+		log.Error("mark document failed errored", logging.Err(markErr))
 	}
-	r.hub.Publish(jobID, hub.StatusEvent{Status: "FAILED", Error: errMsg})
+	r.hub.Publish(documentID, hub.StatusEvent{Status: "FAILED", Error: errMsg})
 }

@@ -28,11 +28,11 @@ func TestNewRequiresLogger(t *testing.T) {
 
 func TestPublishReachesSubscriber(t *testing.T) {
 	h := newHub(t)
-	ch := h.Subscribe("job-1")
-	defer h.Unsubscribe("job-1", ch)
+	ch := h.Subscribe("document-1")
+	defer h.Unsubscribe("document-1", ch)
 
 	event := hub.StatusEvent{Status: "PROCESSING", Message: "progress"}
-	h.Publish("job-1", event)
+	h.Publish("document-1", event)
 
 	select {
 	case got := <-ch:
@@ -47,26 +47,26 @@ func TestPublishReachesSubscriber(t *testing.T) {
 	}
 }
 
-func TestPublishDoesNotReachUnrelatedJob(t *testing.T) {
+func TestPublishDoesNotReachUnrelatedDocument(t *testing.T) {
 	h := newHub(t)
-	ch := h.Subscribe("job-1")
-	defer h.Unsubscribe("job-1", ch)
+	ch := h.Subscribe("document-1")
+	defer h.Unsubscribe("document-1", ch)
 
-	h.Publish("job-2", hub.StatusEvent{Status: "DONE"})
+	h.Publish("document-2", hub.StatusEvent{Status: "DONE"})
 
 	select {
 	case <-ch:
-		t.Fatal("received unexpected event for unrelated job")
+		t.Fatal("received unexpected event for unrelated document")
 	default:
 	}
 }
 
 func TestPublishCarriesMessage(t *testing.T) {
 	h := newHub(t)
-	ch := h.Subscribe("job-3")
-	defer h.Unsubscribe("job-3", ch)
+	ch := h.Subscribe("document-3")
+	defer h.Unsubscribe("document-3", ch)
 
-	h.Publish("job-3", hub.StatusEvent{
+	h.Publish("document-3", hub.StatusEvent{
 		Status:  "PROCESSING",
 		Message: "converted page 3/10",
 	})
@@ -104,11 +104,11 @@ func TestStatusEventJSONShape(t *testing.T) {
 func TestSubscribeReplaysEventsPublishedBeforeConnect(t *testing.T) {
 	h := newHub(t)
 
-	h.Publish("job-r", hub.StatusEvent{Status: "PROCESSING", Message: "batch 1"})
-	h.Publish("job-r", hub.StatusEvent{Status: "PROCESSING", Message: "batch 2"})
+	h.Publish("document-r", hub.StatusEvent{Status: "PROCESSING", Message: "batch 1"})
+	h.Publish("document-r", hub.StatusEvent{Status: "PROCESSING", Message: "batch 2"})
 
-	ch := h.Subscribe("job-r")
-	defer h.Unsubscribe("job-r", ch)
+	ch := h.Subscribe("document-r")
+	defer h.Unsubscribe("document-r", ch)
 
 	for _, want := range []string{"batch 1", "batch 2"} {
 		select {
@@ -125,13 +125,13 @@ func TestSubscribeReplaysEventsPublishedBeforeConnect(t *testing.T) {
 func TestReplayBufferClearedOnLastUnsubscribe(t *testing.T) {
 	h := newHub(t)
 
-	h.Publish("job-c", hub.StatusEvent{Status: "PROCESSING", Message: "batch 1"})
-	ch := h.Subscribe("job-c")
-	h.Unsubscribe("job-c", ch)
+	h.Publish("document-c", hub.StatusEvent{Status: "PROCESSING", Message: "batch 1"})
+	ch := h.Subscribe("document-c")
+	h.Unsubscribe("document-c", ch)
 
 	// New subscriber after cleanup should get no replayed events.
-	ch2 := h.Subscribe("job-c")
-	defer h.Unsubscribe("job-c", ch2)
+	ch2 := h.Subscribe("document-c")
+	defer h.Unsubscribe("document-c", ch2)
 
 	select {
 	case got := <-ch2:
@@ -142,10 +142,10 @@ func TestReplayBufferClearedOnLastUnsubscribe(t *testing.T) {
 
 func TestUnsubscribeStopsDelivery(t *testing.T) {
 	h := newHub(t)
-	ch := h.Subscribe("job-1")
-	h.Unsubscribe("job-1", ch)
+	ch := h.Subscribe("document-1")
+	h.Unsubscribe("document-1", ch)
 
-	h.Publish("job-1", hub.StatusEvent{Status: "DONE"})
+	h.Publish("document-1", hub.StatusEvent{Status: "DONE"})
 
 	select {
 	case <-ch:

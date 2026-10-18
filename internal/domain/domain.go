@@ -2,11 +2,11 @@ package domain
 
 import "time"
 
-type JobFormat string
+type DocumentFormat string
 
-const EpubFormat JobFormat = "epub"
+const EpubFormat DocumentFormat = "epub"
 
-type Job struct {
+type Document struct {
 	ID              string
 	Filename        string
 	RequestID       string
@@ -20,7 +20,7 @@ type Job struct {
 	Author          string
 	Cover           []byte
 	SourceURL       string
-	Format          JobFormat
+	Format          DocumentFormat
 	Tags            []string
 	CreatedAt       time.Time
 	UpdatedAt       time.Time
@@ -28,7 +28,7 @@ type Job struct {
 
 type Highlight struct {
 	ID           string    `json:"id"`
-	JobID        string    `json:"job_id"`
+	DocumentID   string    `json:"document_id"`
 	StartBlockID string    `json:"start_block_id"`
 	EndBlockID   string    `json:"end_block_id"`
 	Chapter      int       `json:"chapter"`
@@ -41,16 +41,16 @@ type Highlight struct {
 }
 
 type ExportRecord struct {
-	ID            string
-	HighlightID   string
-	HighlightText string
-	HighlightNote string
-	HighlightTag  string
-	JobFilename   string
-	JobTags       []string
-	BackendName   string
-	ExternalID    string
-	Status        string
-	Error         string
-	ExportedAt    time.Time
+	ID               string
+	HighlightID      string
+	HighlightText    string
+	HighlightNote    string
+	HighlightTag     string
+	DocumentFilename string
+	DocumentTags     []string
+	BackendName      string
+	ExternalID       string
+	Status           string
+	Error            string
+	ExportedAt       time.Time
 }

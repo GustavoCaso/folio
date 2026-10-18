@@ -502,7 +502,7 @@ describe("buildPendingSelection", () => {
 
   it("returns null for collapsed selection", () => {
     const reader = makeReader(`<p data-block-id="p-1">hello</p>`);
-    expect(buildPendingSelection(reader, "job1", { isCollapsed: true, rangeCount: 0 })).toBeNull();
+    expect(buildPendingSelection(reader, "document1", { isCollapsed: true, rangeCount: 0 })).toBeNull();
   });
 
   it("returns null when selection is outside reader", () => {
@@ -512,7 +512,7 @@ describe("buildPendingSelection", () => {
     document.body.appendChild(outside);
     const range = document.createRange();
     range.selectNodeContents(outside);
-    expect(buildPendingSelection(reader, "job1", fakeSelection(range, "outside"))).toBeNull();
+    expect(buildPendingSelection(reader, "document1", fakeSelection(range, "outside"))).toBeNull();
   });
 
   it("returns null when selection has no block ancestor", () => {
@@ -521,7 +521,7 @@ describe("buildPendingSelection", () => {
     const range = document.createRange();
     range.setStart(text, 0);
     range.setEnd(text, 2);
-    expect(buildPendingSelection(reader, "job1", fakeSelection(range, "no"))).toBeNull();
+    expect(buildPendingSelection(reader, "document1", fakeSelection(range, "no"))).toBeNull();
   });
 
   it("clears the selection when there is no block ancestor", () => {
@@ -531,7 +531,7 @@ describe("buildPendingSelection", () => {
     range.setStart(text, 0);
     range.setEnd(text, 2);
     const sel = { ...fakeSelection(range, "no"), removeAllRanges: vi.fn() };
-    buildPendingSelection(reader, "job1", sel);
+    buildPendingSelection(reader, "document1", sel);
     expect(sel.removeAllRanges).toHaveBeenCalledOnce();
   });
 
@@ -541,9 +541,9 @@ describe("buildPendingSelection", () => {
     const range = document.createRange();
     range.setStart(text, 0);
     range.setEnd(text, 5);
-    const result = buildPendingSelection(reader, "job42", fakeSelection(range, "hello"));
+    const result = buildPendingSelection(reader, "document42", fakeSelection(range, "hello"));
     expect(result).toEqual({
-      job_id: "job42",
+      document_id: "document42",
       start_block_id: "p-1",
       end_block_id: "p-1",
       start_pos: 0,
@@ -561,9 +561,9 @@ describe("buildPendingSelection", () => {
     const range = document.createRange();
     range.setStart(startText, 2);
     range.setEnd(endText, 3);
-    const result = buildPendingSelection(reader, "job1", fakeSelection(range, "llo\nwor"));
+    const result = buildPendingSelection(reader, "document1", fakeSelection(range, "llo\nwor"));
     expect(result).toEqual({
-      job_id: "job1",
+      document_id: "document1",
       start_block_id: "p-1",
       end_block_id: "p-2",
       start_pos: 2,

@@ -36,13 +36,13 @@ func (h *Handlers) backendByName(name string) export.Backend {
 }
 
 func Register(store repository.Store, h *hub.Hub, dataDir string, logger *slog.Logger, backends []export.Backend) (*http.ServeMux, error) {
-	parsers := map[domain.JobFormat]parser.Parser{
+	parsers := map[domain.DocumentFormat]parser.Parser{
 		domain.EpubFormat: parser.NewEPUB(store, dataDir),
 	}
 	return register(store, h, dataDir, logger, backends, parsers)
 }
 
-func register(store repository.Store, h *hub.Hub, dataDir string, logger *slog.Logger, backends []export.Backend, parsers map[domain.JobFormat]parser.Parser) (*http.ServeMux, error) {
+func register(store repository.Store, h *hub.Hub, dataDir string, logger *slog.Logger, backends []export.Backend, parsers map[domain.DocumentFormat]parser.Parser) (*http.ServeMux, error) {
 	if logger == nil {
 		return nil, errors.New("handlers.Register: logger is required")
 	}
@@ -67,11 +67,11 @@ func register(store repository.Store, h *hub.Hub, dataDir string, logger *slog.L
 	mux.HandleFunc("DELETE /documents/{id}", hs.DeleteDocument)
 	mux.HandleFunc("GET /documents/{id}/edit", hs.EditDocumentForm)
 	mux.HandleFunc("POST /documents/{id}/edit", hs.EditDocument)
-	mux.HandleFunc("GET /read/{jobID}", hs.ReadDocument)
-	mux.HandleFunc("GET /jobs/{jobID}/watch", hs.WatchJob)
+	mux.HandleFunc("GET /read/{documentID}", hs.ReadDocument)
+	mux.HandleFunc("GET /documents/{documentID}/watch", hs.WatchDocument)
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)
 	mux.HandleFunc("DELETE /highlights/{id}", hs.DeleteHighlight)
-	mux.HandleFunc("POST /read/{jobID}/progress", hs.UpdateReadingProgress)
+	mux.HandleFunc("POST /read/{documentID}/progress", hs.UpdateReadingProgress)
 	mux.HandleFunc("GET /exports", hs.ListExports)
 
 	isDev := os.Getenv("ENV") != "production"

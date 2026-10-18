@@ -1,10 +1,10 @@
 # Format-keyed parser dispatch; each parser owns its full completion lifecycle
 
-`converter.Runner` dispatches conversions through a `map[string]parser.Parser` keyed by `domain.Format`, and the `Parser` interface (`Convert`/`ConvertFromURL`) returns only `error` — not a result struct for the Runner to write out. Each implementation (`NewPDF`, `NewEPUB`) is responsible for writing its own output, calling `MarkJobDone`/`MarkJobFailed`, and publishing hub events itself.
+`converter.Runner` dispatches conversions through a `map[string]parser.Parser` keyed by `domain.Format`, and the `Parser` interface (`Convert`/`ConvertFromURL`) returns only `error` — not a result struct for the Runner to write out. Each implementation (`NewPDF`, `NewEPUB`) is responsible for writing its own output, calling `MarkDocumentDone`/`MarkDocumentFailed`, and publishing hub events itself.
 
 This replaced an earlier shape where `converter.Runner` held a single hardcoded PDF `client.Client` plus a separate `epubconvert.Runner`, with format branching happening in the handlers. The chosen shape duplicates completion boilerplate across parsers, but it's the right trade because formats don't share a completion shape: PDF writes one markdown file via a gRPC round-trip, EPUB writes multiple chapter HTML files plus `toc.json` synchronously with no gRPC. Forcing both through one shared "write result, then complete" path would mean the shared path constantly branches on format anyway.
 
-An unregistered format marks the job failed rather than panicking.
+An unregistered format marks the document failed rather than panicking.
 
 ## Considered options
 

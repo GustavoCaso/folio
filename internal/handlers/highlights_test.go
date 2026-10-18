@@ -13,19 +13,19 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
-// seedJobAndHighlight creates a job, marks it done, then creates a highlight
-// attached to that job. Returns both for further assertions.
-func seedJobAndHighlight(t *testing.T, store repository.Store) (domain.Job, domain.Highlight) {
+// seedDocumentAndHighlight creates a document, marks it done, then creates a highlight
+// attached to that document. Returns both for further assertions.
+func seedDocumentAndHighlight(t *testing.T, store repository.Store) (domain.Document, domain.Highlight) {
 	t.Helper()
-	job, err := store.CreateJob(context.Background(), "doc.epub", []byte{}, "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "doc.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, "/dev/null", "", "", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, "/dev/null", "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 	h, err := store.CreateHighlight(context.Background(), domain.Highlight{
-		JobID:        job.ID,
+		DocumentID:   document.ID,
 		StartBlockID: "paragraph-1",
 		EndBlockID:   "paragraph-1",
 		StartPos:     0,
@@ -37,18 +37,18 @@ func seedJobAndHighlight(t *testing.T, store repository.Store) (domain.Job, doma
 	if err != nil {
 		t.Fatal(err)
 	}
-	return job, h
+	return document, h
 }
 
 func TestCreateHighlight_HappyPath(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "doc.epub", []byte{}, "req-1", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "doc.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	body, _ := json.Marshal(map[string]any{
-		"job_id":         job.ID,
+		"document_id":    document.ID,
 		"start_block_id": "paragraph-1",
 		"end_block_id":   "paragraph-1",
 		"start_pos":      0,
@@ -106,7 +106,7 @@ func TestCreateHighlight_InvalidJSON(t *testing.T) {
 
 func TestDeleteHighlight_HappyPath(t *testing.T) {
 	store := newTestStore(t)
-	_, h := seedJobAndHighlight(t, store)
+	_, h := seedDocumentAndHighlight(t, store)
 
 	req := httptest.NewRequest(http.MethodDelete, "/highlights/"+h.ID, nil)
 	req.Header.Set("Accept", "text/html")
@@ -127,7 +127,7 @@ func TestDeleteHighlight_HappyPath(t *testing.T) {
 
 func TestDeleteHighlight_RemovesFromStore(t *testing.T) {
 	store := newTestStore(t)
-	job, h := seedJobAndHighlight(t, store)
+	document, h := seedDocumentAndHighlight(t, store)
 
 	req := httptest.NewRequest(http.MethodDelete, "/highlights/"+h.ID, nil)
 	rec := httptest.NewRecorder()
@@ -138,7 +138,7 @@ func TestDeleteHighlight_RemovesFromStore(t *testing.T) {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
 
-	highlights, err := store.ListHighlights(context.Background(), job.ID)
+	highlights, err := store.ListHighlights(context.Background(), document.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -170,12 +170,12 @@ func TestCreateHighlight_DerivesChapterFromStartBlockID(t *testing.T) {
 	for blockID, want := range cases {
 		t.Run(blockID, func(t *testing.T) {
 			store := newTestStore(t)
-			job, err := store.CreateJob(context.Background(), "doc.epub", []byte{}, "req-1", domain.EpubFormat)
+			document, err := store.CreateDocument(context.Background(), "doc.epub", []byte{}, "req-1", domain.EpubFormat)
 			if err != nil {
 				t.Fatal(err)
 			}
 			body, _ := json.Marshal(map[string]any{
-				"job_id":         job.ID,
+				"document_id":    document.ID,
 				"start_block_id": blockID,
 				"end_block_id":   blockID,
 				"start_pos":      0,

@@ -26,14 +26,14 @@ func TestReadDocument_NotFound(t *testing.T) {
 	}
 }
 
-func TestReadDocument_JobPending_NotReady(t *testing.T) {
+func TestReadDocument_DocumentPending_NotReady(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "pending.epub", []byte{}, "", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "pending.epub", []byte{}, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID, nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -46,17 +46,17 @@ func TestReadDocument_JobPending_NotReady(t *testing.T) {
 	}
 }
 
-func TestReadDocument_JobFailed(t *testing.T) {
+func TestReadDocument_DocumentFailed(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "broken.epub", []byte{}, "", domain.EpubFormat)
+	document, err := store.CreateDocument(context.Background(), "broken.epub", []byte{}, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobFailed(context.Background(), job.ID, "parser crashed"); err != nil {
+	if err := store.MarkDocumentFailed(context.Background(), document.ID, "parser crashed"); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID, nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -72,15 +72,15 @@ func TestReadDocument_JobFailed(t *testing.T) {
 func TestReadDocument_UnsupportedFormat(t *testing.T) {
 	dir := t.TempDir()
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "", domain.JobFormat("pdf"))
+	document, err := store.CreateDocument(context.Background(), "doc.pdf", []byte{}, "", domain.DocumentFormat("pdf"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, filepath.Join(dir, "doc.md"), "", "", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, filepath.Join(dir, "doc.md"), "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID, nil)
+	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID, nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -107,15 +107,15 @@ func TestReadDocument_EPUB_RendersRequestedChapter(t *testing.T) {
 	}
 
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "book.epub", []byte{}, "", "epub")
+	document, err := store.CreateDocument(context.Background(), "book.epub", []byte{}, "", "epub")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, dir, "Test Book", "Test Author", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, dir, "Test Book", "Test Author", nil); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?chapter=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?chapter=1", nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -145,15 +145,15 @@ func TestReadDocument_EPUB_FullConcatenatesAllChapters(t *testing.T) {
 	}
 
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "book.epub", []byte{}, "", "epub")
+	document, err := store.CreateDocument(context.Background(), "book.epub", []byte{}, "", "epub")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, dir, "Test Book", "Test Author", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, dir, "Test Book", "Test Author", nil); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?full=1", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?full=1", nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -200,18 +200,18 @@ func TestReadDocument_EPUB_ChapterNav(t *testing.T) {
 	}
 
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "book.epub", []byte{}, "", "epub")
+	document, err := store.CreateDocument(context.Background(), "book.epub", []byte{}, "", "epub")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, dir, "Test Book", "Test Author", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, dir, "Test Book", "Test Author", nil); err != nil {
 		t.Fatal(err)
 	}
 
 	mux, _ := newTestMux(t, store)
 
 	// First chapter: no "previous" link, but a "next" link to chapter 1.
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?chapter=0", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?chapter=0", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -232,7 +232,7 @@ func TestReadDocument_EPUB_ChapterNav(t *testing.T) {
 	}
 
 	// Last chapter: "previous" link to chapter 1, but no "next" link.
-	req = httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?chapter=2", nil)
+	req = httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?chapter=2", nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -284,11 +284,11 @@ func TestReadDocument_EPUB_ChapterNav_NestedSubsectionLinks(t *testing.T) {
 	}
 
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "book.epub", []byte{}, "", "epub")
+	document, err := store.CreateDocument(context.Background(), "book.epub", []byte{}, "", "epub")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, dir, "Test Book", "Test Author", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, dir, "Test Book", "Test Author", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -296,7 +296,7 @@ func TestReadDocument_EPUB_ChapterNav_NestedSubsectionLinks(t *testing.T) {
 
 	// Viewing chapter 0: the subsection belongs to the current chapter, so
 	// its link should be a same-page "#anchor" jump, not a "?chapter=" nav.
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?chapter=0", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?chapter=0", nil)
 	rec := httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -312,7 +312,7 @@ func TestReadDocument_EPUB_ChapterNav_NestedSubsectionLinks(t *testing.T) {
 
 	// Viewing chapter 1: the subsection belongs to a different chapter, so
 	// its link should be "?chapter=0#h1-sect" (load chapter then jump).
-	req = httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?chapter=1", nil)
+	req = httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?chapter=1", nil)
 	rec = httptest.NewRecorder()
 	mux.ServeHTTP(rec, req)
 	if rec.Code != http.StatusOK {
@@ -335,15 +335,15 @@ func TestReadDocument_EPUB_MissingChapterFile(t *testing.T) {
 	}
 
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "book.epub", []byte{}, "", "epub")
+	document, err := store.CreateDocument(context.Background(), "book.epub", []byte{}, "", "epub")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, dir, "Test Book", "Test Author", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, dir, "Test Book", "Test Author", nil); err != nil {
 		t.Fatal(err)
 	}
 
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?chapter=5", nil)
+	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?chapter=5", nil)
 	rec := httptest.NewRecorder()
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
@@ -369,16 +369,16 @@ func TestReadDocument_EPUB_OnlyLoadsCurrentChapterHighlights(t *testing.T) {
 	}
 
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "book.epub", []byte{}, "", "epub")
+	document, err := store.CreateDocument(context.Background(), "book.epub", []byte{}, "", "epub")
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, dir, "Test Book", "Test Author", nil); err != nil {
+	if err := store.MarkDocumentDone(context.Background(), document.ID, dir, "Test Book", "Test Author", nil); err != nil {
 		t.Fatal(err)
 	}
 	for _, h := range []domain.Highlight{
-		{JobID: job.ID, StartBlockID: "ch0-p-1", EndBlockID: "ch0-p-1", Chapter: 0, Text: "HIGHLIGHT_ZERO"},
-		{JobID: job.ID, StartBlockID: "ch1-p-1", EndBlockID: "ch1-p-1", Chapter: 1, Text: "HIGHLIGHT_ONE"},
+		{DocumentID: document.ID, StartBlockID: "ch0-p-1", EndBlockID: "ch0-p-1", Chapter: 0, Text: "HIGHLIGHT_ZERO"},
+		{DocumentID: document.ID, StartBlockID: "ch1-p-1", EndBlockID: "ch1-p-1", Chapter: 1, Text: "HIGHLIGHT_ONE"},
 	} {
 		if _, err := store.CreateHighlight(context.Background(), h); err != nil {
 			t.Fatal(err)
@@ -388,7 +388,7 @@ func TestReadDocument_EPUB_OnlyLoadsCurrentChapterHighlights(t *testing.T) {
 	mux, _ := newTestMux(t, store)
 
 	rec := httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?chapter=1", nil))
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?chapter=1", nil))
 	if rec.Code != http.StatusOK {
 		t.Fatalf("expected 200, got %d", rec.Code)
 	}
@@ -401,7 +401,7 @@ func TestReadDocument_EPUB_OnlyLoadsCurrentChapterHighlights(t *testing.T) {
 	}
 
 	rec = httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?full=1", nil))
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?full=1", nil))
 	body = rec.Body.String()
 	if !strings.Contains(body, "HIGHLIGHT_ZERO") || !strings.Contains(body, "HIGHLIGHT_ONE") {
 		t.Errorf("full view should load every highlight")

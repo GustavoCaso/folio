@@ -18,18 +18,18 @@ func TestWithTx_CommitsOnSuccess(t *testing.T) {
 	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
-	var created domain.Job
+	var created domain.Document
 
 	err = database.WithTx(ctx, func(ctx context.Context, tx repository.Store) error {
 		var err error
-		created, err = tx.CreateJob(ctx, "book.epub", content, "req-1", domain.EpubFormat)
+		created, err = tx.CreateDocument(ctx, "book.epub", content, "req-1", domain.EpubFormat)
 		return err
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 
-	got, err := database.GetJob(ctx, created.ID)
+	got, err := database.GetDocument(ctx, created.ID)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -46,23 +46,23 @@ func TestWithTx_RollsBackOnError(t *testing.T) {
 	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
-	var jobID string
+	var documentID string
 
 	err = database.WithTx(ctx, func(ctx context.Context, tx repository.Store) error {
-		job, err := tx.CreateJob(ctx, "book.epub", content, "req-1", domain.EpubFormat)
+		document, err := tx.CreateDocument(ctx, "book.epub", content, "req-1", domain.EpubFormat)
 		if err != nil {
 			return err
 		}
-		jobID = job.ID
+		documentID = document.ID
 		return errors.New("something went wrong")
 	})
 	if err == nil {
 		t.Fatal("expected error, got nil")
 	}
 
-	_, err = database.GetJob(ctx, jobID)
+	_, err = database.GetDocument(ctx, documentID)
 	if err == nil {
-		t.Fatal("expected job to be absent after rollback, got nil error")
+		t.Fatal("expected document to be absent after rollback, got nil error")
 	}
 }
 
@@ -74,18 +74,18 @@ func TestWithTx_MultipleOpsAtomic(t *testing.T) {
 	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
-	var jobID string
+	var documentID string
 
-	// Transaction creates a job and a highlight; fails after the highlight —
+	// Transaction creates a document and a highlight; fails after the highlight —
 	// both should be rolled back.
 	err = database.WithTx(ctx, func(ctx context.Context, tx repository.Store) error {
-		job, err := tx.CreateJob(ctx, "book.epub", content, "req-1", domain.EpubFormat)
+		document, err := tx.CreateDocument(ctx, "book.epub", content, "req-1", domain.EpubFormat)
 		if err != nil {
 			return err
 		}
-		jobID = job.ID
+		documentID = document.ID
 		if _, err := tx.CreateHighlight(ctx, domain.Highlight{
-			JobID: job.ID, StartBlockID: "p-1", EndBlockID: "p-1",
+			DocumentID: document.ID, StartBlockID: "p-1", EndBlockID: "p-1",
 			StartPos: 0, EndPos: 5, Text: "hello",
 		}); err != nil {
 			return err
@@ -96,9 +96,9 @@ func TestWithTx_MultipleOpsAtomic(t *testing.T) {
 		t.Fatal("expected error, got nil")
 	}
 
-	_, err = database.GetJob(ctx, jobID)
+	_, err = database.GetDocument(ctx, documentID)
 	if err == nil {
-		t.Fatal("expected job to be absent after rollback")
+		t.Fatal("expected document to be absent after rollback")
 	}
 }
 
