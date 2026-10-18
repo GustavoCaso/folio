@@ -3,6 +3,8 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"strconv"
+	"strings"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
@@ -18,6 +20,24 @@ type createHighlightRequest struct {
 	Text         string `json:"text"`
 	Tag          string `json:"tag"`
 	Note         string `json:"note"`
+}
+
+// chapterFromBlockID parses N from a ch{N}-{tag}-{M} block ID (ADR 0001).
+// IDs without that prefix fall back to chapter 0.
+func chapterFromBlockID(blockID string) int {
+	rest, ok := strings.CutPrefix(blockID, "ch")
+	if !ok {
+		return 0
+	}
+	n, _, ok := strings.Cut(rest, "-")
+	if !ok {
+		return 0
+	}
+	chapter, err := strconv.Atoi(n)
+	if err != nil {
+		return 0
+	}
+	return chapter
 }
 
 func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
@@ -36,6 +56,7 @@ func (h *Handlers) CreateHighlight(w http.ResponseWriter, r *http.Request) {
 		JobID:        req.JobID,
 		StartBlockID: req.StartBlockID,
 		EndBlockID:   req.EndBlockID,
+		Chapter:      chapterFromBlockID(req.StartBlockID),
 		StartPos:     req.StartPos,
 		EndPos:       req.EndPos,
 		Text:         req.Text,

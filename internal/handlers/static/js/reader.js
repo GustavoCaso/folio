@@ -122,8 +122,8 @@ export function wrapRangeTextNodes(range, className, dataset) {
 
 // Render a stored highlight onto the DOM.
 export function applyHighlight(reader, h) {
-  const startBlockID = h.StartBlockID;
-  const endBlockID = h.EndBlockID;
+  const startBlockID = h.start_block_id;
+  const endBlockID = h.end_block_id;
   const startBlock = reader.querySelector(`[data-block-id="${startBlockID}"]`);
   const endBlock = reader.querySelector(`[data-block-id="${endBlockID}"]`);
   if (!startBlock || !endBlock) {
@@ -131,8 +131,8 @@ export function applyHighlight(reader, h) {
     return;
   }
 
-  const startAnchor = getAnchorNode(startBlock, h.StartPos);
-  const endAnchor = getAnchorNode(endBlock, h.EndPos);
+  const startAnchor = getAnchorNode(startBlock, h.start_pos);
+  const endAnchor = getAnchorNode(endBlock, h.end_pos);
 
   if (!startAnchor || !endAnchor) {
     console.log('[highlight.js] skipping highlight. no node to anchor at');
@@ -148,28 +148,11 @@ export function applyHighlight(reader, h) {
     return;
   }
 
-  wrapRangeTextNodes(range, "highlight", { highlightId: h.ID });
+  wrapRangeTextNodes(range, "highlight", { highlightId: h.id });
 }
 
 export function applyHighlights(reader, highlights) {
   highlights.forEach((h) => applyHighlight(reader, h));
-}
-
-// Filters highlights down to those belonging to the currently viewed epub
-// chapter. Reads #reader's own data-current-chapter attribute (set by
-// reader.templ's currentChapterAttr):
-//   - absent entirely: not a reader page — pass through all highlights.
-//   - "-1": full-book view — no single-chapter restriction, pass through all highlights.
-//   - "N": single-chapter view — keep only highlights whose start_block_id starts
-//     with "chN-" (epubrender's chapter-prefixed block ID scheme).
-export function filterHighlightsByChapter(reader, highlights) {
-  if (!highlights) return highlights;
-
-  const chapterIdx = reader.dataset.currentChapter;
-  if (chapterIdx === undefined || chapterIdx === "-1") return highlights;
-
-  const prefix = `ch${chapterIdx}-`;
-  return highlights.filter((h) => h.start_block_id && h.start_block_id.startsWith(prefix));
 }
 
 // Convert a DOM Range endpoint (node + nodeOffset) into a character position.
@@ -207,8 +190,8 @@ export function offsetWithinBlock(block, targetNode, targetOffset) {
 
 export function formatHighlight(h) {
   if (!h) return "(no annotation)";
-  if (h.Tag && h.Note) return h.Tag + ": " + h.Note;
-  return h.Tag || h.Note || "(no annotation)";
+  if (h.tag && h.note) return h.tag + ": " + h.note;
+  return h.tag || h.note || "(no annotation)";
 }
 
 function showTooltip(rect, text) {
@@ -476,9 +459,9 @@ function bootstrap() {
   let pendingSelection = null;
   let popoverOpen = false;
   let suppressNextClick = false;
-  const filteredHighlights = filterHighlightsByChapter(reader, highlights);
-  if (filteredHighlights != null && filteredHighlights.length > 0) {
-    applyHighlights(reader, filteredHighlights);
+  // The server only sends the current chapter's highlights (or all of them in full view).
+  if (highlights != null && highlights.length > 0) {
+    applyHighlights(reader, highlights);
     console.log('[highlight.js] Highlights applied')
   }
 
@@ -531,7 +514,7 @@ function bootstrap() {
     reader.addEventListener("click", (e) => {
       const mark = e.target.closest("mark.highlight");
       if (!mark) return;
-      const h = highlights.find(x => String(x.ID) === mark.dataset.highlightId);
+      const h = highlights.find(x => String(x.id) === mark.dataset.highlightId);
       showTooltip(mark.getBoundingClientRect(), formatHighlight(h));
     });
 

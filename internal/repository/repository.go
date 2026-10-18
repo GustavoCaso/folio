@@ -23,6 +23,7 @@ type JobRepository interface {
 type HighlightRepository interface {
 	CreateHighlight(ctx context.Context, h domain.Highlight) (domain.Highlight, error)
 	ListHighlights(ctx context.Context, jobID string) ([]domain.Highlight, error)
+	ListChapterHighlights(ctx context.Context, jobID string, chapter int) ([]domain.Highlight, error)
 	DeleteHighlight(ctx context.Context, id string) error
 }
 

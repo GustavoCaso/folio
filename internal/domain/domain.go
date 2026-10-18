@@ -27,16 +27,17 @@ type Job struct {
 }
 
 type Highlight struct {
-	ID           string
-	JobID        string
-	StartBlockID string
-	EndBlockID   string
-	StartPos     int
-	EndPos       int
-	Text         string
-	Tag          string
-	Note         string
-	CreatedAt    time.Time
+	ID           string    `json:"id"`
+	JobID        string    `json:"job_id"`
+	StartBlockID string    `json:"start_block_id"`
+	EndBlockID   string    `json:"end_block_id"`
+	Chapter      int       `json:"chapter"`
+	StartPos     int       `json:"start_pos"`
+	EndPos       int       `json:"end_pos"`
+	Text         string    `json:"text"`
+	Tag          string    `json:"tag"`
+	Note         string    `json:"note"`
+	CreatedAt    time.Time `json:"created_at"`
 }
 
 type ExportRecord struct {

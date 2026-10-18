@@ -355,3 +355,55 @@ func TestReadDocument_EPUB_MissingChapterFile(t *testing.T) {
 		t.Errorf("expected 'Failed to read document' in response, got:\n%s", rec.Body.String())
 	}
 }
+
+func TestReadDocument_EPUB_OnlyLoadsCurrentChapterHighlights(t *testing.T) {
+	dir := t.TempDir()
+	if err := os.WriteFile(filepath.Join(dir, "chapter-0.html"), []byte(`<p data-block-id="ch0-p-1">Chapter zero</p>`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "chapter-1.html"), []byte(`<p data-block-id="ch1-p-1">Chapter one</p>`), 0644); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(dir, "toc.json"), []byte(`[]`), 0644); err != nil {
+		t.Fatal(err)
+	}
+
+	store := newTestStore(t)
+	job, err := store.CreateJob(context.Background(), "book.epub", []byte{}, "", "epub")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkJobDone(context.Background(), job.ID, dir, "Test Book", "Test Author", nil); err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range []domain.Highlight{
+		{JobID: job.ID, StartBlockID: "ch0-p-1", EndBlockID: "ch0-p-1", Chapter: 0, Text: "HIGHLIGHT_ZERO"},
+		{JobID: job.ID, StartBlockID: "ch1-p-1", EndBlockID: "ch1-p-1", Chapter: 1, Text: "HIGHLIGHT_ONE"},
+	} {
+		if _, err := store.CreateHighlight(context.Background(), h); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	mux, _ := newTestMux(t, store)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?chapter=1", nil))
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	body := rec.Body.String()
+	if !strings.Contains(body, "HIGHLIGHT_ONE") {
+		t.Errorf("expected chapter 1 highlight in response")
+	}
+	if strings.Contains(body, "HIGHLIGHT_ZERO") {
+		t.Errorf("chapter 0 highlight should not be loaded for chapter=1")
+	}
+
+	rec = httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/read/"+job.ID+"?full=1", nil))
+	body = rec.Body.String()
+	if !strings.Contains(body, "HIGHLIGHT_ZERO") || !strings.Contains(body, "HIGHLIGHT_ONE") {
+		t.Errorf("full view should load every highlight")
+	}
+}

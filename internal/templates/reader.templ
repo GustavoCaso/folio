@@ -270,9 +270,8 @@ templ epubSidebarTrigger() {
 }
 
 // currentChapterAttr renders the value for #reader's data-current-chapter
-// attribute: "-1" in full-book view (no single current chapter, matching the
-// existing -1 convention filterHighlightsByChapter already uses in
-// reader.js), otherwise the chapter index. reader.js's TOC scroll tracker
+// attribute: "-1" in full-book view (no single current chapter), otherwise
+// the chapter index. reader.js's TOC scroll tracker
 // reads this to know which chapter's headings to watch.
 func currentChapterAttr(currentChapterIdx int, full bool) string {
 	if full {

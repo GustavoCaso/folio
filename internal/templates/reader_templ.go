@@ -1015,9 +1015,8 @@ func epubSidebarTrigger() templ.Component {
 }
 
 // currentChapterAttr renders the value for #reader's data-current-chapter
-// attribute: "-1" in full-book view (no single current chapter, matching the
-// existing -1 convention filterHighlightsByChapter already uses in
-// reader.js), otherwise the chapter index. reader.js's TOC scroll tracker
+// attribute: "-1" in full-book view (no single current chapter), otherwise
+// the chapter index. reader.js's TOC scroll tracker
 // reads this to know which chapter's headings to watch.
 func currentChapterAttr(currentChapterIdx int, full bool) string {
 	if full {
@@ -1246,7 +1245,7 @@ func readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Hig
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(job.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 336, Col: 40}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 40}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1259,7 +1258,7 @@ func readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Hig
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(job.ReadingProgress)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 336, Col: 86}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 86}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
@@ -1272,7 +1271,7 @@ func readerEpubBody(job domain.Job, renderedHTML string, highlights []domain.Hig
 		var templ_7745c5c3_Var48 string
 		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(currentChapterAttr(currentChapterIdx, full))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 336, Col: 155}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 155}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
