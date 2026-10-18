@@ -74,11 +74,11 @@ func TestCreateHighlight_HappyPath(t *testing.T) {
 	if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
 		t.Fatalf("could not decode response: %v", err)
 	}
-	if got["ID"] == "" || got["ID"] == nil {
-		t.Errorf("expected non-empty ID in response, got %v", got)
+	if got["id"] == "" || got["id"] == nil {
+		t.Errorf("expected non-empty id in response, got %v", got)
 	}
-	if got["Text"] != "hello" {
-		t.Errorf("expected Text=hello, got %v", got["Text"])
+	if got["text"] != "hello" {
+		t.Errorf("expected text=hello, got %v", got["text"])
 	}
 }
 
@@ -158,5 +158,46 @@ func TestDeleteHighlight_UnknownID_ReturnsErrorToast(t *testing.T) {
 	}
 	if !strings.Contains(rec.Body.String(), "Fail to delete highlight") {
 		t.Errorf("expected error toast in response, got:\n%s", rec.Body.String())
+	}
+}
+
+func TestCreateHighlight_DerivesChapterFromStartBlockID(t *testing.T) {
+	cases := map[string]int{
+		"ch0-p-1":     0,
+		"ch12-h2-3":   12,
+		"paragraph-1": 0,
+	}
+	for blockID, want := range cases {
+		t.Run(blockID, func(t *testing.T) {
+			store := newTestStore(t)
+			job, err := store.CreateJob(context.Background(), "doc.epub", []byte{}, "req-1", domain.EpubFormat)
+			if err != nil {
+				t.Fatal(err)
+			}
+			body, _ := json.Marshal(map[string]any{
+				"job_id":         job.ID,
+				"start_block_id": blockID,
+				"end_block_id":   blockID,
+				"start_pos":      0,
+				"end_pos":        1,
+				"text":           "x",
+			})
+			req := httptest.NewRequest(http.MethodPost, "/highlights", bytes.NewReader(body))
+			req.Header.Set("Content-Type", "application/json")
+			rec := httptest.NewRecorder()
+			mux, _ := newTestMux(t, store)
+			mux.ServeHTTP(rec, req)
+
+			if rec.Code != http.StatusCreated {
+				t.Fatalf("expected 201, got %d: %s", rec.Code, rec.Body.String())
+			}
+			var got domain.Highlight
+			if err := json.NewDecoder(rec.Body).Decode(&got); err != nil {
+				t.Fatal(err)
+			}
+			if got.Chapter != want {
+				t.Errorf("expected chapter %d, got %d", want, got.Chapter)
+			}
+		})
 	}
 }

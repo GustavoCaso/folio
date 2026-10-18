@@ -91,7 +91,12 @@ func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, job d
 		return
 	}
 
-	highlights, err := h.store.ListHighlights(r.Context(), job.ID)
+	var highlights []domain.Highlight
+	if full {
+		highlights, err = h.store.ListHighlights(r.Context(), job.ID)
+	} else {
+		highlights, err = h.store.ListChapterHighlights(r.Context(), job.ID, chapterIdx)
+	}
 	if err != nil {
 		log.Error("list highlights failed", logging.Err(err))
 		renderErr(http.StatusInternalServerError, "Failed to load highlights. Please try again.")

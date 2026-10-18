@@ -13,18 +13,28 @@ func (d *db) CreateHighlight(ctx context.Context, h domain.Highlight) (domain.Hi
 	h.ID = uuid.NewString()
 	h.CreatedAt = time.Now().UTC()
 	_, err := d.conn.ExecContext(ctx,
-		`INSERT INTO highlights (id, job_id, start_block_id, end_block_id, start_pos, end_pos, text, tag, note, created_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		h.ID, h.JobID, h.StartBlockID, h.EndBlockID, h.StartPos, h.EndPos, h.Text, h.Tag, h.Note,
+		`INSERT INTO highlights (id, job_id, start_block_id, end_block_id, chapter, start_pos, end_pos, text, tag, note, created_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		h.ID, h.JobID, h.StartBlockID, h.EndBlockID, h.Chapter, h.StartPos, h.EndPos, h.Text, h.Tag, h.Note,
 		h.CreatedAt.Format(time.RFC3339),
 	)
 	return h, err
 }
 
 func (d *db) ListHighlights(ctx context.Context, jobID string) ([]domain.Highlight, error) {
-	rows, err := d.conn.QueryContext(ctx,
-		`SELECT id, job_id, start_block_id, end_block_id, start_pos, end_pos, text, tag, note, created_at
+	return d.queryHighlights(ctx,
+		`SELECT id, job_id, start_block_id, end_block_id, chapter, start_pos, end_pos, text, tag, note, created_at
 		 FROM highlights WHERE job_id = ? ORDER BY created_at ASC`, jobID)
+}
+
+func (d *db) ListChapterHighlights(ctx context.Context, jobID string, chapter int) ([]domain.Highlight, error) {
+	return d.queryHighlights(ctx,
+		`SELECT id, job_id, start_block_id, end_block_id, chapter, start_pos, end_pos, text, tag, note, created_at
+		 FROM highlights WHERE job_id = ? AND chapter = ? ORDER BY created_at ASC`, jobID, chapter)
+}
+
+func (d *db) queryHighlights(ctx context.Context, query string, args ...any) ([]domain.Highlight, error) {
+	rows, err := d.conn.QueryContext(ctx, query, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -34,7 +44,7 @@ func (d *db) ListHighlights(ctx context.Context, jobID string) ([]domain.Highlig
 	for rows.Next() {
 		var h domain.Highlight
 		var createdAt string
-		if err := rows.Scan(&h.ID, &h.JobID, &h.StartBlockID, &h.EndBlockID, &h.StartPos, &h.EndPos,
+		if err := rows.Scan(&h.ID, &h.JobID, &h.StartBlockID, &h.EndBlockID, &h.Chapter, &h.StartPos, &h.EndPos,
 			&h.Text, &h.Tag, &h.Note, &createdAt); err != nil {
 			return nil, err
 		}

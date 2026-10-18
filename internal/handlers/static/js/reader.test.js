@@ -5,7 +5,6 @@ import {
   buildPendingSelection,
   calcPopoverPosition,
   computeProgress,
-  filterHighlightsByChapter,
   findBlockAncestor,
   firstVisibleBlockID,
   formatHighlight,
@@ -53,11 +52,11 @@ describe("applyHighlight with images in the block", () => {
     // "before"(6) + img(1) + "after"(5) = 11
     // chars 3..10 → "ore" + img + "aft"
     applyHighlight(reader, {
-      ID: "h1",
-      StartBlockID: "p-1",
-      EndBlockID: "p-1",
-      StartPos: 3,
-      EndPos: 10,
+      id: "h1",
+      start_block_id: "p-1",
+      end_block_id: "p-1",
+      start_pos: 3,
+      end_pos: 10,
     });
 
     const marks = reader.querySelectorAll("mark.highlight");
@@ -75,11 +74,11 @@ describe("applyHighlight with images in the block", () => {
   it("highlighting just the image wraps only the image", () => {
     // img at offsets [6, 7]
     applyHighlight(reader, {
-      ID: "h1",
-      StartBlockID: "p-1",
-      EndBlockID: "p-1",
-      StartPos: 6,
-      EndPos: 7,
+      id: "h1",
+      start_block_id: "p-1",
+      end_block_id: "p-1",
+      start_pos: 6,
+      end_pos: 7,
     });
     const marks = reader.querySelectorAll("mark.highlight");
     expect(marks.length).toBe(1);
@@ -89,11 +88,11 @@ describe("applyHighlight with images in the block", () => {
 
   it("preserves the image element in the DOM", () => {
     applyHighlight(reader, {
-      ID: "h1",
-      StartBlockID: "p-1",
-      EndBlockID: "p-1",
-      StartPos: 0,
-      EndPos: 12,
+      id: "h1",
+      start_block_id: "p-1",
+      end_block_id: "p-1",
+      start_pos: 0,
+      end_pos: 12,
     });
     expect(reader.querySelectorAll("img").length).toBe(1);
   });
@@ -103,11 +102,11 @@ describe("applyHighlight with simple text", () => {
   it("wraps a contiguous range in a single mark", () => {
     const reader = makeReader(`<p data-block-id="p-1">hello world</p>`);
     applyHighlight(reader, {
-      ID: "h1",
-      StartBlockID: "p-1",
-      EndBlockID: "p-1",
-      StartPos: 0,
-      EndPos: 5,
+      id: "h1",
+      start_block_id: "p-1",
+      end_block_id: "p-1",
+      start_pos: 0,
+      end_pos: 5,
     });
     const marks = reader.querySelectorAll("mark.highlight");
     expect(marks.length).toBe(1);
@@ -117,13 +116,13 @@ describe("applyHighlight with simple text", () => {
   it("does not set title attribute on mark (tooltip is handled via JS click)", () => {
     const reader = makeReader(`<p data-block-id="p-1">hello</p>`);
     applyHighlight(reader, {
-      ID: "h1",
-      StartBlockID: "p-1",
-      EndBlockID: "p-1",
-      StartPos: 0,
-      EndPos: 5,
-      Tag: "important",
-      Note: "remember this",
+      id: "h1",
+      start_block_id: "p-1",
+      end_block_id: "p-1",
+      start_pos: 0,
+      end_pos: 5,
+      tag: "important",
+      note: "remember this",
     });
     const mark = reader.querySelector("mark.highlight");
     expect(mark.title).toBe("");
@@ -132,11 +131,11 @@ describe("applyHighlight with simple text", () => {
   it("does nothing when block-id is missing", () => {
     const reader = makeReader(`<p data-block-id="p-1">hi</p>`);
     applyHighlight(reader, {
-      ID: "h1",
-      StartBlockID: "missing",
-      EndBlockID: "missing",
-      StartPos: 0,
-      EndPos: 1,
+      id: "h1",
+      start_block_id: "missing",
+      end_block_id: "missing",
+      start_pos: 0,
+      end_pos: 1,
     });
     expect(reader.querySelectorAll("mark").length).toBe(0);
   });
@@ -151,11 +150,11 @@ describe("applyHighlight across multiple blocks", () => {
     );
     // start at "world" (offset 6 in p-1), end at "end" (offset 3 in p-3)
     applyHighlight(reader, {
-      ID: "h1",
-      StartBlockID: "p-1",
-      EndBlockID: "p-3",
-      StartPos: 6,
-      EndPos: 3,
+      id: "h1",
+      start_block_id: "p-1",
+      end_block_id: "p-3",
+      start_pos: 6,
+      end_pos: 3,
     });
     const marks = reader.querySelectorAll("mark.highlight");
     expect(marks.length).toBe(3);
@@ -171,11 +170,11 @@ describe("applyHighlight across multiple blocks", () => {
       `<p data-block-id="p-3">end</p>`,
     );
     applyHighlight(reader, {
-      ID: "h1",
-      StartBlockID: "p-1",
-      EndBlockID: "p-3",
-      StartPos: 0,
-      EndPos: 3,
+      id: "h1",
+      start_block_id: "p-1",
+      end_block_id: "p-3",
+      start_pos: 0,
+      end_pos: 3,
     });
     const marks = reader.querySelectorAll("mark.highlight");
     // p-1: "hello" (1) + p-2: "a"(1) + img(1) + "b"(1) = 3 + p-3: "end"(1) = 5
@@ -190,8 +189,8 @@ describe("applyHighlights", () => {
       `<p data-block-id="p-1">hello world</p><p data-block-id="p-2">foo bar</p>`,
     );
     applyHighlights(reader, [
-      { ID: "h1", StartBlockID: "p-1", EndBlockID: "p-1", StartPos: 0, EndPos: 5 },
-      { ID: "h2", StartBlockID: "p-2", EndBlockID: "p-2", StartPos: 4, EndPos: 7 },
+      { id: "h1", start_block_id: "p-1", end_block_id: "p-1", start_pos: 0, end_pos: 5 },
+      { id: "h2", start_block_id: "p-2", end_block_id: "p-2", start_pos: 4, end_pos: 7 },
     ]);
     expect(reader.querySelectorAll("mark.highlight").length).toBe(2);
   });
@@ -199,19 +198,19 @@ describe("applyHighlights", () => {
 
 describe("formatHighlight", () => {
   it("returns tag and note joined when both present", () => {
-    expect(formatHighlight({ Tag: "important", Note: "remember this" })).toBe("important: remember this");
+    expect(formatHighlight({ tag: "important", note: "remember this" })).toBe("important: remember this");
   });
 
   it("returns tag alone when note is absent", () => {
-    expect(formatHighlight({ Tag: "important", Note: "" })).toBe("important");
+    expect(formatHighlight({ tag: "important", note: "" })).toBe("important");
   });
 
   it("returns note alone when tag is absent", () => {
-    expect(formatHighlight({ Tag: "", Note: "remember this" })).toBe("remember this");
+    expect(formatHighlight({ tag: "", note: "remember this" })).toBe("remember this");
   });
 
   it("returns fallback when both are absent", () => {
-    expect(formatHighlight({ Tag: "", Note: "" })).toBe("(no annotation)");
+    expect(formatHighlight({ tag: "", note: "" })).toBe("(no annotation)");
   });
 
   it("returns fallback for null/undefined highlight", () => {
@@ -571,59 +570,6 @@ describe("buildPendingSelection", () => {
       end_pos: 3,
       text: "llo\nwor",
     });
-  });
-});
-
-describe("filterHighlightsByChapter", () => {
-  const highlights = [
-    { ID: "h1", start_block_id: "ch0-p-1" },
-    { ID: "h2", start_block_id: "ch1-p-2" },
-    { ID: "h3", start_block_id: "ch1-h1-1" },
-  ];
-
-  it("returns only highlights whose start_block_id matches the current chapter prefix", () => {
-    const reader = makeReader(`<p data-block-id="ch1-p-2">hi</p>`);
-    reader.dataset.currentChapter = "1";
-    const filtered = filterHighlightsByChapter(reader, highlights);
-    expect(filtered.map((h) => h.ID)).toEqual(["h2", "h3"]);
-  });
-
-  it("returns all highlights unfiltered when data-current-chapter is -1 (full view)", () => {
-    const reader = makeReader(``);
-    reader.dataset.currentChapter = "-1";
-    const filtered = filterHighlightsByChapter(reader, highlights);
-    expect(filtered).toEqual(highlights);
-  });
-
-  it("returns all highlights unfiltered when no data-current-chapter attribute is present", () => {
-    const reader = makeReader(`<p data-block-id="paragraph-1">hi</p>`);
-    const filtered = filterHighlightsByChapter(reader, highlights);
-    expect(filtered).toEqual(highlights);
-  });
-
-  it("excludes highlights whose start_block_id doesn't match the ch{N}- prefix pattern", () => {
-    const reader = makeReader(``);
-    reader.dataset.currentChapter = "0";
-    const mixed = [
-      { ID: "h1", start_block_id: "ch0-p-1" },
-      { ID: "h2", start_block_id: "paragraph-3" },
-    ];
-    const filtered = filterHighlightsByChapter(reader, mixed);
-    expect(filtered.map((h) => h.ID)).toEqual(["h1"]);
-  });
-
-  it("returns null unchanged when highlights is null", () => {
-    const reader = makeReader(``);
-    reader.dataset.currentChapter = "1";
-    const filtered = filterHighlightsByChapter(reader, null);
-    expect(filtered).toBeNull();
-  });
-
-  it("returns undefined unchanged when highlights is undefined", () => {
-    const reader = makeReader(``);
-    reader.dataset.currentChapter = "1";
-    const filtered = filterHighlightsByChapter(reader, undefined);
-    expect(filtered).toBeUndefined();
   });
 });
 

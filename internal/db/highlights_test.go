@@ -88,3 +88,47 @@ func TestDeleteHighlight_NotFound(t *testing.T) {
 		t.Fatal("expected an error when deleting a non-existent highlight, got nil")
 	}
 }
+
+func TestListChapterHighlights(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+
+	ctx := context.Background()
+	job, err := database.CreateJob(ctx, "book.epub", content, "", domain.EpubFormat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, h := range []domain.Highlight{
+		{JobID: job.ID, StartBlockID: "ch0-p-1", EndBlockID: "ch0-p-1", Chapter: 0, Text: "zero"},
+		{JobID: job.ID, StartBlockID: "ch1-p-1", EndBlockID: "ch1-p-1", Chapter: 1, Text: "one"},
+		{JobID: job.ID, StartBlockID: "ch1-p-4", EndBlockID: "ch1-p-5", Chapter: 1, Text: "one again"},
+	} {
+		if _, err := database.CreateHighlight(ctx, h); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	got, err := database.ListChapterHighlights(ctx, job.ID, 1)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(got) != 2 {
+		t.Fatalf("expected 2 chapter-1 highlights, got %d", len(got))
+	}
+	for _, h := range got {
+		if h.Chapter != 1 {
+			t.Errorf("expected chapter 1, got %d for %q", h.Chapter, h.Text)
+		}
+	}
+
+	all, err := database.ListHighlights(ctx, job.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(all) != 3 {
+		t.Fatalf("expected 3 highlights in total, got %d", len(all))
+	}
+}
