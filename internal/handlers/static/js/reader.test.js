@@ -595,7 +595,7 @@ describe("filterHighlightsByChapter", () => {
     expect(filtered).toEqual(highlights);
   });
 
-  it("returns all highlights unfiltered when no data-current-chapter attribute is present (pdf/markdown)", () => {
+  it("returns all highlights unfiltered when no data-current-chapter attribute is present", () => {
     const reader = makeReader(`<p data-block-id="paragraph-1">hi</p>`);
     const filtered = filterHighlightsByChapter(reader, highlights);
     expect(filtered).toEqual(highlights);

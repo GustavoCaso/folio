@@ -28,7 +28,7 @@ func TestReadDocument_NotFound(t *testing.T) {
 
 func TestReadDocument_JobPending_NotReady(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "pending.pdf", []byte{}, "", domain.PdfFormat)
+	job, err := store.CreateJob(context.Background(), "pending.epub", []byte{}, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -48,7 +48,7 @@ func TestReadDocument_JobPending_NotReady(t *testing.T) {
 
 func TestReadDocument_JobFailed(t *testing.T) {
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "broken.pdf", []byte{}, "", domain.PdfFormat)
+	job, err := store.CreateJob(context.Background(), "broken.epub", []byte{}, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,42 +69,14 @@ func TestReadDocument_JobFailed(t *testing.T) {
 	}
 }
 
-func TestReadDocument_MarkdownFileMissing(t *testing.T) {
-	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "gone.pdf", []byte{}, "", domain.PdfFormat)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := store.MarkJobDone(context.Background(), job.ID, "/nonexistent/path/gone.md", "", "", nil); err != nil {
-		t.Fatal(err)
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/read/"+job.ID, nil)
-	rec := httptest.NewRecorder()
-	mux, _ := newTestMux(t, store)
-	mux.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusInternalServerError {
-		t.Errorf("expected 500, got %d", rec.Code)
-	}
-	if !strings.Contains(rec.Body.String(), "Failed to read document") {
-		t.Errorf("expected 'Failed to read document' in response, got:\n%s", rec.Body.String())
-	}
-}
-
-func TestReadDocument_HappyPath(t *testing.T) {
+func TestReadDocument_UnsupportedFormat(t *testing.T) {
 	dir := t.TempDir()
-	mdPath := filepath.Join(dir, "doc.md")
-	if err := os.WriteFile(mdPath, []byte("# Hello\n\nWorld paragraph."), 0644); err != nil {
-		t.Fatal(err)
-	}
-
 	store := newTestStore(t)
-	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "", domain.PdfFormat)
+	job, err := store.CreateJob(context.Background(), "doc.pdf", []byte{}, "", domain.JobFormat("pdf"))
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := store.MarkJobDone(context.Background(), job.ID, mdPath, "", "", nil); err != nil {
+	if err := store.MarkJobDone(context.Background(), job.ID, filepath.Join(dir, "doc.md"), "", "", nil); err != nil {
 		t.Fatal(err)
 	}
 
@@ -113,18 +85,11 @@ func TestReadDocument_HappyPath(t *testing.T) {
 	mux, _ := newTestMux(t, store)
 	mux.ServeHTTP(rec, req)
 
-	if rec.Code != http.StatusOK {
-		t.Errorf("expected 200, got %d", rec.Code)
+	if rec.Code != http.StatusUnprocessableEntity {
+		t.Errorf("expected 422, got %d", rec.Code)
 	}
-	got := rec.Body.String()
-	if !strings.Contains(got, "Hello") {
-		t.Errorf("expected rendered heading in response, got:\n%s", got)
-	}
-	if !strings.Contains(got, "World paragraph") {
-		t.Errorf("expected rendered paragraph in response, got:\n%s", got)
-	}
-	if strings.Contains(got, `class="error-banner"`) {
-		t.Errorf("unexpected error banner in successful reader response")
+	if !strings.Contains(rec.Body.String(), "Unsupported document format") {
+		t.Errorf("expected 'Unsupported document format' in response, got:\n%s", rec.Body.String())
 	}
 }
 

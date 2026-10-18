@@ -18,7 +18,7 @@ func TestCreateAndGetJob(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, err := database.CreateJob(context.Background(), "book.pdf", content, "req-123", domain.PdfFormat)
+	job, err := database.CreateJob(context.Background(), "book.epub", content, "req-123", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -39,8 +39,8 @@ func TestCreateAndGetJob(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if got.Filename != "book.pdf" {
-		t.Fatalf("expected book.pdf, got %s", got.Filename)
+	if got.Filename != "book.epub" {
+		t.Fatalf("expected book.epub, got %s", got.Filename)
 	}
 	if got.RequestID != "req-123" {
 		t.Fatalf("expected request_id req-123 after read, got %q", got.RequestID)
@@ -57,12 +57,12 @@ func TestCreateJob_DefaultsFormatToPDF(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, err := database.CreateJob(context.Background(), "book.pdf", content, "req-1", domain.PdfFormat)
+	job, err := database.CreateJob(context.Background(), "book.epub", content, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatalf("CreateJob: %v", err)
 	}
-	if job.Format != domain.PdfFormat {
-		t.Errorf("Format = %q, want %q", job.Format, domain.PdfFormat)
+	if job.Format != domain.EpubFormat {
+		t.Errorf("Format = %q, want %q", job.Format, domain.EpubFormat)
 	}
 }
 
@@ -73,7 +73,7 @@ func TestUpdateJobStatus(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, err := database.CreateJob(context.Background(), "book.pdf", content, "", domain.PdfFormat)
+	job, err := database.CreateJob(context.Background(), "book.epub", content, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -94,7 +94,7 @@ func TestUpdateReadingProgress(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "", domain.PdfFormat)
+	job, _ := database.CreateJob(context.Background(), "book.epub", content, "", domain.EpubFormat)
 	if err := database.UpdateReadingProgress(context.Background(), job.ID, "paragraph-42"); err != nil {
 		t.Fatal(err)
 	}
@@ -114,11 +114,11 @@ func TestGetPendingJobs(t *testing.T) {
 
 	ctx := context.Background()
 
-	pending1, _ := database.CreateJob(ctx, "a.pdf", content, "", domain.PdfFormat)
-	pending2, _ := database.CreateJob(ctx, "b.pdf", content, "", domain.PdfFormat)
-	processing, _ := database.CreateJob(ctx, "c.pdf", content, "", domain.PdfFormat)
-	done, _ := database.CreateJob(ctx, "d.pdf", content, "", domain.PdfFormat)
-	failed, _ := database.CreateJob(ctx, "e.pdf", content, "", domain.PdfFormat)
+	pending1, _ := database.CreateJob(ctx, "a.epub", content, "", domain.EpubFormat)
+	pending2, _ := database.CreateJob(ctx, "b.epub", content, "", domain.EpubFormat)
+	processing, _ := database.CreateJob(ctx, "c.epub", content, "", domain.EpubFormat)
+	done, _ := database.CreateJob(ctx, "d.epub", content, "", domain.EpubFormat)
+	failed, _ := database.CreateJob(ctx, "e.epub", content, "", domain.EpubFormat)
 
 	if err := database.UpdateJobStatus(ctx, processing.ID, "PROCESSING"); err != nil {
 		t.Fatal(err)
@@ -176,7 +176,7 @@ func TestMarkJobDone(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "", domain.PdfFormat)
+	job, _ := database.CreateJob(context.Background(), "book.epub", content, "", domain.EpubFormat)
 	if len(job.Content) == 0 {
 		t.Fatalf("expected content to not be empty, got %v", job.Content)
 	}
@@ -207,7 +207,7 @@ func TestDeleteJob(t *testing.T) {
 
 	ctx := context.Background()
 
-	job, err := database.CreateJob(ctx, "test.pdf", content, "req-1", domain.PdfFormat)
+	job, err := database.CreateJob(ctx, "test.epub", content, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -230,7 +230,7 @@ func TestMarkJobDonePersistsMetadata(t *testing.T) {
 	defer func() { _ = database.Close() }()
 
 	ctx := context.Background()
-	job, err := database.CreateJob(ctx, "test.pdf", []byte("%PDF"), "req-1", domain.PdfFormat)
+	job, err := database.CreateJob(ctx, "test.epub", []byte("%PDF"), "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -267,7 +267,7 @@ func TestRetryJob(t *testing.T) {
 
 	ctx := context.Background()
 
-	job, err := database.CreateJob(ctx, "test.pdf", content, "req-1", domain.PdfFormat)
+	job, err := database.CreateJob(ctx, "test.epub", content, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}

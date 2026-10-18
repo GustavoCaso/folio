@@ -23,7 +23,6 @@ type Handlers struct {
 	store     repository.Store
 	hub       *hub.Hub
 	converter *converter.Runner
-	dataDir   string
 	backends  []export.Backend
 }
 
@@ -58,7 +57,7 @@ func register(store repository.Store, h *hub.Hub, dataDir string, logger *slog.L
 
 	runner := converter.New(store, h, parsers, logger)
 
-	hs := &Handlers{store: store, hub: h, converter: runner, dataDir: dataDir, backends: backends}
+	hs := &Handlers{store: store, hub: h, converter: runner, backends: backends}
 	mux := http.NewServeMux()
 
 	mux.HandleFunc("GET /", hs.ListDocuments)

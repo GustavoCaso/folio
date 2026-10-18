@@ -73,7 +73,7 @@ func TestListExports_ShowsExportedRecord(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "paper.pdf", []byte{}, "req-1", domain.PdfFormat)
+	job, err := store.CreateJob(ctx, "paper.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestListExports_ShowsExportedRecord(t *testing.T) {
 	if !strings.Contains(body, "some important text") {
 		t.Errorf("expected highlight text in response, got:\n%s", body)
 	}
-	if !strings.Contains(body, "paper.pdf") {
+	if !strings.Contains(body, "paper.epub") {
 		t.Errorf("expected document filename in response, got:\n%s", body)
 	}
 	if !strings.Contains(body, "readwise") {
@@ -131,7 +131,7 @@ func TestListExports_ShowsFailedRecord(t *testing.T) {
 	store := newTestStore(t)
 	ctx := context.Background()
 
-	job, err := store.CreateJob(ctx, "doc.pdf", []byte{}, "req-1", domain.PdfFormat)
+	job, err := store.CreateJob(ctx, "doc.epub", []byte{}, "req-1", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}

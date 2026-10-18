@@ -1,7 +1,6 @@
 // Package epub injects highlight-anchoring block IDs into parsed EPUB
-// chapter HTML and serializes it back to a string, mirroring the
-// data-block-id convention used by the goldmark-based renderer for
-// PDF/Markdown documents (see internal/renderer).
+// chapter HTML and serializes it back to a string, following the
+// data-block-id convention described in ADR 0001.
 package epub
 
 import (
@@ -13,8 +12,7 @@ import (
 )
 
 // blockTags are the element names treated as block-level for highlight
-// anchoring purposes, mirroring the goldmark renderer's set (headings,
-// paragraphs, code blocks, lists, list items).
+// anchoring purposes (headings, paragraphs, code blocks, lists, list items).
 var blockTags = map[string]bool{
 	"h1": true, "h2": true, "h3": true, "h4": true, "h5": true, "h6": true,
 	"p": true, "pre": true, "ul": true, "ol": true, "li": true,

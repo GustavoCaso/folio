@@ -54,7 +54,7 @@ func newWorkerStore(t *testing.T, backendName string) (repository.Store, domain.
 	}
 	t.Cleanup(func() { _ = database.Close() })
 
-	job, err := database.CreateJob(context.Background(), "book.pdf", []byte{1}, "req", domain.PdfFormat)
+	job, err := database.CreateJob(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestWorker_MultipleBackendsRunIndependently(t *testing.T) {
 	}
 	t.Cleanup(func() { _ = database.Close() })
 
-	job, err := database.CreateJob(context.Background(), "book.pdf", []byte{1}, "req", domain.PdfFormat)
+	job, err := database.CreateJob(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}

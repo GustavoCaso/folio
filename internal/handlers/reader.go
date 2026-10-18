@@ -14,7 +14,6 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
-	"github.com/GustavoCaso/folio/ui/internal/renderer/markdown"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
 )
 
@@ -50,43 +49,12 @@ func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
 		renderErr(http.StatusNotFound, msg)
 		return
 	}
-	if job.Format == "epub" {
-		h.readEPUBChapter(w, r, job)
+	if job.Format != domain.EpubFormat {
+		log.Warn("unsupported document format", "format", job.Format)
+		renderErr(http.StatusUnprocessableEntity, "Unsupported document format.")
 		return
 	}
-
-	jobPath := job.OutputPath
-	// We are running the server locally
-	if strings.Contains(h.dataDir, "..") {
-		localDir := filepath.Dir(h.dataDir)
-		jobPath = filepath.Join(localDir, job.OutputPath)
-	}
-
-	src, err := os.ReadFile(jobPath)
-	if err != nil {
-		log.Error("read markdown failed", logging.Err(err), "output_path", job.OutputPath)
-		renderErr(http.StatusInternalServerError, "Failed to read document. Please try again.")
-		return
-	}
-
-	rendered, err := markdown.Render(src)
-	if err != nil {
-		log.Error("render markdown failed", logging.Err(err))
-		renderErr(http.StatusInternalServerError, "Failed to render document. Please try again.")
-		return
-	}
-
-	highlights, err := h.store.ListHighlights(r.Context(), jobID)
-	if err != nil {
-		log.Error("list highlights failed", logging.Err(err))
-		renderErr(http.StatusInternalServerError, "Failed to load highlights. Please try again.")
-		return
-	}
-
-	log.Debug("reader rendered", "highlights", len(highlights), "md_bytes", len(src))
-	if err := templates.Reader(job, rendered, highlights, nil, 0, 0, false).Render(r.Context(), w); err != nil {
-		log.Error("render reader failed", logging.Err(err))
-	}
+	h.readEPUBChapter(w, r, job)
 }
 
 func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, job domain.Job) {
