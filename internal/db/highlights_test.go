@@ -15,7 +15,7 @@ func TestCreateAndListHighlights(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, _ := database.CreateJob(context.Background(), "book.pdf", content, "", domain.PdfFormat)
+	job, _ := database.CreateJob(context.Background(), "book.epub", content, "", domain.EpubFormat)
 
 	h := domain.Highlight{
 		JobID:        job.ID,
@@ -55,7 +55,7 @@ func TestDeleteHighlight(t *testing.T) {
 	}
 	defer func() { _ = database.Close() }()
 
-	job, err := database.CreateJob(context.Background(), "book.pdf", content, "", domain.PdfFormat)
+	job, err := database.CreateJob(context.Background(), "book.epub", content, "", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -12,7 +12,7 @@ import (
 // seedJobAndHighlightForExport creates a DONE job, one highlight, and a PENDING export row for backendName.
 func seedJobAndHighlightForExport(t *testing.T, store repository.Store, backendName string) (domain.Job, domain.Highlight) {
 	t.Helper()
-	job, err := store.CreateJob(context.Background(), "book.pdf", []byte{1}, "req", domain.PdfFormat)
+	job, err := store.CreateJob(context.Background(), "book.epub", []byte{1}, "req", domain.EpubFormat)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -69,8 +69,8 @@ func TestListUnexportedHighlights_AllUnexported(t *testing.T) {
 	if records[0].HighlightID != h.ID {
 		t.Errorf("expected highlight %s, got %s", h.ID, records[0].HighlightID)
 	}
-	if records[0].JobFilename != "book.pdf" {
-		t.Errorf("expected book.pdf, got %s", records[0].JobFilename)
+	if records[0].JobFilename != "book.epub" {
+		t.Errorf("expected book.epub, got %s", records[0].JobFilename)
 	}
 	if records[0].HighlightText != "hello world" {
 		t.Errorf("expected text %q, got %q", "hello world", records[0].HighlightText)
@@ -253,8 +253,8 @@ func TestListAllExports_JoinsHighlightAndJob(t *testing.T) {
 	if rec.HighlightText != "hello world" {
 		t.Errorf("expected highlight text %q, got %q", "hello world", rec.HighlightText)
 	}
-	if rec.JobFilename != "book.pdf" {
-		t.Errorf("expected job filename book.pdf, got %s", rec.JobFilename)
+	if rec.JobFilename != "book.epub" {
+		t.Errorf("expected job filename book.epub, got %s", rec.JobFilename)
 	}
 	if rec.Status != "EXPORTED" {
 		t.Errorf("expected status exported, got %s", rec.Status)

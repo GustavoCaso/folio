@@ -4,7 +4,6 @@ import "time"
 
 type JobFormat string
 
-const PdfFormat JobFormat = "pdf"
 const EpubFormat JobFormat = "epub"
 
 type Job struct {

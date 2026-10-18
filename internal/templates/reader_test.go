@@ -186,16 +186,26 @@ func extractAttr(t *testing.T, html, attr string) string {
 	return html[start : start+end]
 }
 
-func TestReaderNonEpubHasNoSidebar(t *testing.T) {
-	got := renderReader(t, domain.Job{ID: "j1", Filename: "doc.pdf"}, "<p>x</p>", nil)
+func TestReaderWithoutTOCHasNoSidebar(t *testing.T) {
+	got := renderReader(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>x</p>", nil)
 
 	if strings.Contains(got, "data-tui-sidebar-layout") {
-		t.Errorf("did not expect sidebar layout wrapper for non-epub job, got: %s", got)
+		t.Errorf("did not expect sidebar layout wrapper without a TOC, got: %s", got)
 	}
 	// Regression: sidebar.Script() must not be loaded in <head> for pages
-	// that render no sidebar DOM at all (e.g. PDF/markdown reader pages).
+	// that render no sidebar DOM at all (reader pages without a TOC).
 	if strings.Contains(got, "/templui/js/sidebar") {
-		t.Errorf("did not expect sidebar.Script() tag for non-epub job, got: %s", got)
+		t.Errorf("did not expect sidebar.Script() tag without a TOC, got: %s", got)
+	}
+}
+
+func TestReaderWithoutTOCRendersChapterNavigation(t *testing.T) {
+	got := renderReaderEpub(t, domain.Job{ID: "j1", Filename: "book.epub"}, "<p>x</p>", nil, nil, 1, 2, false)
+
+	for _, want := range []string{`href="?chapter=0"`, `href="?chapter=2"`, `data-current-chapter="1"`} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %s without a TOC, got: %s", want, got)
+		}
 	}
 }
 

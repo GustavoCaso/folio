@@ -158,7 +158,7 @@ export function applyHighlights(reader, highlights) {
 // Filters highlights down to those belonging to the currently viewed epub
 // chapter. Reads #reader's own data-current-chapter attribute (set by
 // reader.templ's currentChapterAttr):
-//   - absent entirely: not an epub document (pdf/markdown) — pass through all highlights.
+//   - absent entirely: not a reader page — pass through all highlights.
 //   - "-1": full-book view — no single-chapter restriction, pass through all highlights.
 //   - "N": single-chapter view — keep only highlights whose start_block_id starts
 //     with "chN-" (epubrender's chapter-prefixed block ID scheme).
@@ -319,7 +319,7 @@ export function mirrorSidebarState(wrapper) {
 // Finds the epub TOC sidebar's wrapper element (if present on this page),
 // mirrors its initial state onto document.body, and keeps it in sync via a
 // MutationObserver watching for attribute changes. No-ops entirely when no
-// sidebar is present (pdf/markdown reader pages, or any non-reader page),
+// sidebar is present (reader pages without a TOC, or any non-reader page),
 // so document.body never gets a data-sidebar-state attribute there.
 export function setupSidebarStateMirror() {
   const wrapper = document.querySelector(

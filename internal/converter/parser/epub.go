@@ -69,9 +69,7 @@ func (p *epubParser) Convert(ctx context.Context, jobID, requestID, filename str
 	spineIdxByHref := spineIndexByHref(&reader)
 
 	spine := reader.Spine()
-	// docByIdx and orderedHrefs let us render chapters and compute
-	// fallback titles after the TOC tree has been built, so we know which
-	// spine indices got zero TOC coverage at any depth.
+	// docByIdx tracks which spine indices rendered to a chapter file.
 	docByIdx := make(map[int]*html.Node, len(spine))
 	for i, item := range spine {
 		doc := reader.ReadContentHTMLById(item.ID)
