@@ -5,16 +5,19 @@ usage() {
   echo "Usage: $0 -h <host> [-v <version>]"
   echo "  -h  SSH host to deploy to (required)"
   echo "  -v  Image version tag (default: local)"
+  echo "  -p  Platform image (default: linux/arm64)"
   exit 1
 }
 
 VERSION="local"
 HOST=""
+PLATFORM="linux/arm64"
 
-while getopts "h:v:" opt; do
+while getopts "h:v:p:" opt; do
   case $opt in
     h) HOST="$OPTARG" ;;
     v) VERSION="$OPTARG" ;;
+    p) PLATFORM="$OPTARG" ;;
     *) usage ;;
   esac
 done
@@ -31,7 +34,7 @@ build_and_push() {
   echo "==> Building ${tag}..."
   # shellcheck disable=SC2086
   docker buildx build \
-    --platform linux/arm64 \
+    --platform ${PLATFORM} \
     $extra_args \
     -t "$tag" \
     --load \
