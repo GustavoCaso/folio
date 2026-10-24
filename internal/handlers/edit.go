@@ -69,9 +69,15 @@ func (h *Handlers) EditDocument(w http.ResponseWriter, r *http.Request) {
 	title := r.FormValue("title")
 	author := r.FormValue("author")
 	var tags []string
+	seenTags := map[string]struct{}{}
 	for _, t := range strings.Split(r.FormValue("tags"), ",") {
-		if t = strings.TrimSpace(t); t != "" {
+		if t = strings.ToLower(strings.TrimSpace(t)); t != "" {
+			if _, ok := seenTags[t]; ok {
+				continue
+			}
+
 			tags = append(tags, t)
+			seenTags[t] = struct{}{}
 		}
 	}
 

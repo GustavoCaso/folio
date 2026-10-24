@@ -90,7 +90,7 @@ func (d *db) DocumentFacets(ctx context.Context, filter domain.DocumentFilter) (
 		return domain.Facets{}, err
 	}
 	facets.Tags, err = d.facetCounts(ctx,
-		`SELECT t.value, COUNT(*) FROM documents d, json_each(`+tagsJSONExpr+`) t`+where+
+		`SELECT t.value, COUNT(DISTINCT d.id) FROM documents d, json_each(`+tagsJSONExpr+`) t`+where+
 			` GROUP BY t.value ORDER BY t.value COLLATE NOCASE`, args)
 	if err != nil {
 		return domain.Facets{}, err

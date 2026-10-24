@@ -311,9 +311,9 @@ func TestRetryDocument(t *testing.T) {
 	}
 }
 
-// seedLibrary creates documents with the given title, author and tags. A nil
+// seedDocuments creates documents with the given title, author and tags. A nil
 // tags slice leaves the column at its ” default, like books never edited.
-func seedLibrary(t *testing.T, database repository.Store, books []struct {
+func seedDocuments(t *testing.T, database repository.Store, books []struct {
 	filename, title, author string
 	tags                    []string
 }) {
@@ -332,14 +332,14 @@ func seedLibrary(t *testing.T, database repository.Store, books []struct {
 	}
 }
 
-func newLibraryDB(t *testing.T) repository.Store {
+func populateDocumentsDB(t *testing.T) repository.Store {
 	t.Helper()
 	database, err := db.New(":memory:")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Cleanup(func() { _ = database.Close() })
-	seedLibrary(t, database, []struct {
+	seedDocuments(t, database, []struct {
 		filename, title, author string
 		tags                    []string
 	}{
@@ -365,7 +365,7 @@ func titles(docs []domain.Document) []string {
 }
 
 func TestListDocuments_Filter(t *testing.T) {
-	database := newLibraryDB(t)
+	database := populateDocumentsDB(t)
 
 	cases := []struct {
 		name   string
@@ -398,7 +398,7 @@ func TestListDocuments_Filter(t *testing.T) {
 }
 
 func TestDocumentFacets_CountsWholeLibrary(t *testing.T) {
-	database := newLibraryDB(t)
+	database := populateDocumentsDB(t)
 
 	facets, err := database.DocumentFacets(context.Background(), domain.DocumentFilter{})
 	if err != nil {
@@ -415,7 +415,7 @@ func TestDocumentFacets_CountsWholeLibrary(t *testing.T) {
 }
 
 func TestDocumentFacets_NarrowToCurrentResult(t *testing.T) {
-	database := newLibraryDB(t)
+	database := populateDocumentsDB(t)
 
 	facets, err := database.DocumentFacets(context.Background(), domain.DocumentFilter{Tag: "classic"})
 	if err != nil {
@@ -448,5 +448,29 @@ func TestDocumentFacets_EmptyLibrary(t *testing.T) {
 	}
 	if len(facets.Authors) != 0 || len(facets.Tags) != 0 {
 		t.Errorf("expected no facets, got %+v", facets)
+	}
+}
+
+func TestDocumentFacets_DuplicateTagsCountOncePerDocument(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	seedDocuments(t, database, []struct {
+		filename, title, author string
+		tags                    []string
+	}{
+		{"dune.epub", "Dune", "Frank Herbert", []string{"sci-fi", "sci-fi"}},
+		{"children.epub", "Children of Dune", "Frank Herbert", []string{"sci-fi"}},
+	})
+
+	facets, err := database.DocumentFacets(context.Background(), domain.DocumentFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTags := []domain.FacetCount{{Value: "sci-fi", Count: 2}}
+	if !reflect.DeepEqual(facets.Tags, wantTags) {
+		t.Errorf("tags: got %v, want %v", facets.Tags, wantTags)
 	}
 }
