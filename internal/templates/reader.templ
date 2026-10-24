@@ -4,6 +4,7 @@ import (
 	"strconv"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
 	"github.com/templui/templui/components/icon"
@@ -13,32 +14,6 @@ import (
 	"github.com/templui/templui/components/sidebar"
 	"github.com/templui/templui/components/textarea"
 )
-
-func highlightCount(highlights []domain.Highlight) string {
-	return strconv.Itoa(len(highlights))
-}
-
-// EpubTOCEntry mirrors the shape written by epubconvert.Runner to toc.json.
-// reader.go unmarshals toc.json directly into this type (the JSON tags match
-// epubconvert's write-side tocEntry struct exactly), so there is no separate
-// read-side struct in the handlers package.
-type EpubTOCEntry struct {
-	Title      string         `json:"title"`
-	ChapterIdx int            `json:"chapter_idx"`
-	Anchor     string         `json:"anchor"`
-	Items      []EpubTOCEntry `json:"items"`
-}
-
-// subsectionHref reproduces the link logic previously in reader.go's
-// writeTOCList: a same-page "#anchor" jump when the subsection belongs to
-// the chapter currently being viewed and we're not in full-view mode;
-// otherwise a cross-chapter "?chapter=N#anchor" link.
-func subsectionHref(item EpubTOCEntry, currentChapterIdx int, full bool) string {
-	if !full && item.ChapterIdx == currentChapterIdx {
-		return "#" + item.Anchor
-	}
-	return "?chapter=" + strconv.Itoa(item.ChapterIdx) + "#" + item.Anchor
-}
 
 templ highlightCard(h domain.Highlight) {
 	@card.Card(card.Props{Class: "cursor-pointer", Attributes: map[string]any{"data-scroll-to-highlight": h.ID}}) {
@@ -107,7 +82,7 @@ templ headerActions(highlights []domain.Highlight) {
 				@icon.Highlighter(icon.Props{Class: "h-3.5 w-3.5"})
 				Highlights
 				if len(highlights) > 0 {
-					<span class="ml-0.5 inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 text-[0.6875rem] font-semibold text-primary">{ highlightCount(highlights) }</span>
+					<span class="ml-0.5 inline-flex items-center justify-center rounded-full bg-primary/10 px-1.5 text-[0.6875rem] font-semibold text-primary">{ views.HighlightCount(highlights) }</span>
 				}
 			}
 		}
@@ -116,7 +91,7 @@ templ headerActions(highlights []domain.Highlight) {
 
 // epubTOCItems recursively renders tocEntries as sidebar menu items. Nesting
 // is limited to exactly two levels (chapter + subsection), matching what
-// epubconvert's TOC tree actually produces and what the prior writeTOCList
+// parser.NewEPUB's TOC tree actually produces and what the prior writeTOCList
 // implementation was exercised against — subsections themselves are rendered
 // via MenuSub/MenuSubButton rather than recursing further.
 //
@@ -125,7 +100,7 @@ templ headerActions(highlights []domain.Highlight) {
 // the viewport back to its TOC link and mark it active, independent of the
 // href (which for cross-chapter subsections points at a page reader.js
 // never navigates to during same-page scrolling).
-templ epubTOCItems(entries []EpubTOCEntry, currentChapterIdx int, full bool) {
+templ epubTOCItems(entries []views.EpubTOCEntry, currentChapterIdx int, full bool) {
 	for _, entry := range entries {
 		@sidebar.MenuItem() {
 			@sidebar.MenuButton(sidebar.MenuButtonProps{
@@ -143,7 +118,7 @@ templ epubTOCItems(entries []EpubTOCEntry, currentChapterIdx int, full bool) {
 					for _, item := range entry.Items {
 						@sidebar.MenuSubItem() {
 							@sidebar.MenuSubButton(sidebar.MenuSubButtonProps{
-								Href:     subsectionHref(item, currentChapterIdx, full),
+								Href:     views.SubsectionHref(item, currentChapterIdx, full),
 								IsActive: false,
 								Attributes: map[string]any{
 									"data-toc-chapter": strconv.Itoa(item.ChapterIdx),
@@ -200,7 +175,7 @@ templ epubPrevNextRail(side string, targetChapterIdx int, enabled bool) {
 				href={ templ.SafeURL("?chapter=" + strconv.Itoa(targetChapterIdx)) }
 				class="flex size-9 items-center justify-center rounded-full border border-border text-muted-foreground hover:border-foreground hover:text-foreground transition-colors"
 				rel={ side }
-				aria-label={ railLabel(side) }
+				aria-label={ views.RailLabel(side) }
 			>
 				if side == "prev" {
 					@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
@@ -223,13 +198,6 @@ templ epubPrevNextRail(side string, targetChapterIdx int, enabled bool) {
 	</div>
 }
 
-func railLabel(side string) string {
-	if side == "prev" {
-		return "Previous chapter"
-	}
-	return "Next chapter"
-}
-
 // epubSidebarID is a fixed, explicit sidebar ID used by both
 // sidebar.Sidebar() (in epubSidebar) and sidebar.Trigger() (rendered in
 // Reader's sidebar.Inset() block, outside the collapsible sidebar panel so
@@ -238,7 +206,7 @@ func railLabel(side string) string {
 // fixed ID explicitly via TriggerProps.Target.
 const epubSidebarID = "epub-toc-sidebar"
 
-templ epubSidebar(epubTOC []EpubTOCEntry, currentChapterIdx int, full bool) {
+templ epubSidebar(epubTOC []views.EpubTOCEntry, currentChapterIdx int, full bool) {
 	@sidebar.Sidebar(sidebar.Props{
 		ID: epubSidebarID,
 		// The sticky site header (internal/templates/layout.templ) uses
@@ -267,17 +235,6 @@ templ epubSidebar(epubTOC []EpubTOCEntry, currentChapterIdx int, full bool) {
 // sidebar collapsed/expanded state.
 templ epubSidebarTrigger() {
 	@sidebar.Trigger(sidebar.TriggerProps{Target: epubSidebarID})
-}
-
-// currentChapterAttr renders the value for #reader's data-current-chapter
-// attribute: "-1" in full-book view (no single current chapter), otherwise
-// the chapter index. reader.js's TOC scroll tracker
-// reads this to know which chapter's headings to watch.
-func currentChapterAttr(currentChapterIdx int, full bool) string {
-	if full {
-		return "-1"
-	}
-	return strconv.Itoa(currentChapterIdx)
 }
 
 templ highlightsPopover(highlights []domain.Highlight) {
@@ -332,7 +289,7 @@ templ readerEpubBody(document domain.Document, renderedHTML string, highlights [
 	<div class="mx-auto flex max-w-[calc(68ch+2*(2.25rem+1rem))] items-start justify-center gap-4 px-2">
 		@epubPrevNextRail("prev", currentChapterIdx-1, !full && currentChapterIdx > 0)
 		<article class="w-full max-w-[68ch] py-4 pb-24 overflow-x-auto">
-			<div id="reader" data-document-id={ document.ID } data-reading-progress={ document.ReadingProgress } data-current-chapter={ currentChapterAttr(currentChapterIdx, full) }>
+			<div id="reader" data-document-id={ document.ID } data-reading-progress={ document.ReadingProgress } data-current-chapter={ views.CurrentChapterAttr(currentChapterIdx, full) }>
 				@templ.Raw(renderedHTML)
 			</div>
 		</article>
@@ -350,9 +307,9 @@ templ readerHeadExtra() {
 // When epubTOC is non-empty, the page content is wrapped in a
 // sidebar.Layout/sidebar.Sidebar/sidebar.Inset composition; with an empty
 // TOC (the epub has no usable nav/NCX) no sidebar DOM/JS is emitted.
-templ Reader(document domain.Document, renderedHTML string, highlights []domain.Highlight, epubTOC []EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) {
+templ Reader(document domain.Document, renderedHTML string, highlights []domain.Highlight, epubTOC []views.EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) {
 	if len(epubTOC) > 0 {
-		@Layout(document.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded") {
+		@Layout(document.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded", false) {
 			@sidebar.Layout() {
 				@epubSidebar(epubTOC, currentChapterIdx, full)
 				@sidebar.Inset() {
@@ -361,7 +318,7 @@ templ Reader(document domain.Document, renderedHTML string, highlights []domain.
 			}
 		}
 	} else {
-		@Layout(document.Filename, NoAction(), headerActions(highlights), NoAction(), "") {
+		@Layout(document.Filename, NoAction(), headerActions(highlights), NoAction(), "", false) {
 			@readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full)
 		}
 	}

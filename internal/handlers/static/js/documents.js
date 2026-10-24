@@ -9,26 +9,42 @@ function badgeHTML(status) {
   return `<span class="inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${cls}">${label}</span>`;
 }
 
+// Menu item markup mirrors documentActions in documents.templ; keep in sync.
+// Styling lives in library.css because Tailwind doesn't scan this file.
+const itemAttrs = `data-tui-dropdown-item class="book-menu-item"`;
+const dangerAttrs = `data-tui-dropdown-item class="book-menu-item book-menu-item-danger"`;
+
+function escapeHTML(s) {
+  return String(s).replace(/[&<>"']/g, (c) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;" })[c]);
+}
+
 function readButtonHTML(documentID) {
-  return `<a href="/read/${documentID}" class="inline-flex items-center justify-center rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium shadow-xs hover:bg-accent hover:text-accent-foreground">Read</a>`;
+  return `<a ${itemAttrs} href="/read/${documentID}">Read</a>`;
 }
 
 function editButtonHTML(documentID) {
-  return `<a href="/documents/${documentID}/edit" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Edit</a>`;
+  return `<a ${itemAttrs} href="/documents/${documentID}/edit">Edit</a>`;
 }
 
 function deleteFormButton(documentID, filename) {
-  return `<button type="button" data-delete-document="${documentID}" data-document-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Delete</button>`
+  return `<button type="button" ${dangerAttrs} data-delete-document="${documentID}" data-document-name="${escapeHTML(filename)}">Delete</button>`;
 }
 
 function cancelButtonHTML(documentID, filename) {
-  return `<button type="button" data-cancel-document="${documentID}" data-document-name="${filename}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium text-destructive hover:bg-accent">Cancel</button>`;
+  return `<button type="button" ${dangerAttrs} data-cancel-document="${documentID}" data-document-name="${escapeHTML(filename)}">Cancel</button>`;
 }
 
-function retryFormHTML(documentID) {
+function retryFormHTML(documentID, filename) {
   return `<form class="retry-form" method="POST" action="/documents/${documentID}/retry">` +
-    `<button type="submit" data-retry-document="${documentID}" class="inline-flex items-center justify-center rounded-md px-3 py-1.5 text-xs font-medium hover:bg-accent">Retry</button>` +
+    `<button type="submit" ${itemAttrs} data-retry-document="${documentID}" data-document-name="${escapeHTML(filename)}">Retry</button>` +
     `</form>`;
+}
+
+// authorURL keeps the page's other filters, matching toggleAuthorURL in Go.
+function authorURL(author) {
+  const params = new URLSearchParams(window.location.search);
+  params.set("author", author);
+  return "/?" + params.toString();
 }
 
 export function watchDocument(documentID) {
@@ -53,42 +69,46 @@ export function watchDocument(documentID) {
       if (actions) {
         actions.innerHTML = readButtonHTML(documentID) + editButtonHTML(documentID) + deleteFormButton(documentID, filename);
       }
-      const meta = card.querySelector("[data-metadata]");
-      if (meta && (d.Cover || d.Title || d.Author)) {
-        if (d.Cover && !meta.querySelector("[data-cover]")) {
+      card.querySelectorAll("[data-read-link]").forEach((a) => { a.href = "/read/" + documentID; });
+      if (d.Cover) {
+        const placeholder = card.querySelector("[data-cover-placeholder]");
+        if (placeholder) {
           const img = document.createElement("img");
           img.dataset.cover = "";
           img.src = "data:image/png;base64," + d.Cover;
-          img.alt = "cover";
-          img.className = "w-full rounded object-cover aspect-[3/4] bg-muted";
-          meta.prepend(img);
+          img.alt = "";
+          img.className = "book-cover-img";
+          placeholder.replaceWith(img);
         }
-        if (d.Title && !meta.querySelector("[data-title]")) {
-          const p = document.createElement("p");
-          p.dataset.title = "";
-          p.className = "text-xs font-medium truncate";
-          p.textContent = "Title: " + d.Title;
-          meta.append(p);
-        }
-        if (d.Author && !meta.querySelector("[data-author]")) {
-          const p = document.createElement("p");
-          p.dataset.author = "";
-          p.className = "text-xs text-muted-foreground truncate";
-          p.textContent = "Author: " + d.Author;
-          meta.append(p);
+      }
+      if (d.Title) {
+        const title = card.querySelector("[data-title]");
+        if (title) title.textContent = d.Title;
+      }
+      if (d.Author && !card.querySelector("[data-author]")) {
+        const meta = card.querySelector(".book-meta");
+        if (meta) {
+          const a = document.createElement("a");
+          a.dataset.author = "";
+          a.className = "book-author";
+          a.href = authorURL(d.Author);
+          a.textContent = d.Author;
+          const title = meta.querySelector(".book-title");
+          if (title) title.after(a);
+          else meta.prepend(a);
         }
       }
       es.close();
     } else if (d.Status === "FAILED") {
       if (statusText) statusText.textContent = d.Error || "";
       if (actions) {
-        actions.innerHTML = retryFormHTML(documentID) + deleteFormButton(documentID, filename);
+        actions.innerHTML = editButtonHTML(documentID) + retryFormHTML(documentID, filename) + deleteFormButton(documentID, filename);
       }
       es.close();
     } else if (d.Message && statusText) {
       statusText.textContent = d.Message;
       if (actions && !actions.querySelector("[data-cancel-document]")) {
-        actions.innerHTML = cancelButtonHTML(documentID);
+        actions.innerHTML = cancelButtonHTML(documentID, filename) + editButtonHTML(documentID);
       }
     }
   });
@@ -138,12 +158,32 @@ function initDropZone() {
   });
 }
 
+export const VIEW_COOKIE = "folio_view";
+
+// setView swaps the library layout and remembers it for a year. The server
+// reads the cookie on the next load so the first paint is already correct.
+export function setView(view) {
+  if (view !== "grid" && view !== "list") return;
+  const library = document.getElementById("library");
+  if (library) library.dataset.view = view;
+  document.querySelectorAll("[data-view-toggle]").forEach((btn) => {
+    btn.setAttribute("aria-pressed", String(btn.dataset.viewToggle === view));
+  });
+  document.cookie = `${VIEW_COOKIE}=${view}; Path=/; Max-Age=31536000; SameSite=Lax`;
+}
+
 function bootstrap() {
   initDropZone();
   const cfg = document.getElementById("watch-config");
   if (cfg) cfg.dataset.documentIds.split(",").forEach(watchDocument);
 
   document.addEventListener("click", async (e) => {
+    const toggle = e.target.closest("[data-view-toggle]");
+    if (toggle) {
+      setView(toggle.dataset.viewToggle);
+      return;
+    }
+
     // Cancel button
     const cancelBtn = e.target.closest("[data-cancel-document]");
     if (cancelBtn) {

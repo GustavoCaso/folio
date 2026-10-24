@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
@@ -98,7 +99,7 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 			var templ_7745c5c3_Var4 string
 			templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(j.Title)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 30, Col: 19}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 31, Col: 19}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 			if templ_7745c5c3_Err != nil {
@@ -142,9 +143,9 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 							return templ_7745c5c3_Err
 						}
 						var templ_7745c5c3_Var7 string
-						templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("data:image/png;base64," + coverBase64(j))
+						templ_7745c5c3_Var7, templ_7745c5c3_Err = templ.JoinStringErrs("data:image/png;base64," + views.CoverBase64(j))
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 45, Col: 57}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 46, Col: 63}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var7))
 						if templ_7745c5c3_Err != nil {
@@ -162,7 +163,7 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 						var templ_7745c5c3_Var8 string
 						templ_7745c5c3_Var8, templ_7745c5c3_Err = templ.JoinStringErrs(j.Filename)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 56, Col: 123}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 57, Col: 123}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var8))
 						if templ_7745c5c3_Err != nil {
@@ -181,7 +182,7 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 						var templ_7745c5c3_Var9 string
 						templ_7745c5c3_Var9, templ_7745c5c3_Err = templ.JoinStringErrs(j.Title)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 65, Col: 18}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 66, Col: 18}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var9))
 						if templ_7745c5c3_Err != nil {
@@ -191,7 +192,7 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 						var templ_7745c5c3_Var10 string
 						templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(j.Filename)
 						if templ_7745c5c3_Err != nil {
-							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 67, Col: 21}
+							return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 68, Col: 21}
 						}
 						_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 						if templ_7745c5c3_Err != nil {
@@ -232,7 +233,7 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 					var templ_7745c5c3_Var13 string
 					templ_7745c5c3_Var13, templ_7745c5c3_Err = templ.JoinStringErrs(j.Author)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 80, Col: 18}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 81, Col: 18}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var13))
 					if templ_7745c5c3_Err != nil {
@@ -285,7 +286,7 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 							var templ_7745c5c3_Var17 string
 							templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(tag)
 							if templ_7745c5c3_Err != nil {
-								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 94, Col: 15}
+								return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 95, Col: 15}
 							}
 							_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 							if templ_7745c5c3_Err != nil {
@@ -349,7 +350,7 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 					var templ_7745c5c3_Var20 templ.SafeURL
 					templ_7745c5c3_Var20, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("/documents/" + j.ID + "/edit"))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 109, Col: 62}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/edit.templ`, Line: 110, Col: 62}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var20))
 					if templ_7745c5c3_Err != nil {
@@ -705,7 +706,7 @@ func EditDocument(j domain.Document, errMsg string) templ.Component {
 			}
 			return nil
 		})
-		templ_7745c5c3_Err = Layout("Edit Document", NoAction(), NoAction(), NoAction(), "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
+		templ_7745c5c3_Err = Layout("Edit Document", NoAction(), NoAction(), NoAction(), "", false).Render(templ.WithChildren(ctx, templ_7745c5c3_Var2), templ_7745c5c3_Buffer)
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}

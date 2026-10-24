@@ -16,7 +16,7 @@ import (
 	"github.com/templui/templui/utils"
 )
 
-//go:embed static/js/reader.js static/js/documents.js static/tailwind/output.css static/css/reader.css
+//go:embed static/js/reader.js static/js/documents.js static/tailwind/output.css static/css/reader.css static/css/library.css
 var staticFS embed.FS
 
 type Handlers struct {

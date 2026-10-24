@@ -3,10 +3,12 @@ package db_test
 import (
 	"context"
 	"reflect"
+	"sort"
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
 	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/repository"
 )
 
 var content = []byte{'a', 'b', 'c'}
@@ -306,5 +308,169 @@ func TestRetryDocument(t *testing.T) {
 
 	if document.RetryCount != 1 {
 		t.Fatalf("document must retry count to 1 after RetryDocument, got: %d", document.RetryCount)
+	}
+}
+
+// seedDocuments creates documents with the given title, author and tags. A nil
+// tags slice leaves the column at its ” default, like books never edited.
+func seedDocuments(t *testing.T, database repository.Store, books []struct {
+	filename, title, author string
+	tags                    []string
+}) {
+	t.Helper()
+	for _, b := range books {
+		doc, err := database.CreateDocument(context.Background(), b.filename, content, "req", domain.EpubFormat)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if b.tags == nil && b.title == "" && b.author == "" {
+			continue
+		}
+		if err := database.UpdateDocument(context.Background(), doc.ID, b.title, b.author, b.tags, nil); err != nil {
+			t.Fatal(err)
+		}
+	}
+}
+
+func populateDocumentsDB(t *testing.T) repository.Store {
+	t.Helper()
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	seedDocuments(t, database, []struct {
+		filename, title, author string
+		tags                    []string
+	}{
+		{"dune.epub", "Dune", "Frank Herbert", []string{"sci-fi", "classic"}},
+		{"children.epub", "Children of Dune", "Frank Herbert", []string{"sci-fi"}},
+		{"earthsea.epub", "A Wizard of Earthsea", "Ursula K. Le Guin", []string{"fantasy", "classic"}},
+		{"untitled_100%.epub", "", "", nil},
+	})
+	return database
+}
+
+func titles(docs []domain.Document) []string {
+	out := []string{}
+	for _, d := range docs {
+		if d.Title != "" {
+			out = append(out, d.Title)
+		} else {
+			out = append(out, d.Filename)
+		}
+	}
+	sort.Strings(out)
+	return out
+}
+
+func TestListDocuments_Filter(t *testing.T) {
+	database := populateDocumentsDB(t)
+
+	cases := []struct {
+		name   string
+		filter domain.DocumentFilter
+		want   []string
+	}{
+		{"no filter returns everything", domain.DocumentFilter{}, []string{"A Wizard of Earthsea", "Children of Dune", "Dune", "untitled_100%.epub"}},
+		{"query matches title case-insensitively", domain.DocumentFilter{Query: "dune"}, []string{"Children of Dune", "Dune"}},
+		{"query matches author", domain.DocumentFilter{Query: "le guin"}, []string{"A Wizard of Earthsea"}},
+		{"query matches filename", domain.DocumentFilter{Query: "earthsea.epub"}, []string{"A Wizard of Earthsea"}},
+		{"query treats % literally", domain.DocumentFilter{Query: "100%"}, []string{"untitled_100%.epub"}},
+		{"query treats _ literally", domain.DocumentFilter{Query: "d_ne"}, []string{}},
+		{"author is exact match", domain.DocumentFilter{Author: "Frank Herbert"}, []string{"Children of Dune", "Dune"}},
+		{"author partial does not match", domain.DocumentFilter{Author: "Frank"}, []string{}},
+		{"tag matches inside JSON array", domain.DocumentFilter{Tag: "classic"}, []string{"A Wizard of Earthsea", "Dune"}},
+		{"filters combine with AND", domain.DocumentFilter{Query: "dune", Tag: "classic"}, []string{"Dune"}},
+		{"author and tag combine", domain.DocumentFilter{Author: "Frank Herbert", Tag: "fantasy"}, []string{}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.name, func(t *testing.T) {
+			docs, err := database.ListDocuments(context.Background(), tc.filter)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if got := titles(docs); !reflect.DeepEqual(got, tc.want) {
+				t.Errorf("got %v, want %v", got, tc.want)
+			}
+		})
+	}
+}
+
+func TestDocumentFacets_CountsWholeLibrary(t *testing.T) {
+	database := populateDocumentsDB(t)
+
+	facets, err := database.DocumentFacets(context.Background(), domain.DocumentFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantAuthors := []domain.FacetCount{{Value: "Frank Herbert", Count: 2}, {Value: "Ursula K. Le Guin", Count: 1}}
+	if !reflect.DeepEqual(facets.Authors, wantAuthors) {
+		t.Errorf("authors: got %v, want %v", facets.Authors, wantAuthors)
+	}
+	wantTags := []domain.FacetCount{{Value: "classic", Count: 2}, {Value: "fantasy", Count: 1}, {Value: "sci-fi", Count: 2}}
+	if !reflect.DeepEqual(facets.Tags, wantTags) {
+		t.Errorf("tags: got %v, want %v", facets.Tags, wantTags)
+	}
+}
+
+func TestDocumentFacets_NarrowToCurrentResult(t *testing.T) {
+	database := populateDocumentsDB(t)
+
+	facets, err := database.DocumentFacets(context.Background(), domain.DocumentFilter{Tag: "classic"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantAuthors := []domain.FacetCount{{Value: "Frank Herbert", Count: 1}, {Value: "Ursula K. Le Guin", Count: 1}}
+	if !reflect.DeepEqual(facets.Authors, wantAuthors) {
+		t.Errorf("authors: got %v, want %v", facets.Authors, wantAuthors)
+	}
+	wantTags := []domain.FacetCount{{Value: "classic", Count: 2}, {Value: "fantasy", Count: 1}, {Value: "sci-fi", Count: 1}}
+	if !reflect.DeepEqual(facets.Tags, wantTags) {
+		t.Errorf("tags: got %v, want %v", facets.Tags, wantTags)
+	}
+}
+
+func TestDocumentFacets_EmptyLibrary(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+
+	// A document with tags = '' must not break json_each.
+	if _, err := database.CreateDocument(context.Background(), "a.epub", content, "req", domain.EpubFormat); err != nil {
+		t.Fatal(err)
+	}
+	facets, err := database.DocumentFacets(context.Background(), domain.DocumentFilter{Tag: "x"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(facets.Authors) != 0 || len(facets.Tags) != 0 {
+		t.Errorf("expected no facets, got %+v", facets)
+	}
+}
+
+func TestDocumentFacets_DuplicateTagsCountOncePerDocument(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = database.Close() })
+	seedDocuments(t, database, []struct {
+		filename, title, author string
+		tags                    []string
+	}{
+		{"dune.epub", "Dune", "Frank Herbert", []string{"sci-fi", "sci-fi"}},
+		{"children.epub", "Children of Dune", "Frank Herbert", []string{"sci-fi"}},
+	})
+
+	facets, err := database.DocumentFacets(context.Background(), domain.DocumentFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	wantTags := []domain.FacetCount{{Value: "sci-fi", Count: 2}}
+	if !reflect.DeepEqual(facets.Tags, wantTags) {
+		t.Errorf("tags: got %v, want %v", facets.Tags, wantTags)
 	}
 }

@@ -10,7 +10,8 @@ type DocumentRepository interface {
 	CreateDocument(ctx context.Context, filename string, content []byte, requestID string, format domain.DocumentFormat) (domain.Document, error)
 	GetDocument(ctx context.Context, id string) (domain.Document, error)
 	GetPendingDocuments(ctx context.Context) ([]domain.Document, error)
-	ListDocuments(ctx context.Context) ([]domain.Document, error)
+	ListDocuments(ctx context.Context, filter domain.DocumentFilter) ([]domain.Document, error)
+	DocumentFacets(ctx context.Context, filter domain.DocumentFilter) (domain.Facets, error)
 	UpdateDocumentStatus(ctx context.Context, id, status string) error
 	UpdateReadingProgress(ctx context.Context, id, blockID string) error
 	RetryDocument(ctx context.Context, id string) error

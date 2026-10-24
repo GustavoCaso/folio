@@ -22,7 +22,9 @@ templ NoAction() {
 // the sidebar's own default (expanded); a user who previously collapsed the
 // sidebar still sees one flash on load, since that preference lives in a
 // cookie this isn't reading yet.
-templ Layout(title string, headerLeft templ.Component, headerActions templ.Component, headExtra templ.Component, bodySidebarState string) {
+// wide widens the header and <main> past max-w-4xl for pages that pair a
+// sidebar with a content grid (the library).
+templ Layout(title string, headerLeft templ.Component, headerActions templ.Component, headExtra templ.Component, bodySidebarState string, wide bool) {
 	<!DOCTYPE html>
 	<html lang="en">
 		<head>
@@ -46,7 +48,7 @@ templ Layout(title string, headerLeft templ.Component, headerActions templ.Compo
 			}
 		>
 			<header id="site-header" class="sticky top-0 z-40 border-b border-transparent bg-background/80 backdrop-blur-md transition-[border-color,box-shadow,margin-left] duration-200 ease-linear ml-0 [body[data-sidebar-state=expanded]_&]:md:ml-[var(--sidebar-width,16rem)]">
-				<div class="mx-auto max-w-4xl flex items-center justify-between px-4 py-3">
+				<div class={ "mx-auto flex items-center justify-between px-4 py-3", templ.KV("max-w-4xl", !wide), templ.KV("max-w-6xl", wide) }>
 					<div class="flex items-center gap-2">
 						<div id="header-left" class="flex items-center">
 							@headerLeft
@@ -66,7 +68,7 @@ templ Layout(title string, headerLeft templ.Component, headerActions templ.Compo
 					</div>
 				</div>
 			</header>
-			<main class="mx-auto max-w-4xl px-4 py-8">
+			<main class={ "mx-auto px-4 py-8", templ.KV("max-w-4xl", !wide), templ.KV("max-w-6xl", wide) }>
 				{ children... }
 			</main>
 			<script>
@@ -96,7 +98,7 @@ templ ErrorBanner(msg string) {
 }
 
 templ ErrorPage(msg string) {
-	@Layout("Error", NoAction(), NoAction(), NoAction(), "") {
+	@Layout("Error", NoAction(), NoAction(), NoAction(), "", false) {
 		@ErrorBanner(msg)
 	}
 }

@@ -3,6 +3,7 @@ package db
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"time"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
@@ -50,10 +51,11 @@ func (d *db) GetPendingDocuments(ctx context.Context) ([]domain.Document, error)
 	return documents, rows.Err()
 }
 
-func (d *db) ListDocuments(ctx context.Context) ([]domain.Document, error) {
+func (d *db) ListDocuments(ctx context.Context, filter domain.DocumentFilter) ([]domain.Document, error) {
+	where, args := documentFilterClause(filter)
 	rows, err := d.conn.QueryContext(ctx,
 		`SELECT id, filename, request_id, NULL, retry_count, status, reading_progress, error, output_path, title, author, cover, source_url, tags, format, created_at, updated_at
-		 FROM documents ORDER BY created_at DESC`)
+		 FROM documents d`+where+` ORDER BY created_at DESC`, args...)
 	if err != nil {
 		return nil, err
 	}
@@ -69,6 +71,80 @@ func (d *db) ListDocuments(ctx context.Context) ([]domain.Document, error) {
 	}
 	return documents, rows.Err()
 }
+
+// DocumentFacets counts authors and tags across every document matching
+// filter, independent of how the listing itself is paged.
+func (d *db) DocumentFacets(ctx context.Context, filter domain.DocumentFilter) (domain.Facets, error) {
+	where, args := documentFilterClause(filter)
+	authorWhere := " WHERE d.author != ''"
+	if where != "" {
+		authorWhere = where + " AND d.author != ''"
+	}
+
+	var facets domain.Facets
+	var err error
+	facets.Authors, err = d.facetCounts(ctx,
+		`SELECT d.author, COUNT(*) FROM documents d`+authorWhere+
+			` GROUP BY d.author ORDER BY d.author COLLATE NOCASE`, args)
+	if err != nil {
+		return domain.Facets{}, err
+	}
+	facets.Tags, err = d.facetCounts(ctx,
+		`SELECT t.value, COUNT(DISTINCT d.id) FROM documents d, json_each(`+tagsJSONExpr+`) t`+where+
+			` GROUP BY t.value ORDER BY t.value COLLATE NOCASE`, args)
+	if err != nil {
+		return domain.Facets{}, err
+	}
+	return facets, nil
+}
+
+func (d *db) facetCounts(ctx context.Context, query string, args []any) ([]domain.FacetCount, error) {
+	rows, err := d.conn.QueryContext(ctx, query, args...)
+	if err != nil {
+		return nil, err
+	}
+	defer func() { _ = rows.Close() }()
+
+	var counts []domain.FacetCount
+	for rows.Next() {
+		var c domain.FacetCount
+		if err := rows.Scan(&c.Value, &c.Count); err != nil {
+			return nil, err
+		}
+		counts = append(counts, c)
+	}
+	return counts, rows.Err()
+}
+
+// tagsJSONExpr guards json_each against documents saved with tags = ”, which
+// isn't valid JSON.
+const tagsJSONExpr = `CASE WHEN d.tags = '' THEN '[]' ELSE d.tags END`
+
+// documentFilterClause builds a WHERE clause over the documents table aliased
+// as d. It returns "" when filter matches everything.
+func documentFilterClause(filter domain.DocumentFilter) (string, []any) {
+	var conds []string
+	var args []any
+	if filter.Query != "" {
+		pattern := "%" + likeEscaper.Replace(filter.Query) + "%"
+		conds = append(conds, `(d.title LIKE ? ESCAPE '\' OR d.author LIKE ? ESCAPE '\' OR d.filename LIKE ? ESCAPE '\')`)
+		args = append(args, pattern, pattern, pattern)
+	}
+	if filter.Author != "" {
+		conds = append(conds, "d.author = ?")
+		args = append(args, filter.Author)
+	}
+	if filter.Tag != "" {
+		conds = append(conds, "EXISTS (SELECT 1 FROM json_each("+tagsJSONExpr+") WHERE value = ?)")
+		args = append(args, filter.Tag)
+	}
+	if len(conds) == 0 {
+		return "", nil
+	}
+	return " WHERE " + strings.Join(conds, " AND "), args
+}
+
+var likeEscaper = strings.NewReplacer(`\`, `\\`, `%`, `\%`, `_`, `\_`)
 
 func (d *db) UpdateDocumentStatus(ctx context.Context, id, status string) error {
 	_, err := d.conn.ExecContext(ctx,

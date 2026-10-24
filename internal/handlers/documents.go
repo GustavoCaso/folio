@@ -13,31 +13,62 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/hub"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 	"github.com/templui/templui/components/toast"
 )
 
+// viewCookie holds the library layout ("grid" or "list"). documents.js
+// writes it; the server only reads it so the first paint uses the right view.
+const viewCookie = "folio_view"
+
+func libraryView(r *http.Request) views.LibraryView {
+	if c, err := r.Cookie(viewCookie); err == nil && c.Value == string(views.ViewList) {
+		return views.ViewList
+	}
+	return views.ViewGrid
+}
+
+func documentFilter(r *http.Request) domain.DocumentFilter {
+	q := r.URL.Query()
+	return domain.DocumentFilter{
+		Query:  strings.TrimSpace(q.Get("q")),
+		Author: q.Get("author"),
+		Tag:    q.Get("tag"),
+	}
+}
+
 func (h *Handlers) ListDocuments(w http.ResponseWriter, r *http.Request) {
 	log := logging.LoggerFrom(r.Context())
-	documents, err := h.store.ListDocuments(r.Context())
+	filter := documentFilter(r)
+	page := views.LibraryPage{Filter: filter, View: libraryView(r)}
+
+	documents, err := h.store.ListDocuments(r.Context(), filter)
 	if err != nil {
 		log.Error("list documents failed", logging.Err(err))
 		w.WriteHeader(http.StatusInternalServerError)
-		if renderErr := templates.Documents(nil, nil, "Failed to load documents. Please try again.").Render(r.Context(), w); renderErr != nil {
+		page.ErrMsg = "Failed to load documents. Please try again."
+		if renderErr := templates.Documents(page).Render(r.Context(), w); renderErr != nil {
 			log.Error("render error page failed", logging.Err(renderErr))
 		}
 		return
 	}
-	watchDocuments := []string{}
+	page.Documents = documents
+
+	page.Facets, err = h.store.DocumentFacets(r.Context(), filter)
+	if err != nil {
+		log.Error("document facets failed", logging.Err(err))
+	}
+
 	pendingDocuments, err := h.store.GetPendingDocuments(r.Context())
 	if err != nil {
 		log.Error("get pending documents failed", logging.Err(err))
 	} else {
 		for _, pendingDocument := range pendingDocuments {
-			watchDocuments = append(watchDocuments, pendingDocument.ID)
+			page.WatchDocumentIDs = append(page.WatchDocumentIDs, pendingDocument.ID)
 		}
 	}
 
-	if err := templates.Documents(documents, watchDocuments, "").Render(r.Context(), w); err != nil {
+	if err := templates.Documents(page).Render(r.Context(), w); err != nil {
 		log.Error("render documents failed", logging.Err(err))
 	}
 }
@@ -46,12 +77,18 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 	log := logging.LoggerFrom(r.Context())
 
 	renderErr := func(status int, msg string) {
-		documents, listErr := h.store.ListDocuments(r.Context())
+		page := views.LibraryPage{View: libraryView(r), ErrMsg: msg}
+		var listErr error
+		page.Documents, listErr = h.store.ListDocuments(r.Context(), domain.DocumentFilter{})
 		if listErr != nil {
 			log.Error("list documents failed during error render", logging.Err(listErr))
 		}
+		page.Facets, listErr = h.store.DocumentFacets(r.Context(), domain.DocumentFilter{})
+		if listErr != nil {
+			log.Error("document facets failed during error render", logging.Err(listErr))
+		}
 		w.WriteHeader(status)
-		if err := templates.Documents(documents, nil, msg).Render(r.Context(), w); err != nil {
+		if err := templates.Documents(page).Render(r.Context(), w); err != nil {
 			log.Error("render error page failed", logging.Err(err))
 		}
 	}
