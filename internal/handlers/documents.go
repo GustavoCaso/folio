@@ -136,9 +136,21 @@ func (h *Handlers) UploadDocument(w http.ResponseWriter, r *http.Request) {
 		"format", format,
 	)
 
-	go h.converter.Run(document.ID, reqID, format, header.Filename, documentBytes)
+	h.convert(document.ID, reqID, format, header.Filename, documentBytes)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
+}
+
+// convert runs sync formats before returning, so the redirect that follows
+// lands on a list page showing the document as DONE or FAILED (with its
+// error on the card). Other formats convert in the background and report
+// progress over SSE.
+func (h *Handlers) convert(documentID, requestID string, format domain.DocumentFormat, filename string, data []byte) {
+	if h.converter.IsSync(format) {
+		h.converter.Run(documentID, requestID, format, filename, data)
+		return
+	}
+	go h.converter.Run(documentID, requestID, format, filename, data)
 }
 
 func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
@@ -171,7 +183,7 @@ func (h *Handlers) RetryDocument(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	go h.converter.Run(document.ID, document.RequestID, document.Format, document.Filename, document.Content)
+	h.convert(document.ID, document.RequestID, document.Format, document.Filename, document.Content)
 
 	http.Redirect(w, r, "/", http.StatusSeeOther)
 }

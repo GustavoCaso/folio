@@ -48,6 +48,15 @@ func (r *Runner) HasCancel(documentID string) bool {
 	return ok
 }
 
+// IsSync reports whether format's parser should run inside the request.
+// Unregistered formats report false; Run marks them failed either way.
+func (r *Runner) IsSync(format domain.DocumentFormat) bool {
+	p, ok := r.parsers[format]
+	return ok && p.Sync()
+}
+
+// Run converts the document. The parser records the outcome (DONE or FAILED
+// with its error) in the store, so there is nothing to return.
 func (r *Runner) Run(documentID, requestID string, format domain.DocumentFormat, filename string, data []byte) {
 	log := r.logger.With("document_id", documentID, "request_id", requestID, "filename", filename, "format", format)
 	start := time.Now()

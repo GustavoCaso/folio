@@ -89,6 +89,11 @@
   outline-offset: 1px;
 }
 
+#drop-zone[aria-disabled="true"] {
+  pointer-events: none;
+  opacity: 0.6;
+}
+
 /* ---- Body: sidebar + results ---- */
 
 .library-body {
