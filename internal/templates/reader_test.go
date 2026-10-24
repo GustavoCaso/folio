@@ -8,6 +8,7 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 )
 
 func renderReader(t *testing.T, document domain.Document, html string, hls []domain.Highlight) string {
@@ -19,7 +20,7 @@ func renderReader(t *testing.T, document domain.Document, html string, hls []dom
 	return buf.String()
 }
 
-func renderReaderEpub(t *testing.T, document domain.Document, html string, hls []domain.Highlight, toc []templates.EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) string {
+func renderReaderEpub(t *testing.T, document domain.Document, html string, hls []domain.Highlight, toc []views.EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) string {
 	t.Helper()
 	var buf bytes.Buffer
 	if err := templates.Reader(document, html, hls, toc, currentChapterIdx, lastChapterIdx, full).Render(context.Background(), &buf); err != nil {
@@ -123,8 +124,8 @@ func TestReaderHighlightsPanelEmpty(t *testing.T) {
 }
 
 func TestReaderEpubSidebarRendersTOC(t *testing.T) {
-	toc := []templates.EpubTOCEntry{
-		{Title: "Chapter One", ChapterIdx: 0, Items: []templates.EpubTOCEntry{
+	toc := []views.EpubTOCEntry{
+		{Title: "Chapter One", ChapterIdx: 0, Items: []views.EpubTOCEntry{
 			{Title: "Subsection", ChapterIdx: 0, Anchor: "sub1"},
 		}},
 		{Title: "Chapter Two", ChapterIdx: 1},
@@ -156,7 +157,7 @@ func TestReaderEpubSidebarRendersTOC(t *testing.T) {
 // empty data-tui-sidebar-target and clicking it matched no sidebar element.
 // This test extracts both rendered attribute values and asserts they match.
 func TestReaderEpubSidebarTriggerTargetsSidebarID(t *testing.T) {
-	toc := []templates.EpubTOCEntry{{Title: "Chapter One", ChapterIdx: 0}}
+	toc := []views.EpubTOCEntry{{Title: "Chapter One", ChapterIdx: 0}}
 	got := renderReaderEpub(t, domain.Document{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 0, false)
 
 	target := extractAttr(t, got, "data-tui-sidebar-target")
@@ -210,7 +211,7 @@ func TestReaderWithoutTOCRendersChapterNavigation(t *testing.T) {
 }
 
 func TestReaderEpubHasSidebarScript(t *testing.T) {
-	toc := []templates.EpubTOCEntry{{Title: "Chapter One", ChapterIdx: 0}}
+	toc := []views.EpubTOCEntry{{Title: "Chapter One", ChapterIdx: 0}}
 	got := renderReaderEpub(t, domain.Document{ID: "j1", Filename: "book.epub"}, "<p>chapter content</p>", nil, toc, 0, 0, false)
 
 	if !strings.Contains(got, "/templui/js/sidebar") {

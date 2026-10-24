@@ -1,20 +1,12 @@
 package templates
 
 import (
-	"unicode/utf8"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/table"
 )
-
-func truncate(s string, n int) string {
-	if utf8.RuneCountInString(s) <= n {
-		return s
-	}
-	runes := []rune(s)
-	return string(runes[:n]) + "…"
-}
 
 templ exportStatusBadge(status string) {
 	switch status {
@@ -36,7 +28,7 @@ templ exportStatusBadge(status string) {
 }
 
 templ Exports(records []domain.ExportRecord) {
-	@Layout("Exports", NoAction(), NoAction(), NoAction(), "") {
+	@Layout("Exports", NoAction(), NoAction(), NoAction(), "", false) {
 		<div class="flex flex-col gap-6">
 			<h1 class="text-2xl font-semibold">Export History</h1>
 			if len(records) == 0 {
@@ -75,7 +67,7 @@ templ Exports(records []domain.ExportRecord) {
 						for _, rec := range records {
 							@table.Row() {
 								@table.Cell() {
-									<p class="line-clamp-2 font-medium">{ truncate(rec.HighlightText, 80) }</p>
+									<p class="line-clamp-2 font-medium">{ views.Truncate(rec.HighlightText, 80) }</p>
 								}
 								@table.Cell() {
 									if rec.HighlightNote != "" {

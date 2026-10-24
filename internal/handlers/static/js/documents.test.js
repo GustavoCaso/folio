@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { watchDocument } from "./documents.js";
+import { watchDocument, setView } from "./documents.js";
 
 function makeDocumentCard(id, { filename = "test.pdf", status = "PENDING", error = "" } = {}) {
   const card = document.createElement("div");
@@ -167,5 +167,73 @@ describe("watchDocument", () => {
     await new Promise(r => setTimeout(r, 0));
 
     expect(fetchSpy).toHaveBeenCalledWith("/documents/w6", expect.objectContaining({ method: "DELETE" }));
+  });
+});
+
+describe("watchDocument DONE with library card markup", () => {
+  function makeLibraryCard(id) {
+    const card = document.createElement("li");
+    card.id = "document-" + id;
+    card.innerHTML = `
+      <span data-filename hidden>book.epub</span>
+      <a data-read-link class="book-cover"><span data-cover-placeholder></span></a>
+      <div class="book-meta">
+        <h3 class="book-title"><a data-read-link data-title>book.epub</a></h3>
+        <div class="book-status"><span data-status-badge></span><p data-status-text></p></div>
+      </div>
+      <div data-actions></div>`;
+    document.body.appendChild(card);
+    return card;
+  }
+
+  it("links cover and title to the reader, swaps in cover image, title and author", () => {
+    const card = makeLibraryCard("lib1");
+    const es = makeEventSource();
+    watchDocument("lib1");
+
+    es.fire("lib1", { Status: "DONE", Cover: "AAAA", Title: "Dune", Author: "Frank Herbert" });
+
+    card.querySelectorAll("[data-read-link]").forEach((a) => {
+      expect(a.getAttribute("href")).toBe("/read/lib1");
+    });
+    expect(card.querySelector("[data-cover-placeholder]")).toBeNull();
+    expect(card.querySelector("img[data-cover]").src).toContain("data:image/png;base64,AAAA");
+    expect(card.querySelector("[data-title]").textContent).toBe("Dune");
+    const author = card.querySelector("[data-author]");
+    expect(author.textContent).toBe("Frank Herbert");
+    expect(author.getAttribute("href")).toBe("/?author=Frank+Herbert");
+    expect(card.querySelector(".book-title").nextElementSibling).toBe(author);
+  });
+});
+
+describe("setView", () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <button data-view-toggle="grid" aria-pressed="true"></button>
+      <button data-view-toggle="list" aria-pressed="false"></button>
+      <section id="library" data-view="grid"></section>`;
+    document.cookie = "folio_view=; Path=/; Max-Age=0";
+  });
+
+  it("switches data-view, pressed state and writes the cookie", () => {
+    setView("list");
+
+    expect(document.getElementById("library").dataset.view).toBe("list");
+    expect(document.querySelector('[data-view-toggle="list"]').getAttribute("aria-pressed")).toBe("true");
+    expect(document.querySelector('[data-view-toggle="grid"]').getAttribute("aria-pressed")).toBe("false");
+    expect(document.cookie).toContain("folio_view=list");
+  });
+
+  it("ignores unknown views", () => {
+    setView("table");
+
+    expect(document.getElementById("library").dataset.view).toBe("grid");
+    expect(document.cookie).not.toContain("folio_view=table");
+  });
+
+  it("toggle button click applies the view", () => {
+    document.querySelector('[data-view-toggle="list"]').dispatchEvent(new MouseEvent("click", { bubbles: true }));
+
+    expect(document.getElementById("library").dataset.view).toBe("list");
   });
 });

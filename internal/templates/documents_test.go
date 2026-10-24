@@ -8,12 +8,13 @@ import (
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 )
 
 func renderDocuments(t *testing.T, documents []domain.Document, watchDocumentIDs ...string) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.Documents(documents, watchDocumentIDs, "").Render(context.Background(), &buf); err != nil {
+	if err := templates.Documents(views.LibraryPage{Documents: documents, WatchDocumentIDs: watchDocumentIDs}).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()
@@ -22,7 +23,7 @@ func renderDocuments(t *testing.T, documents []domain.Document, watchDocumentIDs
 func renderDocumentList(t *testing.T, documents []domain.Document) string {
 	t.Helper()
 	var buf bytes.Buffer
-	if err := templates.DocumentList(documents).Render(context.Background(), &buf); err != nil {
+	if err := templates.DocumentList(documents, domain.DocumentFilter{}).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	return buf.String()
@@ -120,7 +121,7 @@ func TestDocumentsIncludesDocumentList(t *testing.T) {
 
 func TestDocumentsShowsErrorBanner(t *testing.T) {
 	var buf bytes.Buffer
-	if err := templates.Documents(nil, nil, "Something went wrong").Render(context.Background(), &buf); err != nil {
+	if err := templates.Documents(views.LibraryPage{ErrMsg: "Something went wrong"}).Render(context.Background(), &buf); err != nil {
 		t.Fatalf("render: %v", err)
 	}
 	got := buf.String()
@@ -235,5 +236,85 @@ func TestDocuments_UploadButtonStartsDisabled(t *testing.T) {
 	}
 	if !strings.Contains(got, `disabled`) {
 		t.Errorf("expected upload button to be disabled initially, got:\n%s", got)
+	}
+}
+
+func renderLibrary(t *testing.T, page views.LibraryPage) string {
+	t.Helper()
+	var buf bytes.Buffer
+	if err := templates.Documents(page).Render(context.Background(), &buf); err != nil {
+		t.Fatalf("render: %v", err)
+	}
+	return buf.String()
+}
+
+func TestDocuments_ActiveFacetLinkRemovesItself(t *testing.T) {
+	got := renderLibrary(t, views.LibraryPage{
+		Filter: domain.DocumentFilter{Query: "dune", Author: "Frank Herbert"},
+		Facets: domain.Facets{Authors: []domain.FacetCount{{Value: "Frank Herbert", Count: 2}}},
+	})
+
+	// Rendered twice: desktop sidebar and mobile sheet.
+	if n := strings.Count(got, `href="/?q=dune" class="facet" aria-current="true"`); n != 2 {
+		t.Errorf("expected active author facet linking back to the search only (x2), found %d in:\n%s", n, got)
+	}
+}
+
+func TestDocuments_FilterChipsAndClearAll(t *testing.T) {
+	got := renderLibrary(t, views.LibraryPage{
+		Filter: domain.DocumentFilter{Query: "dune", Tag: "sci-fi"},
+	})
+
+	for _, want := range []string{
+		`href="/?tag=sci-fi" class="filter-chip"`, // removing the query keeps the tag
+		`href="/?q=dune" class="filter-chip"`,     // removing the tag keeps the query
+		`<input type="hidden" name="tag" value="sci-fi">`,
+		"Clear all",
+		"No books match these filters.",
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %q in output", want)
+		}
+	}
+}
+
+func TestDocuments_NoFilterHidesClearAll(t *testing.T) {
+	got := renderLibrary(t, views.LibraryPage{})
+	if strings.Contains(got, "Clear all") {
+		t.Error("did not expect Clear all without filters")
+	}
+	if !strings.Contains(got, "Your library is empty.") {
+		t.Error("expected empty library state")
+	}
+}
+
+func TestDocuments_ViewTogglePressedState(t *testing.T) {
+	got := renderLibrary(t, views.LibraryPage{View: views.ViewList})
+	if !strings.Contains(got, `data-view-toggle="list" aria-pressed="true"`) {
+		t.Errorf("expected list toggle pressed, got:\n%s", got)
+	}
+	if !strings.Contains(got, `data-view-toggle="grid" aria-pressed="false"`) {
+		t.Errorf("expected grid toggle not pressed")
+	}
+}
+
+func TestDocumentList_AuthorAndTagLinksKeepFilter(t *testing.T) {
+	var buf bytes.Buffer
+	err := templates.DocumentList(
+		[]domain.Document{{ID: "j1", Filename: "dune.epub", Status: "DONE", Author: "Frank Herbert", Tags: []string{"sci-fi"}}},
+		domain.DocumentFilter{Query: "dune"},
+	).Render(context.Background(), &buf)
+	if err != nil {
+		t.Fatal(err)
+	}
+	got := buf.String()
+	for _, want := range []string{
+		`href="/?author=Frank+Herbert&amp;q=dune"`,
+		`href="/?q=dune&amp;tag=sci-fi"`,
+		`data-cover-placeholder`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %q in output:\n%s", want, got)
+		}
 	}
 }

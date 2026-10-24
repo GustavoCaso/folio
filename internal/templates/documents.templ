@@ -1,111 +1,113 @@
 package templates
 
 import (
-	"encoding/base64"
+	"strconv"
 	"strings"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 	"github.com/templui/templui/components/badge"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
 	"github.com/templui/templui/components/collapsible"
+	"github.com/templui/templui/components/dropdown"
 	"github.com/templui/templui/components/icon"
+	"github.com/templui/templui/components/sheet"
 )
 
-func coverBase64(j domain.Document) string {
-	return base64.StdEncoding.EncodeToString(j.Cover)
-}
-
-templ documentCard(j domain.Document) {
-	@card.Card(card.Props{ID: "document-" + j.ID}) {
-		@card.Content(card.ContentProps{Class: "flex flex-col gap-3"}) {
-			<div class="flex items-start justify-between gap-2">
-				<p class="font-medium text-sm leading-snug truncate" data-filename>{ j.Filename }</p>
+templ documentCard(j domain.Document, filter domain.DocumentFilter) {
+	<li id={ "document-" + j.ID } class="book">
+		<span data-filename hidden>{ j.Filename }</span>
+		<a
+			data-read-link
+			class="book-cover"
+			if j.Status == "DONE" {
+				href={ templ.SafeURL("/read/" + j.ID) }
+			}
+			tabindex="-1"
+			aria-hidden="true"
+		>
+			if len(j.Cover) > 0 {
+				<img data-cover src={ "data:image/png;base64," + views.CoverBase64(j) } alt="" class="book-cover-img"/>
+			} else {
+				<span class={ "book-cover-placeholder", views.CoverTone(j) } data-cover-placeholder>
+					<span class="book-cover-placeholder-title">{ views.DisplayTitle(j) }</span>
+					if j.Author != "" {
+						<span class="book-cover-placeholder-author">{ j.Author }</span>
+					}
+				</span>
+			}
+			if j.ReadingProgress != "" {
+				<span class="book-ribbon" title="In progress">
+					@icon.Bookmark(icon.Props{Class: "h-6 w-6"})
+				</span>
+			}
+		</a>
+		<div class="book-meta">
+			<h3 class="book-title">
+				<a
+					data-read-link
+					data-title
+					if j.Status == "DONE" {
+						href={ templ.SafeURL("/read/" + j.ID) }
+					}
+				>{ views.DisplayTitle(j) }</a>
+			</h3>
+			if j.Author != "" {
+				<a data-author class="book-author" href={ templ.URL(views.ToggleAuthorURL(filter, j.Author)) }>{ j.Author }</a>
+			}
+			if len(j.Tags) > 0 {
+				<ul class="book-tags" aria-label="Tags">
+					for _, tag := range j.Tags {
+						<li><a href={ templ.URL(views.ToggleTagURL(filter, tag)) }>{ tag }</a></li>
+					}
+				</ul>
+			}
+			<div class="book-status">
 				<span data-status-badge>
 					@documentBadge(j.Status)
 				</span>
+				<p class="text-xs text-muted-foreground" data-status-text>
+					if j.Status == "FAILED" {
+						{ j.Error }
+					}
+				</p>
 			</div>
-			<div data-metadata class="flex flex-col gap-1">
-				if len(j.Cover) > 0 {
-					<img
-						data-cover
-						src={ "data:image/png;base64," + coverBase64(j) }
-						alt="cover"
-						class="w-full rounded object-cover aspect-[3/4] bg-muted"
-					/>
+		</div>
+		<div class="book-menu">
+			@dropdown.Dropdown() {
+				@dropdown.Trigger() {
+					<button type="button" class="book-menu-trigger" aria-label={ "Actions for " + views.DisplayTitle(j) }>
+						@icon.Ellipsis(icon.Props{Class: "h-4 w-4"})
+					</button>
 				}
-				if j.Title != "" {
-					<p data-title class="text-xs font-medium truncate">Title: { j.Title }</p>
-				}
-				if j.Author != "" {
-					<p data-author class="text-xs text-muted-foreground truncate">Author: { j.Author }</p>
-				}
-				if len(j.Tags) > 0 {
-					<div class="flex flex-wrap gap-1 mt-1">
-						for _, tag := range j.Tags {
-							<span class="inline-flex items-center rounded-full bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">{ tag }</span>
-						}
+				@dropdown.Content(dropdown.ContentProps{Placement: dropdown.PlacementBottomEnd}) {
+					<div class="flex flex-col" data-actions>
+						@documentActions(j)
 					</div>
 				}
-			</div>
-			<p class="text-xs text-muted-foreground" data-status-text>
-				if j.Status == "FAILED" {
-					{ j.Error }
-				}
-			</p>
-			<div class="flex items-center gap-2 mt-1" data-actions>
-				if j.Status == "PENDING" {
-					@button.Button(button.Props{
-						Variant:    button.VariantGhost,
-						Attributes: map[string]any{"data-cancel-document": j.ID, "data-document-name": j.Filename},
-						Size:       button.SizeSm,
-						Class:      "text-destructive hover:text-destructive",
-						Type:       button.TypeButton,
-					}) {
-						Cancel
-					}
-				}
-				if j.Status == "DONE" {
-					@button.Button(button.Props{
-						Variant: button.VariantOutline,
-						Size:    button.SizeSm,
-						Href:    "/read/" + j.ID,
-					}) {
-						Read
-					}
-				}
-				@button.Button(button.Props{
-					Variant: button.VariantGhost,
-					Size:    button.SizeSm,
-					Href:    "/documents/" + j.ID + "/edit",
-				}) {
-					Edit
-				}
-				if j.Status == "FAILED" {
-					<form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") }>
-						@button.Button(button.Props{
-							Attributes: map[string]any{"data-retry-document": j.ID, "data-document-name": j.Filename},
-							Variant:    button.VariantGhost,
-							Size:       button.SizeSm,
-							Type:       button.TypeSubmit,
-						}) {
-							Retry
-						}
-					</form>
-				}
-				if j.Status == "DONE" || j.Status == "FAILED" {
-					@button.Button(button.Props{
-						Variant:    button.VariantGhost,
-						Attributes: map[string]any{"data-delete-document": j.ID, "data-document-name": j.Filename},
-						Size:       button.SizeSm,
-						Class:      "text-destructive hover:text-destructive",
-						Type:       button.TypeButton,
-					}) {
-						Delete
-					}
-				}
-			</div>
-		}
+			}
+		</div>
+	</li>
+}
+
+// documentActions mirrors the menu items documents.js writes when a watched
+// document changes status; keep the markup in sync.
+templ documentActions(j domain.Document) {
+	if j.Status == "PENDING" {
+		<button type="button" data-tui-dropdown-item class="book-menu-item book-menu-item-danger" data-cancel-document={ j.ID } data-document-name={ j.Filename }>Cancel</button>
+	}
+	if j.Status == "DONE" {
+		<a data-tui-dropdown-item class="book-menu-item" href={ templ.SafeURL("/read/" + j.ID) }>Read</a>
+	}
+	<a data-tui-dropdown-item class="book-menu-item" href={ templ.SafeURL("/documents/" + j.ID + "/edit") }>Edit</a>
+	if j.Status == "FAILED" {
+		<form class="retry-form" method="POST" action={ templ.SafeURL("/documents/" + j.ID + "/retry") }>
+			<button type="submit" data-tui-dropdown-item class="book-menu-item" data-retry-document={ j.ID } data-document-name={ j.Filename }>Retry</button>
+		</form>
+	}
+	if j.Status == "DONE" || j.Status == "FAILED" {
+		<button type="button" data-tui-dropdown-item class="book-menu-item book-menu-item-danger" data-delete-document={ j.ID } data-document-name={ j.Filename }>Delete</button>
 	}
 }
 
@@ -127,25 +129,163 @@ templ documentBadge(status string) {
 	}
 }
 
-templ DocumentList(documents []domain.Document) {
+templ DocumentList(documents []domain.Document, filter domain.DocumentFilter) {
 	if len(documents) > 0 {
-		<div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+		<ol class="library-books">
 			for _, j := range documents {
-				@documentCard(j)
+				@documentCard(j, filter)
 			}
-		</div>
+		</ol>
 	}
 }
 
-templ Documents(documents []domain.Document, watchDocumentIDs []string, errMsg string) {
-	@Layout("Documents", NoAction(), NoAction(), NoAction(), "") {
-		@ErrorBanner(errMsg)
-		<div class="flex flex-col gap-8">
-			<div class="flex flex-col gap-4">
-				<!-- Title row with toggle -->
-				@collapsible.Collapsible(collapsible.Props{ID: "add-document"}) {
-					<div class="flex items-center justify-between">
-						<h1 class="text-2xl font-semibold" style="font-family:'Lora',Georgia,serif;">Documents</h1>
+templ libraryHead() {
+	@dropdown.Script()
+	<link rel="stylesheet" href="/static/css/library.css"/>
+}
+
+templ facetLink(label string, count int, href string, active bool) {
+	<li>
+		<a
+			href={ templ.URL(href) }
+			class="facet"
+			if active {
+				aria-current="true"
+				title={ "Remove " + label }
+			}
+		>
+			<span class="facet-label">{ label }</span>
+			if active {
+				@icon.X(icon.Props{Class: "h-3.5 w-3.5 shrink-0"})
+			} else {
+				<span class="facet-count">{ strconv.Itoa(count) }</span>
+			}
+		</a>
+	</li>
+}
+
+templ libraryFacets(page views.LibraryPage) {
+	<nav class="facets" aria-label="Filter books">
+		if len(page.Facets.Authors) == 0 && len(page.Facets.Tags) == 0 {
+			<p class="text-sm text-muted-foreground">Authors and tags show up here once your books have them.</p>
+		}
+		if len(page.Facets.Authors) > 0 {
+			<section>
+				<h2 class="facet-heading">Authors</h2>
+				<ul>
+					for _, a := range page.Facets.Authors {
+						@facetLink(a.Value, a.Count, views.ToggleAuthorURL(page.Filter, a.Value), page.Filter.Author == a.Value)
+					}
+				</ul>
+			</section>
+		}
+		if len(page.Facets.Tags) > 0 {
+			<section>
+				<h2 class="facet-heading">Tags</h2>
+				<ul>
+					for _, t := range page.Facets.Tags {
+						@facetLink(t.Value, t.Count, views.ToggleTagURL(page.Filter, t.Value), page.Filter.Tag == t.Value)
+					}
+				</ul>
+			</section>
+		}
+	</nav>
+}
+
+templ filterChip(label string, href string) {
+	<a href={ templ.URL(href) } class="filter-chip" title={ "Remove " + label }>
+		{ label }
+		@icon.X(icon.Props{Class: "h-3 w-3"})
+	</a>
+}
+
+templ viewToggle(view views.LibraryView) {
+	<div class="view-toggle" role="group" aria-label="Layout">
+		<button type="button" data-view-toggle="grid" aria-pressed={ strconv.FormatBool(view != views.ViewList) } aria-label="Show as grid" title="Grid">
+			@icon.LayoutGrid(icon.Props{Class: "h-4 w-4"})
+		</button>
+		<button type="button" data-view-toggle="list" aria-pressed={ strconv.FormatBool(view == views.ViewList) } aria-label="Show as list" title="List">
+			@icon.List(icon.Props{Class: "h-4 w-4"})
+		</button>
+	</div>
+}
+
+templ uploadForm() {
+	@card.Card() {
+		@card.Content() {
+			<!-- Drop zone (upload) -->
+			<form id="upload-form" method="POST" action="/documents" enctype="multipart/form-data">
+				<input
+					id="file-input"
+					type="file"
+					name="document"
+					accept=".epub"
+					required
+					class="sr-only"
+				/>
+				<div
+					id="drop-zone"
+					role="button"
+					tabindex="0"
+					aria-label="Drop a document here or click to browse"
+					class="relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-6 py-8 text-center transition-all duration-200 cursor-pointer hover:border-foreground/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+				>
+					<span class="text-muted-foreground/60 mb-1 pointer-events-none">
+						@icon.FileUp(icon.Props{Class: "w-8 h-8"})
+					</span>
+					<p id="drop-label" class="text-sm font-medium text-foreground pointer-events-none" style="font-family:'DM Sans',sans-serif;">Drop an EPUB here</p>
+					<p class="text-xs text-muted-foreground pointer-events-none">or click to browse</p>
+				</div>
+				<div id="upload-actions" class="hidden mt-3 flex items-center justify-between gap-3 px-1">
+					<span id="selected-filename" class="text-sm text-muted-foreground truncate flex-1"></span>
+					@button.Button(button.Props{
+						ID:   "upload-btn",
+						Type: button.TypeSubmit,
+						Size: button.SizeSm,
+					}) {
+						Upload
+					}
+				</div>
+			</form>
+			<noscript>
+				<p class="mt-2 text-xs text-muted-foreground">JavaScript is disabled — use the file input above directly.</p>
+			</noscript>
+		}
+	}
+}
+
+templ Documents(page views.LibraryPage) {
+	@Layout("Library", NoAction(), NoAction(), libraryHead(), "", true) {
+		@ErrorBanner(page.ErrMsg)
+		<div class="flex flex-col gap-6">
+			@collapsible.Collapsible(collapsible.Props{ID: "add-document"}) {
+				<div class="library-head">
+					<h1 class="library-title">Library</h1>
+					<form role="search" method="GET" action="/" class="library-search">
+						@icon.Search(icon.Props{Class: "library-search-icon h-4 w-4"})
+						<input
+							type="search"
+							name="q"
+							value={ page.Filter.Query }
+							placeholder="Search by title, author or filename"
+							aria-label="Search books"
+							autocomplete="off"
+						/>
+						if page.Filter.Author != "" {
+							<input type="hidden" name="author" value={ page.Filter.Author }/>
+						}
+						if page.Filter.Tag != "" {
+							<input type="hidden" name="tag" value={ page.Filter.Tag }/>
+						}
+					</form>
+					<div class="flex items-center gap-2">
+						@viewToggle(page.View)
+						@sheet.Trigger(sheet.TriggerProps{For: "library-filters", Class: "md:hidden"}) {
+							@button.Button(button.Props{Variant: button.VariantOutline, Size: button.SizeSm, Class: "gap-1.5"}) {
+								@icon.ListFilter(icon.Props{Class: "h-3.5 w-3.5"})
+								<span class="sr-only sm:not-sr-only">Filters</span>
+							}
+						}
 						@collapsible.Trigger() {
 							@button.Button(button.Props{
 								Variant: button.VariantOutline,
@@ -153,63 +293,68 @@ templ Documents(documents []domain.Document, watchDocumentIDs []string, errMsg s
 							}) {
 								<span class="flex items-center gap-1.5">
 									@icon.Plus(icon.Props{Class: "w-3.5 h-3.5"})
-									Add document
+									<span class="sr-only sm:not-sr-only">Add book</span>
 								</span>
 							}
 						}
 					</div>
-					<!-- Full-width collapsible form -->
-					@collapsible.Content() {
-						<div class="mt-4">
-							@card.Card() {
-								@card.Content() {
-									<!-- Drop zone (upload) -->
-									<form id="upload-form" method="POST" action="/documents" enctype="multipart/form-data">
-										<input
-											id="file-input"
-											type="file"
-											name="document"
-											accept=".epub"
-											required
-											class="sr-only"
-										/>
-										<div
-											id="drop-zone"
-											role="button"
-											tabindex="0"
-											aria-label="Drop a document here or click to browse"
-											class="relative flex flex-col items-center justify-center gap-2 rounded-lg border-2 border-dashed border-border px-6 py-8 text-center transition-all duration-200 cursor-pointer hover:border-foreground/40 hover:bg-accent/30 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-										>
-											<span class="text-muted-foreground/60 mb-1 pointer-events-none">
-												@icon.FileUp(icon.Props{Class: "w-8 h-8"})
-											</span>
-											<p id="drop-label" class="text-sm font-medium text-foreground pointer-events-none" style="font-family:'DM Sans',sans-serif;">Drop an EPUB here</p>
-											<p class="text-xs text-muted-foreground pointer-events-none">or click to browse</p>
-										</div>
-										<div id="upload-actions" class="hidden mt-3 flex items-center justify-between gap-3 px-1">
-											<span id="selected-filename" class="text-sm text-muted-foreground truncate flex-1"></span>
-											@button.Button(button.Props{
-												ID:   "upload-btn",
-												Type: button.TypeSubmit,
-												Size: button.SizeSm,
-											}) {
-												Upload
-											}
-										</div>
-									</form>
-									<noscript>
-										<p class="mt-2 text-xs text-muted-foreground">JavaScript is disabled — use the file input above directly.</p>
-									</noscript>
-								}
-							}
+				</div>
+				@collapsible.Content() {
+					<div class="mt-4">
+						@uploadForm()
+					</div>
+				}
+			}
+			<div class="library-body">
+				<aside class="library-sidebar">
+					@libraryFacets(page)
+				</aside>
+				<section id="library" class="library-results" data-view={ string(page.View) } aria-label="Books">
+					<div class="library-summary">
+						<span class="text-sm text-muted-foreground">{ views.BookCount(len(page.Documents)) }</span>
+						if page.Filter.Query != "" {
+							@filterChip("“"+page.Filter.Query+"”", views.LibraryURL(domain.DocumentFilter{Author: page.Filter.Author, Tag: page.Filter.Tag}))
+						}
+						if page.Filter.Author != "" {
+							@filterChip("Author: "+page.Filter.Author, views.ToggleAuthorURL(page.Filter, page.Filter.Author))
+						}
+						if page.Filter.Tag != "" {
+							@filterChip("Tag: "+page.Filter.Tag, views.ToggleTagURL(page.Filter, page.Filter.Tag))
+						}
+						if page.Filter.Active() {
+							<a href="/" class="text-sm text-muted-foreground underline-offset-4 hover:text-foreground hover:underline">Clear all</a>
+						}
+					</div>
+					if len(page.Documents) > 0 {
+						@DocumentList(page.Documents, page.Filter)
+					} else if page.Filter.Active() {
+						<div class="library-empty">
+							<p class="library-empty-title">No books match these filters.</p>
+							<p class="text-sm text-muted-foreground">Try a different search, or <a href="/" class="underline underline-offset-4 hover:text-foreground">clear all filters</a>.</p>
+						</div>
+					} else {
+						<div class="library-empty">
+							<p class="library-empty-title">Your library is empty.</p>
+							<p class="text-sm text-muted-foreground">Add an EPUB with the Add book button to start reading.</p>
 						</div>
 					}
-				}
+				</section>
 			</div>
-			@DocumentList(documents)
 		</div>
-		if len(watchDocumentIDs) > 0 {
-			<div id="watch-config" data-document-ids={ strings.Join(watchDocumentIDs, ",") } style="display:none"></div>
+		@sheet.Sheet(sheet.Props{ID: "library-filters", Side: sheet.SideLeft}) {
+			@sheet.Content() {
+				@sheet.Header() {
+					@sheet.Title() {
+						Filters
+					}
+				}
+				<div class="overflow-y-auto px-4 pb-4">
+					@libraryFacets(page)
+				</div>
+			}
+		}
+		if len(page.WatchDocumentIDs) > 0 {
+			<div id="watch-config" data-document-ids={ strings.Join(page.WatchDocumentIDs, ",") } style="display:none"></div>
 		}
 		<script type="module" src="/static/js/documents.js"></script>
 	}

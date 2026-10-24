@@ -146,7 +146,7 @@ func TestUploadDocument_EPUBSetsFormat(t *testing.T) {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
 	}
 
-	documents, err := store.ListDocuments(context.Background())
+	documents, err := store.ListDocuments(context.Background(), domain.DocumentFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestUploadDocument_RejectsNonEPUB(t *testing.T) {
 	if rec.Code != http.StatusBadRequest {
 		t.Fatalf("status = %d, want %d", rec.Code, http.StatusBadRequest)
 	}
-	documents, err := store.ListDocuments(context.Background())
+	documents, err := store.ListDocuments(context.Background(), domain.DocumentFilter{})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -501,5 +501,114 @@ func TestListDocuments_RendersDocuments_And_PendingDocuments(t *testing.T) {
 	}
 	if strings.Contains(body, `class="error-banner"`) {
 		t.Errorf("unexpected error-banner on successful list, got:\n%s", body)
+	}
+}
+
+func seedBook(t *testing.T, store repository.Store, filename, title, author string, tags []string) {
+	t.Helper()
+	doc, err := store.CreateDocument(t.Context(), filename, []byte{}, "", domain.EpubFormat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.UpdateDocument(t.Context(), doc.ID, title, author, tags, nil); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestListDocuments_FiltersByQueryAuthorAndTag(t *testing.T) {
+	store := newTestStore(t)
+	seedBook(t, store, "dune.epub", "Dune", "Frank Herbert", []string{"sci-fi"})
+	seedBook(t, store, "messiah.epub", "Dune Messiah", "Frank Herbert", []string{"sequel"})
+	seedBook(t, store, "earthsea.epub", "A Wizard of Earthsea", "Ursula K. Le Guin", []string{"fantasy"})
+	mux, _ := newTestMux(t, store)
+
+	cases := []struct {
+		url      string
+		want     []string
+		dontWant []string
+	}{
+		{"/?q=dune", []string{"dune.epub", "messiah.epub"}, []string{"earthsea.epub"}},
+		{"/?author=Ursula+K.+Le+Guin", []string{"earthsea.epub"}, []string{"dune.epub"}},
+		{"/?q=dune&tag=sequel", []string{"messiah.epub"}, []string{"dune.epub", "earthsea.epub"}},
+	}
+	for _, tc := range cases {
+		t.Run(tc.url, func(t *testing.T) {
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, tc.url, nil))
+			if rec.Code != http.StatusOK {
+				t.Fatalf("expected 200, got %d", rec.Code)
+			}
+			body := rec.Body.String()
+			for _, w := range tc.want {
+				if !strings.Contains(body, w) {
+					t.Errorf("expected %q in response", w)
+				}
+			}
+			for _, w := range tc.dontWant {
+				if strings.Contains(body, w) {
+					t.Errorf("did not expect %q in response", w)
+				}
+			}
+		})
+	}
+}
+
+func TestListDocuments_FacetCountsFollowFilter(t *testing.T) {
+	store := newTestStore(t)
+	seedBook(t, store, "dune.epub", "Dune", "Frank Herbert", []string{"sci-fi"})
+	seedBook(t, store, "earthsea.epub", "A Wizard of Earthsea", "Ursula K. Le Guin", []string{"fantasy"})
+	mux, _ := newTestMux(t, store)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/?tag=fantasy", nil))
+	body := rec.Body.String()
+
+	// Facet links are the only place author names appear as toggle hrefs
+	// that keep the active tag.
+	if !strings.Contains(body, `href="/?author=Ursula+K.+Le+Guin&amp;tag=fantasy"`) {
+		t.Errorf("expected Le Guin facet keeping tag filter, got:\n%s", body)
+	}
+	if strings.Contains(body, "Frank Herbert") {
+		t.Errorf("expected Herbert facet to be narrowed away, got:\n%s", body)
+	}
+}
+
+func TestListDocuments_EmptyFilterResult(t *testing.T) {
+	store := newTestStore(t)
+	seedBook(t, store, "dune.epub", "Dune", "Frank Herbert", nil)
+	mux, _ := newTestMux(t, store)
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/?q=nothing", nil))
+	if !strings.Contains(rec.Body.String(), "No books match these filters.") {
+		t.Errorf("expected empty filter state, got:\n%s", rec.Body.String())
+	}
+}
+
+func TestListDocuments_ViewFromCookie(t *testing.T) {
+	store := newTestStore(t)
+	mux, _ := newTestMux(t, store)
+
+	cases := []struct {
+		cookie string
+		want   string
+	}{
+		{"", `data-view="grid"`},
+		{"list", `data-view="list"`},
+		{"grid", `data-view="grid"`},
+		{"bogus", `data-view="grid"`},
+	}
+	for _, tc := range cases {
+		t.Run("cookie="+tc.cookie, func(t *testing.T) {
+			req := httptest.NewRequest(http.MethodGet, "/", nil)
+			if tc.cookie != "" {
+				req.AddCookie(&http.Cookie{Name: "folio_view", Value: tc.cookie})
+			}
+			rec := httptest.NewRecorder()
+			mux.ServeHTTP(rec, req)
+			if !strings.Contains(rec.Body.String(), tc.want) {
+				t.Errorf("expected %s in response", tc.want)
+			}
+		})
 	}
 }

@@ -26,6 +26,29 @@ type Document struct {
 	UpdatedAt       time.Time
 }
 
+// DocumentFilter narrows the library listing. Empty fields match everything;
+// set fields combine with AND.
+type DocumentFilter struct {
+	Query  string
+	Author string
+	Tag    string
+}
+
+func (f DocumentFilter) Active() bool {
+	return f.Query != "" || f.Author != "" || f.Tag != ""
+}
+
+type FacetCount struct {
+	Value string
+	Count int
+}
+
+// Facets are the author and tag counts across a filtered result set.
+type Facets struct {
+	Authors []FacetCount
+	Tags    []FacetCount
+}
+
 type Highlight struct {
 	ID           string    `json:"id"`
 	DocumentID   string    `json:"document_id"`

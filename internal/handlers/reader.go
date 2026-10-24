@@ -15,6 +15,7 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	"github.com/GustavoCaso/folio/ui/internal/templates"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 )
 
 func (h *Handlers) ReadDocument(w http.ResponseWriter, r *http.Request) {
@@ -109,15 +110,15 @@ func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, docum
 }
 
 // loadTOC reads and unmarshals toc.json from outputDir directly into
-// templates.EpubTOCEntry — its JSON tags match the shape written by
-// epubconvert.Runner's own tocEntry struct, so no separate read-side struct
+// views.EpubTOCEntry — its JSON tags match the shape written by
+// parser.NewEPUB's own tocEntry struct, so no separate read-side struct
 // is needed here.
-func loadTOC(outputDir string) ([]templates.EpubTOCEntry, error) {
+func loadTOC(outputDir string) ([]views.EpubTOCEntry, error) {
 	data, err := os.ReadFile(filepath.Join(outputDir, "toc.json"))
 	if err != nil {
 		return nil, fmt.Errorf("read toc.json: %w", err)
 	}
-	var entries []templates.EpubTOCEntry
+	var entries []views.EpubTOCEntry
 	if err := json.Unmarshal(data, &entries); err != nil {
 		return nil, fmt.Errorf("unmarshal toc.json: %w", err)
 	}
@@ -129,8 +130,8 @@ func loadTOC(outputDir string) ([]templates.EpubTOCEntry, error) {
 // concatenation. This is independent of len(tocEntries), since the TOC tree
 // may have fewer top-level entries than spine chapters (nested subsections)
 // or, in principle, more (multiple top-level entries could theoretically
-// point at chapters already covered, though buildTOCTree/appendFallback in
-// epubconvert do not currently produce that).
+// point at chapters already covered, though buildTOCTree in
+// parser/epub.go does not currently produce that).
 func countChapterFiles(outputDir string) int {
 	count := 0
 	for {

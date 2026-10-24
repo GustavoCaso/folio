@@ -12,6 +12,7 @@ import (
 	"strconv"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 	"github.com/templui/templui/components/button"
 	"github.com/templui/templui/components/card"
 	"github.com/templui/templui/components/icon"
@@ -21,32 +22,6 @@ import (
 	"github.com/templui/templui/components/sidebar"
 	"github.com/templui/templui/components/textarea"
 )
-
-func highlightCount(highlights []domain.Highlight) string {
-	return strconv.Itoa(len(highlights))
-}
-
-// EpubTOCEntry mirrors the shape written by epubconvert.Runner to toc.json.
-// reader.go unmarshals toc.json directly into this type (the JSON tags match
-// epubconvert's write-side tocEntry struct exactly), so there is no separate
-// read-side struct in the handlers package.
-type EpubTOCEntry struct {
-	Title      string         `json:"title"`
-	ChapterIdx int            `json:"chapter_idx"`
-	Anchor     string         `json:"anchor"`
-	Items      []EpubTOCEntry `json:"items"`
-}
-
-// subsectionHref reproduces the link logic previously in reader.go's
-// writeTOCList: a same-page "#anchor" jump when the subsection belongs to
-// the chapter currently being viewed and we're not in full-view mode;
-// otherwise a cross-chapter "?chapter=N#anchor" link.
-func subsectionHref(item EpubTOCEntry, currentChapterIdx int, full bool) string {
-	if !full && item.ChapterIdx == currentChapterIdx {
-		return "#" + item.Anchor
-	}
-	return "?chapter=" + strconv.Itoa(item.ChapterIdx) + "#" + item.Anchor
-}
 
 func highlightCard(h domain.Highlight) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -100,7 +75,7 @@ func highlightCard(h domain.Highlight) templ.Component {
 				var templ_7745c5c3_Var4 string
 				templ_7745c5c3_Var4, templ_7745c5c3_Err = templ.JoinStringErrs(h.Text)
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 46, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 21, Col: 76}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var4))
 				if templ_7745c5c3_Err != nil {
@@ -118,7 +93,7 @@ func highlightCard(h domain.Highlight) templ.Component {
 					var templ_7745c5c3_Var5 string
 					templ_7745c5c3_Var5, templ_7745c5c3_Err = templ.JoinStringErrs(h.Tag)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 48, Col: 133}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 23, Col: 133}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var5))
 					if templ_7745c5c3_Err != nil {
@@ -141,7 +116,7 @@ func highlightCard(h domain.Highlight) templ.Component {
 					var templ_7745c5c3_Var6 string
 					templ_7745c5c3_Var6, templ_7745c5c3_Err = templ.JoinStringErrs(h.Note)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 51, Col: 66}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 26, Col: 66}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var6))
 					if templ_7745c5c3_Err != nil {
@@ -421,9 +396,9 @@ func headerActions(highlights []domain.Highlight) templ.Component {
 						return templ_7745c5c3_Err
 					}
 					var templ_7745c5c3_Var17 string
-					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(highlightCount(highlights))
+					templ_7745c5c3_Var17, templ_7745c5c3_Err = templ.JoinStringErrs(views.HighlightCount(highlights))
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 110, Col: 172}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 85, Col: 178}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var17))
 					if templ_7745c5c3_Err != nil {
@@ -462,7 +437,7 @@ func headerActions(highlights []domain.Highlight) templ.Component {
 
 // epubTOCItems recursively renders tocEntries as sidebar menu items. Nesting
 // is limited to exactly two levels (chapter + subsection), matching what
-// epubconvert's TOC tree actually produces and what the prior writeTOCList
+// parser.NewEPUB's TOC tree actually produces and what the prior writeTOCList
 // implementation was exercised against — subsections themselves are rendered
 // via MenuSub/MenuSubButton rather than recursing further.
 //
@@ -471,7 +446,7 @@ func headerActions(highlights []domain.Highlight) templ.Component {
 // the viewport back to its TOC link and mark it active, independent of the
 // href (which for cross-chapter subsections points at a page reader.js
 // never navigates to during same-page scrolling).
-func epubTOCItems(entries []EpubTOCEntry, currentChapterIdx int, full bool) templ.Component {
+func epubTOCItems(entries []views.EpubTOCEntry, currentChapterIdx int, full bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -520,7 +495,7 @@ func epubTOCItems(entries []EpubTOCEntry, currentChapterIdx int, full bool) temp
 					var templ_7745c5c3_Var21 string
 					templ_7745c5c3_Var21, templ_7745c5c3_Err = templ.JoinStringErrs(entry.Title)
 					if templ_7745c5c3_Err != nil {
-						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 139, Col: 17}
+						return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 114, Col: 17}
 					}
 					_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var21))
 					if templ_7745c5c3_Err != nil {
@@ -584,7 +559,7 @@ func epubTOCItems(entries []EpubTOCEntry, currentChapterIdx int, full bool) temp
 									var templ_7745c5c3_Var25 string
 									templ_7745c5c3_Var25, templ_7745c5c3_Err = templ.JoinStringErrs(item.Title)
 									if templ_7745c5c3_Err != nil {
-										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 153, Col: 20}
+										return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 128, Col: 20}
 									}
 									_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var25))
 									if templ_7745c5c3_Err != nil {
@@ -593,7 +568,7 @@ func epubTOCItems(entries []EpubTOCEntry, currentChapterIdx int, full bool) temp
 									return nil
 								})
 								templ_7745c5c3_Err = sidebar.MenuSubButton(sidebar.MenuSubButtonProps{
-									Href:     subsectionHref(item, currentChapterIdx, full),
+									Href:     views.SubsectionHref(item, currentChapterIdx, full),
 									IsActive: false,
 									Attributes: map[string]any{
 										"data-toc-chapter": strconv.Itoa(item.ChapterIdx),
@@ -675,7 +650,7 @@ func epubPrevNext(currentChapterIdx, lastChapterIdx int, full bool) templ.Compon
 				var templ_7745c5c3_Var27 templ.SafeURL
 				templ_7745c5c3_Var27, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx-1)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 177, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 152, Col: 76}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var27))
 				if templ_7745c5c3_Err != nil {
@@ -703,7 +678,7 @@ func epubPrevNext(currentChapterIdx, lastChapterIdx int, full bool) templ.Compon
 				var templ_7745c5c3_Var28 templ.SafeURL
 				templ_7745c5c3_Var28, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx+1)))
 				if templ_7745c5c3_Err != nil {
-					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 182, Col: 76}
+					return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 157, Col: 76}
 				}
 				_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var28))
 				if templ_7745c5c3_Err != nil {
@@ -767,7 +742,7 @@ func epubPrevNextRail(side string, targetChapterIdx int, enabled bool) templ.Com
 			var templ_7745c5c3_Var30 templ.SafeURL
 			templ_7745c5c3_Var30, templ_7745c5c3_Err = templ.JoinURLErrs(templ.SafeURL("?chapter=" + strconv.Itoa(targetChapterIdx)))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 200, Col: 70}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 175, Col: 70}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var30))
 			if templ_7745c5c3_Err != nil {
@@ -780,7 +755,7 @@ func epubPrevNextRail(side string, targetChapterIdx int, enabled bool) templ.Com
 			var templ_7745c5c3_Var31 string
 			templ_7745c5c3_Var31, templ_7745c5c3_Err = templ.JoinStringErrs(side)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 202, Col: 14}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 177, Col: 14}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var31))
 			if templ_7745c5c3_Err != nil {
@@ -791,9 +766,9 @@ func epubPrevNextRail(side string, targetChapterIdx int, enabled bool) templ.Com
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var32 string
-			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(railLabel(side))
+			templ_7745c5c3_Var32, templ_7745c5c3_Err = templ.JoinStringErrs(views.RailLabel(side))
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 203, Col: 32}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 178, Col: 38}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var32))
 			if templ_7745c5c3_Err != nil {
@@ -847,13 +822,6 @@ func epubPrevNextRail(side string, targetChapterIdx int, enabled bool) templ.Com
 	})
 }
 
-func railLabel(side string) string {
-	if side == "prev" {
-		return "Previous chapter"
-	}
-	return "Next chapter"
-}
-
 // epubSidebarID is a fixed, explicit sidebar ID used by both
 // sidebar.Sidebar() (in epubSidebar) and sidebar.Trigger() (rendered in
 // Reader's sidebar.Inset() block, outside the collapsible sidebar panel so
@@ -862,7 +830,7 @@ func railLabel(side string) string {
 // fixed ID explicitly via TriggerProps.Target.
 const epubSidebarID = "epub-toc-sidebar"
 
-func epubSidebar(epubTOC []EpubTOCEntry, currentChapterIdx int, full bool) templ.Component {
+func epubSidebar(epubTOC []views.EpubTOCEntry, currentChapterIdx int, full bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -1012,17 +980,6 @@ func epubSidebarTrigger() templ.Component {
 		}
 		return nil
 	})
-}
-
-// currentChapterAttr renders the value for #reader's data-current-chapter
-// attribute: "-1" in full-book view (no single current chapter), otherwise
-// the chapter index. reader.js's TOC scroll tracker
-// reads this to know which chapter's headings to watch.
-func currentChapterAttr(currentChapterIdx int, full bool) string {
-	if full {
-		return "-1"
-	}
-	return strconv.Itoa(currentChapterIdx)
 }
 
 func highlightsPopover(highlights []domain.Highlight) templ.Component {
@@ -1245,7 +1202,7 @@ func readerEpubBody(document domain.Document, renderedHTML string, highlights []
 		var templ_7745c5c3_Var46 string
 		templ_7745c5c3_Var46, templ_7745c5c3_Err = templ.JoinStringErrs(document.ID)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 50}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 292, Col: 50}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var46))
 		if templ_7745c5c3_Err != nil {
@@ -1258,7 +1215,7 @@ func readerEpubBody(document domain.Document, renderedHTML string, highlights []
 		var templ_7745c5c3_Var47 string
 		templ_7745c5c3_Var47, templ_7745c5c3_Err = templ.JoinStringErrs(document.ReadingProgress)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 101}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 292, Col: 101}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var47))
 		if templ_7745c5c3_Err != nil {
@@ -1269,9 +1226,9 @@ func readerEpubBody(document domain.Document, renderedHTML string, highlights []
 			return templ_7745c5c3_Err
 		}
 		var templ_7745c5c3_Var48 string
-		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(currentChapterAttr(currentChapterIdx, full))
+		templ_7745c5c3_Var48, templ_7745c5c3_Err = templ.JoinStringErrs(views.CurrentChapterAttr(currentChapterIdx, full))
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 335, Col: 170}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/reader.templ`, Line: 292, Col: 176}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var48))
 		if templ_7745c5c3_Err != nil {
@@ -1339,7 +1296,7 @@ func readerHeadExtra() templ.Component {
 // When epubTOC is non-empty, the page content is wrapped in a
 // sidebar.Layout/sidebar.Sidebar/sidebar.Inset composition; with an empty
 // TOC (the epub has no usable nav/NCX) no sidebar DOM/JS is emitted.
-func Reader(document domain.Document, renderedHTML string, highlights []domain.Highlight, epubTOC []EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) templ.Component {
+func Reader(document domain.Document, renderedHTML string, highlights []domain.Highlight, epubTOC []views.EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
 		templ_7745c5c3_W, ctx := templ_7745c5c3_Input.Writer, templ_7745c5c3_Input.Context
 		if templ_7745c5c3_CtxErr := ctx.Err(); templ_7745c5c3_CtxErr != nil {
@@ -1423,7 +1380,7 @@ func Reader(document domain.Document, renderedHTML string, highlights []domain.H
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = Layout(document.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded").Render(templ.WithChildren(ctx, templ_7745c5c3_Var51), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Layout(document.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded", false).Render(templ.WithChildren(ctx, templ_7745c5c3_Var51), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
@@ -1446,7 +1403,7 @@ func Reader(document domain.Document, renderedHTML string, highlights []domain.H
 				}
 				return nil
 			})
-			templ_7745c5c3_Err = Layout(document.Filename, NoAction(), headerActions(highlights), NoAction(), "").Render(templ.WithChildren(ctx, templ_7745c5c3_Var54), templ_7745c5c3_Buffer)
+			templ_7745c5c3_Err = Layout(document.Filename, NoAction(), headerActions(highlights), NoAction(), "", false).Render(templ.WithChildren(ctx, templ_7745c5c3_Var54), templ_7745c5c3_Buffer)
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}

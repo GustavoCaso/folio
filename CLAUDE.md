@@ -41,6 +41,7 @@ internal/
   handlers/          HTTP handlers (documents, reader, highlights, exports, SSE)
   handlers/static/   js/ (client JS), css/ (custom), tailwind/ (generated)
   templates/         templ templates (layout, documents, reader, edit, exports)
+  views/             page view models + pure template helpers (keep Go out of .templ files)
   logging/           structured JSON logger + HTTP middleware
 ```
 
