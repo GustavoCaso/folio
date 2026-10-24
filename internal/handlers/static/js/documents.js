@@ -122,6 +122,8 @@ function initDropZone() {
   const filenameSpan = document.getElementById("selected-filename");
   if (!zone || !fileInput) return;
 
+  const busy = () => zone.getAttribute("aria-disabled") === "true";
+
   function selectFile(file) {
     const isEPUB = file && (
       file.type === "application/epub+zip" ||
@@ -138,8 +140,8 @@ function initDropZone() {
     zone.classList.add("border-foreground/40", "bg-accent/30");
   }
 
-  zone.addEventListener("click", () => fileInput.click());
-  zone.addEventListener("keydown", (e) => { if (e.key === "Enter" || e.key === " ") fileInput.click(); });
+  zone.addEventListener("click", () => { if (!busy()) fileInput.click(); });
+  zone.addEventListener("keydown", (e) => { if (!busy() && (e.key === "Enter" || e.key === " ")) fileInput.click(); });
 
   fileInput.addEventListener("change", () => {
     if (fileInput.files[0]) selectFile(fileInput.files[0]);
@@ -154,8 +156,32 @@ function initDropZone() {
   });
   zone.addEventListener("drop", (e) => {
     e.preventDefault();
-    selectFile(e.dataTransfer.files[0]);
+    if (!busy()) selectFile(e.dataTransfer.files[0]);
   });
+}
+
+// initUploadBusy shows a spinner while the upload request runs. Sync formats
+// convert before the server responds, so this can take a few seconds. The
+// button stays disabled to block a duplicate upload; pageshow undoes it when
+// the browser restores this page from the back/forward cache.
+export function initUploadBusy() {
+  const form = document.getElementById("upload-form");
+  const btn = document.getElementById("upload-btn");
+  const zone = document.getElementById("drop-zone");
+  if (!form || !btn) return;
+  const spinner = btn.querySelector("[data-upload-spinner]");
+  const label = btn.querySelector("[data-upload-label]");
+
+  function setBusy(isBusy) {
+    btn.disabled = isBusy;
+    btn.setAttribute("aria-busy", String(isBusy));
+    if (spinner) spinner.hidden = !isBusy;
+    if (label) label.textContent = isBusy ? "Uploading…" : "Upload";
+    if (zone) zone.setAttribute("aria-disabled", String(isBusy));
+  }
+
+  form.addEventListener("submit", () => setBusy(true));
+  window.addEventListener("pageshow", (e) => { if (e.persisted) setBusy(false); });
 }
 
 export const VIEW_COOKIE = "folio_view";
@@ -174,6 +200,7 @@ export function setView(view) {
 
 function bootstrap() {
   initDropZone();
+  initUploadBusy();
   const cfg = document.getElementById("watch-config");
   if (cfg) cfg.dataset.documentIds.split(",").forEach(watchDocument);
 

@@ -73,6 +73,31 @@ func (errorParser) Convert(_ context.Context, _, _, _ string, _ []byte, _ *hub.H
 	return errors.New("stubbed")
 }
 
+func (errorParser) Sync() bool { return true }
+
+// syncParser runs inside the request and records its outcome like a real
+// parser: done with author when err is nil, failed with err otherwise.
+type syncParser struct {
+	store  repository.Store
+	author string
+	err    error
+}
+
+func (p syncParser) Convert(ctx context.Context, documentID, _, _ string, _ []byte, h *hub.Hub) error {
+	if p.err != nil {
+		_ = p.store.MarkDocumentFailed(ctx, documentID, p.err.Error())
+		h.Publish(documentID, hub.StatusEvent{Status: "FAILED", Error: p.err.Error()})
+		return p.err
+	}
+	if err := p.store.MarkDocumentDone(ctx, documentID, "/tmp/out", "Dune", p.author, nil); err != nil {
+		return err
+	}
+	h.Publish(documentID, hub.StatusEvent{Status: "DONE"})
+	return nil
+}
+
+func (syncParser) Sync() bool { return true }
+
 // epubUploadRequest builds a POST /documents multipart request uploading
 // filename with the given bytes.
 func epubUploadRequest(t *testing.T, filename string, data []byte) *http.Request {
@@ -413,6 +438,10 @@ func (p *blockingParser) Convert(ctx context.Context, documentID, _, _ string, _
 	return ctx.Err()
 }
 
+// Sync is false: blocking inside the request would hang the upload, and the
+// cancel tests need the conversion running in the background.
+func (p *blockingParser) Sync() bool { return false }
+
 func TestCancelDocument_OK(t *testing.T) {
 	store := newTestStore(t)
 	bp := &blockingParser{store: store, started: make(chan struct{})}
@@ -610,5 +639,90 @@ func TestListDocuments_ViewFromCookie(t *testing.T) {
 				t.Errorf("expected %s in response", tc.want)
 			}
 		})
+	}
+}
+
+func onlyDocument(t *testing.T, store repository.Store) domain.Document {
+	t.Helper()
+	documents, err := store.ListDocuments(t.Context(), domain.DocumentFilter{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(documents) != 1 {
+		t.Fatalf("expected 1 document, got %d", len(documents))
+	}
+	return documents[0]
+}
+
+func TestUploadDocument_SyncParserFinishesBeforeRedirect(t *testing.T) {
+	store := newTestStore(t)
+	mux := newTestMuxWithParser(t, store, syncParser{store: store, author: "Frank Herbert"})
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, epubUploadRequest(t, "dune.epub", []byte("epub")))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+
+	// No waiting: the document is already DONE when the redirect is sent.
+	if got := onlyDocument(t, store); got.Status != "DONE" {
+		t.Fatalf("expected DONE before redirect, got %s", got.Status)
+	}
+
+	list := httptest.NewRecorder()
+	mux.ServeHTTP(list, httptest.NewRequest(http.MethodGet, "/", nil))
+	body := list.Body.String()
+	if !strings.Contains(body, `href="/?author=Frank+Herbert" class="facet"`) {
+		t.Errorf("expected author facet on the redirected page, got:\n%s", body)
+	}
+	if strings.Contains(body, "data-document-ids") {
+		t.Errorf("expected nothing left to watch over SSE, got:\n%s", body)
+	}
+}
+
+func TestUploadDocument_SyncParserFailureShowsOnCard(t *testing.T) {
+	store := newTestStore(t)
+	mux := newTestMuxWithParser(t, store, syncParser{store: store, err: errors.New("zip: not a valid zip file")})
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, epubUploadRequest(t, "broken.epub", []byte("epub")))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+
+	got := onlyDocument(t, store)
+	if got.Status != "FAILED" || got.Error != "zip: not a valid zip file" {
+		t.Fatalf("expected FAILED with parser error before redirect, got %s %q", got.Status, got.Error)
+	}
+
+	list := httptest.NewRecorder()
+	mux.ServeHTTP(list, httptest.NewRequest(http.MethodGet, "/", nil))
+	if !strings.Contains(list.Body.String(), "zip: not a valid zip file") {
+		t.Errorf("expected error text on the card, got:\n%s", list.Body.String())
+	}
+}
+
+func TestRetryDocument_SyncParserFinishesBeforeRedirect(t *testing.T) {
+	store := newTestStore(t)
+	document, err := store.CreateDocument(t.Context(), "dune.epub", []byte("epub"), "req-1", domain.EpubFormat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkDocumentFailed(t.Context(), document.ID, "parse error"); err != nil {
+		t.Fatal(err)
+	}
+	mux := newTestMuxWithParser(t, store, syncParser{store: store, author: "Frank Herbert"})
+
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodPost, "/documents/"+document.ID+"/retry", nil))
+	if rec.Code != http.StatusSeeOther {
+		t.Fatalf("status = %d, want %d", rec.Code, http.StatusSeeOther)
+	}
+	got, err := store.GetDocument(t.Context(), document.ID)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got.Status != "DONE" || got.Author != "Frank Herbert" {
+		t.Errorf("expected DONE with author before redirect, got %s %q", got.Status, got.Author)
 	}
 }

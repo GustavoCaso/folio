@@ -53,6 +53,8 @@ func (p *successParser) Convert(ctx context.Context, documentID, _, _ string, _ 
 	return nil
 }
 
+func (p *successParser) Sync() bool { return true }
+
 // failParser always fails the document.
 type failParser struct {
 	store repository.Store
@@ -64,6 +66,8 @@ func (p *failParser) Convert(ctx context.Context, documentID, _, _ string, _ []b
 	h.Publish(documentID, hub.StatusEvent{Status: "FAILED", Error: p.err.Error()})
 	return p.err
 }
+
+func (p *failParser) Sync() bool { return true }
 
 // blockingParser blocks until its context is cancelled, then marks the document
 // failed with "cancelled by user" — mirrors what a real parser must do on
@@ -80,6 +84,8 @@ func (p *blockingParser) Convert(ctx context.Context, documentID, _, _ string, _
 	h.Publish(documentID, hub.StatusEvent{Status: "FAILED", Error: "cancelled by user"})
 	return ctx.Err()
 }
+
+func (p *blockingParser) Sync() bool { return false }
 
 func TestRun_MarksDone(t *testing.T) {
 	store := newStore(t)
@@ -185,5 +191,21 @@ func TestRun_UnknownFormat_MarksDocumentFailed(t *testing.T) {
 	}
 	if !strings.Contains(got.Error, "mobi") {
 		t.Errorf("expected error to mention unknown format, got: %s", got.Error)
+	}
+}
+
+func TestIsSync(t *testing.T) {
+	store := newStore(t)
+	parsers := map[domain.DocumentFormat]parser.Parser{
+		domain.EpubFormat: &successParser{store: store},
+		"slow":            &blockingParser{store: store, started: make(chan struct{})},
+	}
+	r := converter.New(store, newHub(t), parsers, newLogger())
+
+	cases := map[domain.DocumentFormat]bool{domain.EpubFormat: true, "slow": false, "unregistered": false}
+	for format, want := range cases {
+		if got := r.IsSync(format); got != want {
+			t.Errorf("IsSync(%q) = %v, want %v", format, got, want)
+		}
 	}
 }

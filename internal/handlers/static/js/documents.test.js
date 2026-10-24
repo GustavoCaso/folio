@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { watchDocument, setView } from "./documents.js";
+import { watchDocument, setView, initUploadBusy } from "./documents.js";
 
 function makeDocumentCard(id, { filename = "test.pdf", status = "PENDING", error = "" } = {}) {
   const card = document.createElement("div");
@@ -235,5 +235,51 @@ describe("setView", () => {
     document.querySelector('[data-view-toggle="list"]').dispatchEvent(new MouseEvent("click", { bubbles: true }));
 
     expect(document.getElementById("library").dataset.view).toBe("list");
+  });
+});
+
+describe("initUploadBusy", () => {
+  beforeEach(() => {
+    document.body.innerHTML = `
+      <form id="upload-form">
+        <div id="drop-zone"></div>
+        <button id="upload-btn" type="submit">
+          <span data-upload-spinner hidden></span>
+          <span data-upload-label>Upload</span>
+        </button>
+      </form>`;
+    initUploadBusy();
+  });
+
+  const btn = () => document.getElementById("upload-btn");
+
+  it("submit disables the button, shows the spinner and marks it busy", () => {
+    document.getElementById("upload-form").dispatchEvent(new Event("submit"));
+
+    expect(btn().disabled).toBe(true);
+    expect(btn().getAttribute("aria-busy")).toBe("true");
+    expect(btn().querySelector("[data-upload-spinner]").hidden).toBe(false);
+    expect(btn().querySelector("[data-upload-label]").textContent).toBe("Uploading…");
+    expect(document.getElementById("drop-zone").getAttribute("aria-disabled")).toBe("true");
+  });
+
+  it("pageshow from the back/forward cache resets the busy state", () => {
+    document.getElementById("upload-form").dispatchEvent(new Event("submit"));
+    const restored = new Event("pageshow");
+    restored.persisted = true;
+    window.dispatchEvent(restored);
+
+    expect(btn().disabled).toBe(false);
+    expect(btn().getAttribute("aria-busy")).toBe("false");
+    expect(btn().querySelector("[data-upload-spinner]").hidden).toBe(true);
+    expect(btn().querySelector("[data-upload-label]").textContent).toBe("Upload");
+    expect(document.getElementById("drop-zone").getAttribute("aria-disabled")).toBe("false");
+  });
+
+  it("a normal pageshow leaves the busy state alone", () => {
+    document.getElementById("upload-form").dispatchEvent(new Event("submit"));
+    window.dispatchEvent(new Event("pageshow"));
+
+    expect(btn().disabled).toBe(true);
   });
 });

@@ -40,6 +40,9 @@ func NewEPUB(store Store, dataDir string) Parser {
 	return &epubParser{store: store, dataDir: dataDir, logger: slog.Default()}
 }
 
+// Sync is true: EPUB parsing is local and quick, so uploads wait for it.
+func (p *epubParser) Sync() bool { return true }
+
 type tocEntry struct {
 	Title      string     `json:"title"`
 	ChapterIdx int        `json:"chapter_idx"`
