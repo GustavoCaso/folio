@@ -1,3 +1,7 @@
+<p align="center">
+  <img src="https://raw.githubusercontent.com/GustavoCaso/folio/refs/heads/main/images/folio.jpeg" alt="Folio logo" width="240">
+</p>
+
 # Folio
 
 Self-hosted EPUB reader with persistent highlights.
@@ -56,3 +60,18 @@ make build
 make test && make test-js
 go run . -data ./data -db ./data/folio.db
 ```
+
+## Roadmap
+
+- Support for more document formats (e.g. PDF, Markdown, web articles)
+- More highlight export backends beyond Readwise (e.g. Obsidian, Notion, Markdown files)
+
+Ideas and requests are welcome in [GitHub Issues](https://github.com/GustavoCaso/folio/issues).
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## License
+
+[MIT](LICENSE)

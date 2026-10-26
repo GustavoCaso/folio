@@ -3,7 +3,6 @@ package templates
 import "github.com/templui/templui/components/collapsible"
 import "github.com/templui/templui/components/sheet"
 import "github.com/templui/templui/components/toast"
-import "github.com/templui/templui/components/icon"
 
 templ NoAction() {
 }
@@ -31,6 +30,7 @@ templ Layout(title string, headerLeft templ.Component, headerActions templ.Compo
 			<meta charset="UTF-8"/>
 			<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
 			<title>{ title } — Folio</title>
+			<link rel="icon" href="/static/images/favicon.ico" sizes="any"/>
 			<link rel="preconnect" href="https://fonts.googleapis.com"/>
 			<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
 			<link href="https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500&display=swap" rel="stylesheet"/>
@@ -55,8 +55,7 @@ templ Layout(title string, headerLeft templ.Component, headerActions templ.Compo
 						</div>
 						<div class="flex items-center gap-6">
 							<a href="/" class="group flex items-center gap-2 font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity" style="font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;">
-								@icon.BookOpen(icon.Props{Class: "h-4 w-4 -translate-y-px text-primary"})
-								Folio
+								<img src="/static/images/logo.png" alt="" class="h-6 w-6"/>
 							</a>
 							<a href="/exports" class="text-sm text-muted-foreground hover:text-foreground transition-colors">Exports</a>
 						</div>
