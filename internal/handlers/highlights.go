@@ -1,13 +1,17 @@
 package handlers
 
 import (
+	"database/sql"
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strconv"
 	"strings"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
+	"github.com/GustavoCaso/folio/ui/internal/templates"
+	"github.com/GustavoCaso/folio/ui/internal/views"
 	"github.com/templui/templui/components/toast"
 )
 
@@ -133,4 +137,47 @@ func (h *Handlers) DeleteHighlight(w http.ResponseWriter, r *http.Request) {
 		Position:      toast.PositionTopLeft,
 		ShowIndicator: true,
 	}).Render(r.Context(), w) //nolint:errcheck
+}
+
+func (h *Handlers) ListDocumentHighlights(w http.ResponseWriter, r *http.Request) {
+	documentID := r.PathValue("id")
+	log := logging.LoggerFrom(r.Context()).With("document_id", documentID)
+
+	renderErr := func(status int, msg string) {
+		w.WriteHeader(status)
+		if err := templates.ErrorPage(msg).Render(r.Context(), w); err != nil {
+			log.Error("render error page failed", logging.Err(err))
+		}
+	}
+
+	document, err := h.store.GetDocument(r.Context(), documentID)
+	if err != nil {
+		if errors.Is(err, sql.ErrNoRows) {
+			renderErr(http.StatusNotFound, "Document not found.")
+		} else {
+			log.Error("get document failed", logging.Err(err))
+			renderErr(http.StatusInternalServerError, "Failed to load document. Please try again.")
+		}
+		return
+	}
+
+	highlights, err := h.store.ListHighlights(r.Context(), document.ID)
+	if err != nil {
+		log.Error("list highlights failed", logging.Err(err))
+		renderErr(http.StatusInternalServerError, "Failed to load highlights. Please try again.")
+		return
+	}
+
+	// A missing TOC only costs chapter titles; headings fall back to numbers.
+	var toc []views.EpubTOCEntry
+	if document.OutputPath != "" {
+		if toc, err = loadTOC(document.OutputPath); err != nil {
+			log.Warn("load toc failed", logging.Err(err))
+		}
+	}
+
+	groups := views.GroupHighlightsByChapter(highlights, toc)
+	if err := templates.DocumentHighlights(document, groups, len(highlights)).Render(r.Context(), w); err != nil {
+		log.Error("render highlights page failed", logging.Err(err))
+	}
 }

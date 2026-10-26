@@ -19,7 +19,8 @@ function escapeHTML(s) {
 }
 
 function readButtonHTML(documentID) {
-  return `<a ${itemAttrs} href="/read/${documentID}">Read</a>`;
+  return `<a ${itemAttrs} href="/read/${documentID}">Read</a>` +
+    `<a ${itemAttrs} href="/documents/${documentID}/highlights">Highlights</a>`;
 }
 
 function editButtonHTML(documentID) {

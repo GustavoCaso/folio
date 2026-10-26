@@ -254,3 +254,17 @@ mark.highlight img {
   outline-offset: 2px;
   background: transparent;
 }
+
+/* Arrival from a ?highlight=ID link: pulse once so the target is easy to spot. */
+mark.highlight.highlight-linked {
+  animation: highlight-linked 1.6s ease-out 1;
+}
+
+@keyframes highlight-linked {
+  0%, 35% { background: oklch(82% 0.17 88 / 0.95); box-shadow: 0 0 0 3px oklch(82% 0.17 88 / 0.45); }
+  100% { background: oklch(92% 0.12 88 / 0.55); box-shadow: 0 0 0 0 transparent; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  mark.highlight.highlight-linked { animation-duration: 0.01s; }
+}

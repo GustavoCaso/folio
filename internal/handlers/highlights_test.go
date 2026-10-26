@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"os"
+	"path/filepath"
 	"strings"
 	"testing"
 
@@ -199,5 +201,76 @@ func TestCreateHighlight_DerivesChapterFromStartBlockID(t *testing.T) {
 				t.Errorf("expected chapter %d, got %d", want, got.Chapter)
 			}
 		})
+	}
+}
+
+func TestListDocumentHighlights_GroupsByTOCChapter(t *testing.T) {
+	store := newTestStore(t)
+	ctx := context.Background()
+
+	dir := t.TempDir()
+	toc := `[{"title":"Opening","chapter_idx":0,"anchor":"","items":null},{"title":"The Desert","chapter_idx":1,"anchor":"","items":null}]`
+	if err := os.WriteFile(filepath.Join(dir, "toc.json"), []byte(toc), 0o644); err != nil {
+		t.Fatal(err)
+	}
+	document, err := store.CreateDocument(ctx, "dune.epub", []byte{}, "req-1", domain.EpubFormat)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := store.MarkDocumentDone(ctx, document.ID, dir, "Dune", "Frank Herbert", nil); err != nil {
+		t.Fatal(err)
+	}
+	h, err := store.CreateHighlight(ctx, domain.Highlight{
+		DocumentID: document.ID, StartBlockID: "ch1-p-3", EndBlockID: "ch1-p-3", Chapter: 1, EndPos: 5, Text: "Fear is the mind-killer.",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	mux, _ := newTestMux(t, store)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/documents/"+document.ID+"/highlights", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d; body: %s", rec.Code, rec.Body.String())
+	}
+	body := rec.Body.String()
+	for _, want := range []string{
+		"Dune", "The Desert", "Fear is the mind-killer.",
+		"/read/" + document.ID + "?chapter=1&amp;highlight=" + h.ID,
+	} {
+		if !strings.Contains(body, want) {
+			t.Errorf("expected %q in body", want)
+		}
+	}
+	if strings.Contains(body, "Opening") {
+		t.Errorf("chapter without highlights should not render a section")
+	}
+}
+
+func TestListDocumentHighlights_MissingTOCFallsBackToChapterNumber(t *testing.T) {
+	store := newTestStore(t)
+	document, _ := seedDocumentAndHighlight(t, store)
+
+	mux, _ := newTestMux(t, store)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/documents/"+document.ID+"/highlights", nil))
+
+	if rec.Code != http.StatusOK {
+		t.Fatalf("expected 200, got %d", rec.Code)
+	}
+	if !strings.Contains(rec.Body.String(), "Chapter 1") {
+		t.Errorf("expected fallback chapter heading, got:\n%s", rec.Body.String())
+	}
+}
+
+func TestListDocumentHighlights_UnknownDocument(t *testing.T) {
+	store := newTestStore(t)
+	mux, _ := newTestMux(t, store)
+	rec := httptest.NewRecorder()
+	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/documents/nope/highlights", nil))
+
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404, got %d", rec.Code)
 	}
 }

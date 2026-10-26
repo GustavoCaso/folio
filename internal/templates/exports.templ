@@ -1,11 +1,9 @@
 package templates
 
 import (
-
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/views"
 	"github.com/templui/templui/components/badge"
-	"github.com/templui/templui/components/table"
 )
 
 templ exportStatusBadge(status string) {
@@ -28,97 +26,69 @@ templ exportStatusBadge(status string) {
 }
 
 templ Exports(records []domain.ExportRecord) {
-	@Layout("Exports", NoAction(), NoAction(), NoAction(), "", false) {
-		<div class="flex flex-col gap-6">
-			<h1 class="text-2xl font-semibold">Export History</h1>
+	@Layout("Exports", NoAction(), NoAction(), highlightsHead(), "", false) {
+		<div class="ex-page">
+			<h1 class="ex-page-title">Export History</h1>
 			if len(records) == 0 {
 				<p class="text-sm text-muted-foreground">No exports yet. Configure a backend via environment variables to start exporting highlights.</p>
 			} else {
-				@table.Table() {
-					@table.Header() {
-						@table.Row() {
-							@table.Head() {
-								Highlight
-							}
-							@table.Head() {
-								Note
-							}
-							@table.Head() {
-								Tags
-							}
-							@table.Head() {
-								Document
-							}
-							@table.Head() {
-								Backend
-							}
-							@table.Head() {
-								Status
-							}
-							@table.Head() {
-								Exported At
-							}
-							@table.Head() {
-								Error
-							}
-						}
-					}
-					@table.Body() {
-						for _, rec := range records {
-							@table.Row() {
-								@table.Cell() {
-									<p class="line-clamp-2 font-medium">{ views.Truncate(rec.HighlightText, 80) }</p>
-								}
-								@table.Cell() {
-									if rec.HighlightNote != "" {
-										<p class="text-xs text-muted-foreground line-clamp-2">{ rec.HighlightNote }</p>
-									} else {
-										<span class="text-muted-foreground">--</span>
-									}
-								}
-								@table.Cell() {
-									<div class="flex flex-wrap gap-1">
-										if rec.HighlightTag != "" {
-											@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-xs"}) {
-												{ rec.HighlightTag }
-											}
-										}
-										for _, tag := range rec.DocumentTags {
-											@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-xs"}) {
-												{ tag }
-											}
-										}
-										if rec.HighlightTag == "" && len(rec.DocumentTags) == 0 {
-											<span class="text-muted-foreground">--</span>
-										}
-									</div>
-								}
-								@table.Cell() {
-									<span class="text-muted-foreground truncate max-w-xs block">{ rec.DocumentFilename }</span>
-								}
-								@table.Cell() {
-									@badge.Badge(badge.Props{Variant: badge.VariantSecondary}) {
-										{ rec.BackendName }
-									}
-								}
-								@table.Cell() {
-									@exportStatusBadge(rec.Status)
-								}
-								@table.Cell() {
-									if rec.ExportedAt.IsZero() {
-										<span class="text-muted-foreground whitespace-nowrap">--</span>
-									} else {
-										<span class="text-muted-foreground whitespace-nowrap">{ rec.ExportedAt.Format("2006-01-02 15:04") }</span>
-									}
-								}
-								@table.Cell() {
-									<span class="text-destructive text-xs truncate max-w-xs block">{ rec.Error }</span>
-								}
-							}
-						}
-					}
+				for _, group := range views.GroupExportsByDocument(records) {
+					@exportBook(group)
 				}
 			}
 		</div>
 	}
+}
+
+templ exportBook(group views.DocumentExports) {
+	<section class="ex-book">
+		<header class="ex-book-head">
+			<h2 class="ex-book-title">
+				<a href={ templ.SafeURL(views.HighlightsHref(group.DocumentID)) }>{ group.Title }</a>
+			</h2>
+			<span class="ex-book-count">{ views.HighlightCountLabel(len(group.Records)) }</span>
+		</header>
+		<ol>
+			for _, rec := range group.Records {
+				@exportRow(rec)
+			}
+		</ol>
+	</section>
+}
+
+templ exportRow(rec domain.ExportRecord) {
+	<li class="ex-row">
+		<div>
+			<a class="ex-quote" href={ templ.SafeURL(views.HighlightHref(rec.DocumentID, rec.Chapter, rec.HighlightID)) }>
+				<span class="hl-wash">{ views.Truncate(rec.HighlightText, 200) }</span>
+			</a>
+			if rec.HighlightNote != "" {
+				<p class="hl-note">{ rec.HighlightNote }</p>
+			}
+			if rec.HighlightTag != "" || len(rec.DocumentTags) > 0 {
+				<div class="ex-tags">
+					if rec.HighlightTag != "" {
+						@badge.Badge(badge.Props{Variant: badge.VariantOutline, Class: "text-xs"}) {
+							{ rec.HighlightTag }
+						}
+					}
+					for _, tag := range rec.DocumentTags {
+						@badge.Badge(badge.Props{Variant: badge.VariantSecondary, Class: "text-xs"}) {
+							{ tag }
+						}
+					}
+				</div>
+			}
+		</div>
+		<div class="ex-meta">
+			@exportStatusBadge(rec.Status)
+			<span>{ rec.BackendName }</span>
+			if !rec.ExportedAt.IsZero() {
+				<time datetime={ rec.ExportedAt.Format("2006-01-02T15:04:05Z07:00") }>{ rec.ExportedAt.Format("2006-01-02 15:04") }</time>
+			}
+			if rec.Error != "" {
+				<span class="ex-error">{ rec.Error }</span>
+			}
+		</div>
+	</li>
 }

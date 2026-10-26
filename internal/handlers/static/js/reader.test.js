@@ -12,6 +12,7 @@ import {
   offsetWithinBlock,
   removeHighlightCard,
   removeHighlightMarks,
+  scrollToLinkedHighlight,
   activeTOCEntry,
   buildTOCScrollEntries,
   setupSidebarStateMirror,
@@ -813,5 +814,42 @@ describe("setupTOCScrollTracking", () => {
 
     const link = sidebar.querySelector("a");
     expect(link.getAttribute("data-tui-sidebar-active")).toBe("true");
+  });
+});
+
+describe("scrollToLinkedHighlight", () => {
+  function readerWith(html) {
+    const reader = document.createElement("div");
+    reader.innerHTML = html;
+    return reader;
+  }
+
+  it("returns false without a highlight param", () => {
+    const reader = readerWith(`<p><mark data-highlight-id="h1">x</mark></p>`);
+    expect(scrollToLinkedHighlight(reader, "?chapter=2")).toBe(false);
+  });
+
+  it("returns false when the highlight no longer exists", () => {
+    const reader = readerWith(`<p><mark data-highlight-id="h1">x</mark></p>`);
+    expect(scrollToLinkedHighlight(reader, "?chapter=2&highlight=gone")).toBe(false);
+  });
+
+  it("scrolls to the first mark and flashes every mark of the highlight", () => {
+    const reader = readerWith(
+      `<p><mark data-highlight-id="h1">a</mark></p><p><mark data-highlight-id="h1">b</mark></p><p><mark data-highlight-id="h2">c</mark></p>`,
+    );
+    const marks = reader.querySelectorAll("mark");
+    marks[0].scrollIntoView = vi.fn();
+
+    expect(scrollToLinkedHighlight(reader, "?chapter=0&highlight=h1")).toBe(true);
+    expect(marks[0].scrollIntoView).toHaveBeenCalledWith({ behavior: "instant", block: "center" });
+    expect(marks[0].classList.contains("highlight-linked")).toBe(true);
+    expect(marks[1].classList.contains("highlight-linked")).toBe(true);
+    expect(marks[2].classList.contains("highlight-linked")).toBe(false);
+  });
+
+  it("treats selector characters in the ID literally", () => {
+    const reader = readerWith(`<p><mark data-highlight-id="h1">a</mark></p>`);
+    expect(() => scrollToLinkedHighlight(reader, '?highlight="]x')).not.toThrow();
   });
 });

@@ -77,19 +77,25 @@ func TestExports_ShowsNoteTagsAndDocumentTags(t *testing.T) {
 	}
 }
 
-func TestExports_EmptyNoteAndTagsShowDash(t *testing.T) {
+func TestExports_GroupsByBookAndLinksToHighlight(t *testing.T) {
 	got := renderExports(t, []domain.ExportRecord{
-		{
-			HighlightText:    "some text",
-			DocumentFilename: "doc.pdf",
-			BackendName:      "readwise",
-			Status:           "EXPORTED",
-			ExportedAt:       time.Now(),
-		},
+		{HighlightID: "h1", HighlightText: "first", DocumentID: "d1", DocumentTitle: "Dune", Chapter: 3, Status: "EXPORTED"},
+		{HighlightID: "h2", HighlightText: "second", DocumentID: "d1", DocumentTitle: "Dune", Chapter: 4, Status: "EXPORTED"},
+		{HighlightID: "h3", HighlightText: "third", DocumentID: "d2", DocumentFilename: "other.epub", Status: "PENDING"},
 	})
 
-	if strings.Count(got, "--") < 2 {
-		t.Errorf("expected at least 2 '--' placeholders for empty note and tags, got:\n%s", got)
+	if n := strings.Count(got, `class="ex-book"`); n != 2 {
+		t.Errorf("expected 2 book sections, got %d", n)
+	}
+	for _, want := range []string{
+		"Dune", "2 highlights", "other.epub", "1 highlight",
+		`href="/documents/d1/highlights"`,
+		`href="/read/d1?chapter=3&amp;highlight=h1"`,
+		`href="/read/d2?chapter=0&amp;highlight=h3"`,
+	} {
+		if !strings.Contains(got, want) {
+			t.Errorf("expected %q in output, got:\n%s", want, got)
+		}
 	}
 }
 

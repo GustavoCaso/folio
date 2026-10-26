@@ -104,11 +104,12 @@ func (d *db) ListExportsByHighlight(ctx context.Context, highlightID string) ([]
 func (d *db) ListAllExports(ctx context.Context) ([]domain.ExportRecord, error) {
 	rows, err := d.conn.QueryContext(ctx, `
 		SELECT he.id, he.highlight_id, he.backend_name, COALESCE(he.external_id, ''), he.status, COALESCE(he.error, ''), COALESCE(he.exported_at, ''),
-		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), j.filename, COALESCE(j.tags, '')
+		       h.text, COALESCE(h.note, ''), COALESCE(h.tag, ''), h.chapter,
+		       j.id, COALESCE(j.title, ''), j.filename, COALESCE(j.tags, '')
 		FROM highlight_exports he
 		JOIN highlights h ON he.highlight_id = h.id
 		JOIN documents j ON h.document_id = j.id
-		ORDER BY he.exported_at DESC`)
+		ORDER BY lower(COALESCE(NULLIF(j.title, ''), j.filename)), h.document_id, h.created_at`)
 	if err != nil {
 		return nil, err
 	}
@@ -121,7 +122,8 @@ func (d *db) ListAllExports(ctx context.Context) ([]domain.ExportRecord, error) 
 		if err := rows.Scan(
 			&rec.ID, &rec.HighlightID, &rec.BackendName, &rec.ExternalID,
 			&rec.Status, &rec.Error, &exportedAt,
-			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.DocumentFilename, &tagsStr,
+			&rec.HighlightText, &rec.HighlightNote, &rec.HighlightTag, &rec.Chapter,
+			&rec.DocumentID, &rec.DocumentTitle, &rec.DocumentFilename, &tagsStr,
 		); err != nil {
 			return nil, err
 		}
