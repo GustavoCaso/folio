@@ -11,7 +11,6 @@ import templruntime "github.com/a-h/templ/runtime"
 import "github.com/templui/templui/components/collapsible"
 import "github.com/templui/templui/components/sheet"
 import "github.com/templui/templui/components/toast"
-import "github.com/templui/templui/components/icon"
 
 func NoAction() templ.Component {
 	return templruntime.GeneratedTemplate(func(templ_7745c5c3_Input templruntime.GeneratedComponentInput) (templ_7745c5c3_Err error) {
@@ -82,13 +81,13 @@ func Layout(title string, headerLeft templ.Component, headerActions templ.Compon
 		var templ_7745c5c3_Var3 string
 		templ_7745c5c3_Var3, templ_7745c5c3_Err = templ.JoinStringErrs(title)
 		if templ_7745c5c3_Err != nil {
-			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 33, Col: 17}
+			return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 32, Col: 17}
 		}
 		_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var3))
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Folio</title><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/tailwind/output.css\"><link rel=\"stylesheet\" href=\"/static/css/reader.css\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 2, " — Folio</title><link rel=\"icon\" href=\"/static/images/favicon.ico\" sizes=\"any\"><link rel=\"preconnect\" href=\"https://fonts.googleapis.com\"><link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin><link href=\"https://fonts.googleapis.com/css2?family=Lora:ital,wght@0,400;0,500;1,400&family=DM+Sans:wght@400;500&display=swap\" rel=\"stylesheet\"><link rel=\"stylesheet\" href=\"/static/tailwind/output.css\"><link rel=\"stylesheet\" href=\"/static/css/reader.css\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -161,15 +160,7 @@ func Layout(title string, headerLeft templ.Component, headerActions templ.Compon
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div><div class=\"flex items-center gap-6\"><a href=\"/\" class=\"group flex items-center gap-2 font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity\" style=\"font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;\">")
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = icon.BookOpen(icon.Props{Class: "h-4 w-4 -translate-y-px text-primary"}).Render(ctx, templ_7745c5c3_Buffer)
-		if templ_7745c5c3_Err != nil {
-			return templ_7745c5c3_Err
-		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "Folio</a> <a href=\"/exports\" class=\"text-sm text-muted-foreground hover:text-foreground transition-colors\">Exports</a></div></div><div class=\"flex items-center gap-3\"><div id=\"header-actions\" class=\"flex items-center gap-2\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 9, "</div><div class=\"flex items-center gap-6\"><a href=\"/\" class=\"group flex items-center gap-2 font-semibold tracking-tight text-foreground hover:opacity-70 transition-opacity\" style=\"font-family:'DM Sans',sans-serif; letter-spacing:-0.02em;\"><img src=\"/static/images/logo.png\" alt=\"\" class=\"h-6 w-6\"></a> <a href=\"/exports\" class=\"text-sm text-muted-foreground hover:text-foreground transition-colors\">Exports</a></div></div><div class=\"flex items-center gap-3\"><div id=\"header-actions\" class=\"flex items-center gap-2\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -177,7 +168,7 @@ func Layout(title string, headerLeft templ.Component, headerActions templ.Compon
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "</div></div></div></header>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 10, "</div></div></div></header>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -186,7 +177,7 @@ func Layout(title string, headerLeft templ.Component, headerActions templ.Compon
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "<main class=\"")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 11, "<main class=\"")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -199,7 +190,7 @@ func Layout(title string, headerLeft templ.Component, headerActions templ.Compon
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "\">")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 12, "\">")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -207,7 +198,7 @@ func Layout(title string, headerLeft templ.Component, headerActions templ.Compon
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
-		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "</main><script>\n\t\t\t\t(function() {\n\t\t\t\n\t\t\t\t\tvar header = document.getElementById('site-header');\n\t\t\t\t\tif (!header) return;\n\t\t\t\t\tfunction onScroll() {\n\t\t\t\t\t\tvar scrolled = window.scrollY > 8;\n\t\t\t\t\t\theader.classList.toggle('border-border', scrolled);\n\t\t\t\t\t\theader.classList.toggle('shadow-sm', scrolled);\n\t\t\t\t\t\theader.classList.toggle('border-transparent', !scrolled);\n\t\t\t\t\t}\n\t\t\t\t\twindow.addEventListener('scroll', onScroll, { passive: true });\n\t\t\t\t\tonScroll();\n\t\t\t\t\t\n\t\t\t\t})();\n\t\t\t</script></body></html>")
+		templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 13, "</main><script>\n\t\t\t\t(function() {\n\t\t\t\n\t\t\t\t\tvar header = document.getElementById('site-header');\n\t\t\t\t\tif (!header) return;\n\t\t\t\t\tfunction onScroll() {\n\t\t\t\t\t\tvar scrolled = window.scrollY > 8;\n\t\t\t\t\t\theader.classList.toggle('border-border', scrolled);\n\t\t\t\t\t\theader.classList.toggle('shadow-sm', scrolled);\n\t\t\t\t\t\theader.classList.toggle('border-transparent', !scrolled);\n\t\t\t\t\t}\n\t\t\t\t\twindow.addEventListener('scroll', onScroll, { passive: true });\n\t\t\t\t\tonScroll();\n\t\t\t\t\t\n\t\t\t\t})();\n\t\t\t</script></body></html>")
 		if templ_7745c5c3_Err != nil {
 			return templ_7745c5c3_Err
 		}
@@ -237,20 +228,20 @@ func ErrorBanner(msg string) templ.Component {
 		}
 		ctx = templ.ClearChildren(ctx)
 		if msg != "" {
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "<div class=\"rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive mb-4\" role=\"alert\">")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 14, "<div class=\"rounded-md border border-destructive bg-destructive/10 px-4 py-3 text-sm text-destructive mb-4\" role=\"alert\">")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
 			var templ_7745c5c3_Var10 string
 			templ_7745c5c3_Var10, templ_7745c5c3_Err = templ.JoinStringErrs(msg)
 			if templ_7745c5c3_Err != nil {
-				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 96, Col: 128}
+				return templ.Error{Err: templ_7745c5c3_Err, FileName: `internal/templates/layout.templ`, Line: 95, Col: 128}
 			}
 			_, templ_7745c5c3_Err = templ_7745c5c3_Buffer.WriteString(templ.EscapeString(templ_7745c5c3_Var10))
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
-			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 16, "</div>")
+			templ_7745c5c3_Err = templruntime.WriteString(templ_7745c5c3_Buffer, 15, "</div>")
 			if templ_7745c5c3_Err != nil {
 				return templ_7745c5c3_Err
 			}
