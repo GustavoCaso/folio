@@ -99,6 +99,7 @@ templ documentActions(j domain.Document) {
 	}
 	if j.Status == "DONE" {
 		<a data-tui-dropdown-item class="book-menu-item" href={ templ.SafeURL("/read/" + j.ID) }>Read</a>
+		<a data-tui-dropdown-item class="book-menu-item" href={ templ.SafeURL(views.HighlightsHref(j.ID)) }>Highlights</a>
 	}
 	<a data-tui-dropdown-item class="book-menu-item" href={ templ.SafeURL("/documents/" + j.ID + "/edit") }>Edit</a>
 	if j.Status == "FAILED" {

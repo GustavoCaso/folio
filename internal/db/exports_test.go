@@ -2,6 +2,7 @@ package db_test
 
 import (
 	"context"
+	"strings"
 	"testing"
 
 	"github.com/GustavoCaso/folio/ui/internal/db"
@@ -259,7 +260,89 @@ func TestListAllExports_JoinsHighlightAndDocument(t *testing.T) {
 	if rec.Status != "EXPORTED" {
 		t.Errorf("expected status exported, got %s", rec.Status)
 	}
-	_ = h
+	if rec.DocumentID != h.DocumentID {
+		t.Errorf("expected document id %q, got %q", h.DocumentID, rec.DocumentID)
+	}
+	if rec.Chapter != h.Chapter {
+		t.Errorf("expected chapter %d, got %d", h.Chapter, rec.Chapter)
+	}
+}
+
+func TestListAllExports_GroupsByTitleAlphabetically(t *testing.T) {
+	database, err := db.New(":memory:")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer func() { _ = database.Close() }()
+	ctx := context.Background()
+
+	// Two books share a title; one has no title and sorts by filename.
+	books := []struct{ filename, title string }{
+		{"z.epub", "zebra"},
+		{"n1.epub", "Notes"},
+		{"apple.epub", ""},
+		{"n2.epub", "Notes"},
+		{"m.epub", "Moby"},
+	}
+	var docs []domain.Document
+	for _, b := range books {
+		d, err := database.CreateDocument(ctx, b.filename, []byte{1}, "req-"+b.filename, domain.EpubFormat)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := database.MarkDocumentDone(ctx, d.ID, "/data/"+b.filename, b.title, "", nil); err != nil {
+			t.Fatal(err)
+		}
+		docs = append(docs, d)
+	}
+	// Interleave highlight creation across documents so created_at alone
+	// would mix them.
+	for i := range 2 * len(docs) {
+		d := docs[i%len(docs)]
+		h, err := database.CreateHighlight(ctx, domain.Highlight{
+			DocumentID: d.ID, StartBlockID: "ch2-p-1", EndBlockID: "ch2-p-1", Chapter: 2, EndPos: 3, Text: "t",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := database.CreateHighlightExport(ctx, h.ID, "readwise"); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	records, err := database.ListAllExports(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(records) != 2*len(docs) {
+		t.Fatalf("expected %d records, got %d", 2*len(docs), len(records))
+	}
+
+	// Collapse consecutive rows into one entry per document run.
+	var runs []domain.ExportRecord
+	for i, rec := range records {
+		if i == 0 || rec.DocumentID != records[i-1].DocumentID {
+			runs = append(runs, rec)
+		}
+		if rec.Chapter != 2 {
+			t.Errorf("expected chapter 2, got %d", rec.Chapter)
+		}
+	}
+	if len(runs) != len(docs) {
+		t.Fatalf("expected one run per document (%d), got %d: rows interleaved", len(docs), len(runs))
+	}
+	var got []string
+	for _, r := range runs {
+		name := r.DocumentTitle
+		if name == "" {
+			name = r.DocumentFilename
+		}
+		got = append(got, name)
+	}
+	want := []string{"apple.epub", "Moby", "Notes", "Notes", "zebra"}
+	if strings.Join(got, ",") != strings.Join(want, ",") {
+		t.Errorf("expected group order %v, got %v", want, got)
+	}
 }
 
 func TestListAllExports_ReturnsAllRecords(t *testing.T) {

@@ -222,6 +222,26 @@ export function removeHighlightCard(panel, id) {
   if (card) card.remove();
 }
 
+// Scrolls to the highlight named by ?highlight=ID (links from the highlights
+// and exports pages) and flashes its marks. Returns false when there is no
+// param or the highlight no longer exists, so the caller can fall back to the
+// saved reading position.
+export function scrollToLinkedHighlight(reader, search) {
+  const id = new URLSearchParams(search).get("highlight");
+  if (!id) return false;
+  // Match on dataset rather than a selector so a URL-supplied ID can't break it.
+  const marks = [...reader.querySelectorAll("mark[data-highlight-id]")].filter((m) => m.dataset.highlightId === id);
+  if (!marks.length) return false;
+  if (typeof marks[0].scrollIntoView === "function") {
+    marks[0].scrollIntoView({ behavior: "instant", block: "center" });
+  }
+  marks.forEach((mark) => {
+    mark.classList.add("highlight-linked");
+    mark.addEventListener("animationend", () => mark.classList.remove("highlight-linked"), { once: true });
+  });
+  return true;
+}
+
 // Returns 0-100 based on which block is first visible in the viewport.
 export function computeProgress(blocks) {
   if (!blocks.length) return 0;
@@ -465,9 +485,10 @@ function bootstrap() {
     console.log('[highlight.js] Highlights applied')
   }
 
-  // Restore reading position
+  // A ?highlight=ID link wins over the saved reading position.
+  const linked = scrollToLinkedHighlight(reader, window.location.search);
   const savedBlockID = reader.dataset.readingProgress;
-  if (savedBlockID) {
+  if (!linked && savedBlockID) {
     const target = reader.querySelector(`[data-block-id="${savedBlockID}"]`);
     if (target) target.scrollIntoView({ behavior: "instant", block: "start" });
   }

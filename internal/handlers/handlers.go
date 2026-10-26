@@ -16,7 +16,7 @@ import (
 	"github.com/templui/templui/utils"
 )
 
-//go:embed static/js/reader.js static/js/documents.js static/tailwind/output.css static/css/reader.css static/css/library.css
+//go:embed static/js/reader.js static/js/documents.js static/tailwind/output.css static/css/reader.css static/css/library.css static/css/highlights.css
 var staticFS embed.FS
 
 type Handlers struct {
@@ -67,6 +67,7 @@ func register(store repository.Store, h *hub.Hub, dataDir string, logger *slog.L
 	mux.HandleFunc("DELETE /documents/{id}", hs.DeleteDocument)
 	mux.HandleFunc("GET /documents/{id}/edit", hs.EditDocumentForm)
 	mux.HandleFunc("POST /documents/{id}/edit", hs.EditDocument)
+	mux.HandleFunc("GET /documents/{id}/highlights", hs.ListDocumentHighlights)
 	mux.HandleFunc("GET /read/{documentID}", hs.ReadDocument)
 	mux.HandleFunc("GET /documents/{documentID}/watch", hs.WatchDocument)
 	mux.HandleFunc("POST /highlights", hs.CreateHighlight)

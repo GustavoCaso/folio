@@ -82,8 +82,9 @@ describe("watchDocument", () => {
     es.fire("w2b", { Status: "DONE" });
     es.fire("w2b", { Status: "DONE" });
 
-    // one link for read and one link for edits
-    expect(card.querySelectorAll("a[href]").length).toBe(2);
+    // read, highlights, edit
+    expect(card.querySelectorAll("a[href]").length).toBe(3);
+    expect(card.querySelector('a[href="/documents/w2b/highlights"]')).not.toBeNull();
     expect(card.querySelectorAll("[data-delete-document]").length).toBe(1);
   });
 

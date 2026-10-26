@@ -69,6 +69,9 @@ type ExportRecord struct {
 	HighlightText    string
 	HighlightNote    string
 	HighlightTag     string
+	Chapter          int
+	DocumentID       string
+	DocumentTitle    string
 	DocumentFilename string
 	DocumentTags     []string
 	BackendName      string

@@ -1,0 +1,58 @@
+package templates
+
+import (
+	"github.com/GustavoCaso/folio/ui/internal/domain"
+	"github.com/GustavoCaso/folio/ui/internal/views"
+)
+
+templ highlightsHead() {
+	<link rel="stylesheet" href="/static/css/highlights.css"/>
+}
+
+templ DocumentHighlights(document domain.Document, groups []views.ChapterHighlights, total int) {
+	@Layout("Highlights in "+views.DisplayTitle(document), NoAction(), NoAction(), highlightsHead(), "", false) {
+		<article class="hl-page">
+			<header class="hl-head">
+				<a class="hl-back" href="/">Library</a>
+				<h1 class="hl-title">{ views.DisplayTitle(document) }</h1>
+				if document.Author != "" {
+					<p class="hl-author">{ document.Author }</p>
+				}
+				<div class="hl-summary">
+					<span>{ views.HighlightCountLabel(total) }</span>
+					if document.Status == "DONE" {
+						<a class="hl-continue" href={ templ.SafeURL("/read/" + document.ID) }>Continue reading</a>
+					}
+				</div>
+			</header>
+			if total == 0 {
+				<p class="hl-empty">No highlights yet. Select a passage while reading to save it here.</p>
+			} else {
+				for _, g := range groups {
+					<section class="hl-chapter" aria-labelledby={ views.ChapterSectionID(g.Chapter) }>
+						<h2 class="hl-chapter-title" id={ views.ChapterSectionID(g.Chapter) }>{ g.Title }</h2>
+						<ol class="hl-list">
+							for _, h := range g.Highlights {
+								<li>
+									@highlightEntry(document.ID, h)
+								</li>
+							}
+						</ol>
+					</section>
+				}
+			}
+		</article>
+	}
+}
+
+templ highlightEntry(documentID string, h domain.Highlight) {
+	<a class="hl-entry" href={ templ.SafeURL(views.HighlightHref(documentID, h.Chapter, h.ID)) }>
+		<blockquote class="hl-quote"><span class="hl-wash">{ h.Text }</span></blockquote>
+		if h.Note != "" {
+			<p class="hl-note">{ h.Note }</p>
+		}
+		if h.Tag != "" {
+			<span class="hl-tag">{ h.Tag }</span>
+		}
+	</a>
+}
