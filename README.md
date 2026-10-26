@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/GustavoCaso/folio/refs/heads/main/images/folio.jpeg" alt="Folio logo" width="240">
+  <img src="https://raw.githubusercontent.com/GustavoCaso/folio/refs/heads/main/images/folio.jpeg" alt="Folio logo">
 </p>
 
 # Folio
