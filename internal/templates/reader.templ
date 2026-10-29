@@ -135,31 +135,46 @@ templ epubTOCItems(entries []views.EpubTOCEntry, currentChapterIdx int, full boo
 	}
 }
 
-// epubPrevNext renders the mobile prev/next bar above the article. On md+
-// screens these links are replaced by the sticky side rail buttons
-// (epubPrevNextRail), so they're hidden here. The "Full view" link
+// epubPrevNext renders the mobile prev/next bar, stuck just below the site
+// header (top-14 = header height) so chapter navigation is reachable from
+// anywhere in a chapter. On md+ screens these links are replaced by the
+// sticky side rail buttons (epubPrevNextRail), so they're hidden here.
+// reader.css raises scroll-padding-top below md to clear header + bar.
+// The "Full view" link
 // (?full=1) still exists as a route — reader.go still handles it — it's
 // just not surfaced in this bar visually. lastChapterIdx is
 // chapterCount-1. When full is true there is no single "current chapter",
 // so prev/next controls are replaced by a static indicator, matching prior
 // behavior.
 templ epubPrevNext(currentChapterIdx, lastChapterIdx int, full bool) {
-	<div class="flex items-center gap-4 text-xs font-medium tracking-widest uppercase text-muted-foreground md:hidden">
+	<nav aria-label="Chapter navigation" class="sticky top-14 z-20 -mx-4 flex items-center justify-between border-b border-border bg-background/80 px-2 text-sm font-medium text-muted-foreground backdrop-blur-md md:hidden">
 		if full {
-			<span>Full view</span>
+			<span class="flex min-h-11 items-center px-2">Full view</span>
 		} else {
 			if currentChapterIdx > 0 {
-				<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx-1)) } class="hover:text-foreground" rel="prev">&larr; Previous</a>
+				<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx-1)) } class="flex min-h-11 items-center gap-1 px-2 hover:text-foreground" rel="prev">
+					@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
+					Previous
+				</a>
 			} else {
-				<span class="opacity-40" aria-disabled="true">&larr; Previous</span>
+				<span class="flex min-h-11 items-center gap-1 px-2 opacity-40" aria-disabled="true">
+					@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
+					Previous
+				</span>
 			}
 			if currentChapterIdx < lastChapterIdx {
-				<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx+1)) } class="hover:text-foreground" rel="next">Next &rarr;</a>
+				<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx+1)) } class="flex min-h-11 items-center gap-1 px-2 hover:text-foreground" rel="next">
+					Next
+					@icon.ChevronRight(icon.Props{Class: "h-4 w-4"})
+				</a>
 			} else {
-				<span class="opacity-40" aria-disabled="true">Next &rarr;</span>
+				<span class="flex min-h-11 items-center gap-1 px-2 opacity-40" aria-disabled="true">
+					Next
+					@icon.ChevronRight(icon.Props{Class: "h-4 w-4"})
+				</span>
 			}
 		}
-	</div>
+	</nav>
 }
 
 // epubPrevNextRail renders sticky icon-only prev/next buttons flanking the
@@ -283,10 +298,8 @@ templ highlightsPopover(highlights []domain.Highlight) {
 templ readerEpubBody(document domain.Document, renderedHTML string, highlights []domain.Highlight, currentChapterIdx, lastChapterIdx int, full bool) {
 	<div id="progress-bar"></div>
 	@highlightsPanel(highlights)
-	<div class="mx-auto max-w-[68ch] px-2 pt-4">
-		@epubPrevNext(currentChapterIdx, lastChapterIdx, full)
-	</div>
-	<div class="mx-auto flex max-w-[calc(68ch+2*(2.25rem+1rem))] items-start justify-center gap-4 px-2">
+	@epubPrevNext(currentChapterIdx, lastChapterIdx, full)
+	<div class="mx-auto flex w-full max-w-[calc(68ch+2*(2.25rem+1rem))] items-start justify-center gap-4 px-2">
 		@epubPrevNextRail("prev", currentChapterIdx-1, !full && currentChapterIdx > 0)
 		<article class="w-full max-w-[68ch] py-4 pb-24 overflow-x-auto">
 			<div id="reader" data-document-id={ document.ID } data-reading-progress={ document.ReadingProgress } data-current-chapter={ views.CurrentChapterAttr(currentChapterIdx, full) }>

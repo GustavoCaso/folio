@@ -171,7 +171,7 @@ func TestReadDocument_EPUB_FullConcatenatesAllChapters(t *testing.T) {
 
 	// Full view: there is no single "current chapter", so no TOC menu item is
 	// marked active, and prev/next links are replaced by a static indicator.
-	if !strings.Contains(body, `<span>Full view</span>`) {
+	if !strings.Contains(body, `>Full view</span>`) {
 		t.Errorf("expected static 'Full view' indicator span, got:\n%s", body)
 	}
 	if strings.Contains(body, `rel="prev"`) || strings.Contains(body, `rel="next"`) {

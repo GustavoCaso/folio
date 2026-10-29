@@ -3,6 +3,13 @@ html {
   scroll-padding-top: 4.5rem;
 }
 
+/* Below md the sticky chapter nav (2.75rem) sits under the header too. */
+@media (max-width: 47.99rem) {
+  html {
+    scroll-padding-top: 7.5rem;
+  }
+}
+
 /* templui sheets (mobile TOC sidebar, highlights panel) wrap their children in
    an auto-height grid panel inside an overflow-hidden <dialog>, so inner
    overflow-auto containers never get a bounded height and can't scroll.
