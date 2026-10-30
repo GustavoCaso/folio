@@ -21,16 +21,14 @@ func TestSubsectionHref(t *testing.T) {
 	cases := []struct {
 		name    string
 		current int
-		full    bool
 		want    string
 	}{
-		{"same chapter jumps in page", 2, false, "#sec-1"},
-		{"other chapter links across", 1, false, "?chapter=2#sec-1"},
-		{"full view always links across", 2, true, "?chapter=2#sec-1"},
+		{"same chapter jumps in page", 2, "#sec-1"},
+		{"other chapter links across", 1, "?chapter=2#sec-1"},
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			if got := views.SubsectionHref(item, tc.current, tc.full); got != tc.want {
+			if got := views.SubsectionHref(item, tc.current); got != tc.want {
 				t.Errorf("got %q, want %q", got, tc.want)
 			}
 		})
@@ -43,14 +41,5 @@ func TestRailLabel(t *testing.T) {
 	}
 	if got := views.RailLabel("next"); got != "Next chapter" {
 		t.Errorf("next: got %q", got)
-	}
-}
-
-func TestCurrentChapterAttr(t *testing.T) {
-	if got := views.CurrentChapterAttr(4, false); got != "4" {
-		t.Errorf("chapter view: got %q, want 4", got)
-	}
-	if got := views.CurrentChapterAttr(4, true); got != "-1" {
-		t.Errorf("full view: got %q, want -1", got)
 	}
 }

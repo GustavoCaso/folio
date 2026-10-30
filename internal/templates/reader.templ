@@ -100,12 +100,12 @@ templ headerActions(highlights []domain.Highlight) {
 // the viewport back to its TOC link and mark it active, independent of the
 // href (which for cross-chapter subsections points at a page reader.js
 // never navigates to during same-page scrolling).
-templ epubTOCItems(entries []views.EpubTOCEntry, currentChapterIdx int, full bool) {
+templ epubTOCItems(entries []views.EpubTOCEntry, currentChapterIdx int) {
 	for _, entry := range entries {
 		@sidebar.MenuItem() {
 			@sidebar.MenuButton(sidebar.MenuButtonProps{
 				Href:     "?chapter=" + strconv.Itoa(entry.ChapterIdx),
-				IsActive: !full && entry.Anchor == "" && entry.ChapterIdx == currentChapterIdx,
+				IsActive: entry.Anchor == "" && entry.ChapterIdx == currentChapterIdx,
 				Attributes: map[string]any{
 					"data-toc-chapter": strconv.Itoa(entry.ChapterIdx),
 					"data-toc-anchor":  "",
@@ -118,7 +118,7 @@ templ epubTOCItems(entries []views.EpubTOCEntry, currentChapterIdx int, full boo
 					for _, item := range entry.Items {
 						@sidebar.MenuSubItem() {
 							@sidebar.MenuSubButton(sidebar.MenuSubButtonProps{
-								Href:     views.SubsectionHref(item, currentChapterIdx, full),
+								Href:     views.SubsectionHref(item, currentChapterIdx),
 								IsActive: false,
 								Attributes: map[string]any{
 									"data-toc-chapter": strconv.Itoa(item.ChapterIdx),
@@ -140,39 +140,30 @@ templ epubTOCItems(entries []views.EpubTOCEntry, currentChapterIdx int, full boo
 // anywhere in a chapter. On md+ screens these links are replaced by the
 // sticky side rail buttons (epubPrevNextRail), so they're hidden here.
 // reader.css raises scroll-padding-top below md to clear header + bar.
-// The "Full view" link
-// (?full=1) still exists as a route — reader.go still handles it — it's
-// just not surfaced in this bar visually. lastChapterIdx is
-// chapterCount-1. When full is true there is no single "current chapter",
-// so prev/next controls are replaced by a static indicator, matching prior
-// behavior.
-templ epubPrevNext(currentChapterIdx, lastChapterIdx int, full bool) {
+// lastChapterIdx is chapterCount-1.
+templ epubPrevNext(currentChapterIdx, lastChapterIdx int) {
 	<nav aria-label="Chapter navigation" class="sticky top-14 z-20 -mx-4 flex items-center justify-between border-b border-border bg-background/80 px-2 text-sm font-medium text-muted-foreground backdrop-blur-md md:hidden">
-		if full {
-			<span class="flex min-h-11 items-center px-2">Full view</span>
+		if currentChapterIdx > 0 {
+			<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx-1)) } class="flex min-h-11 items-center gap-1 px-2 hover:text-foreground" rel="prev">
+				@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
+				Previous
+			</a>
 		} else {
-			if currentChapterIdx > 0 {
-				<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx-1)) } class="flex min-h-11 items-center gap-1 px-2 hover:text-foreground" rel="prev">
-					@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
-					Previous
-				</a>
-			} else {
-				<span class="flex min-h-11 items-center gap-1 px-2 opacity-40" aria-disabled="true">
-					@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
-					Previous
-				</span>
-			}
-			if currentChapterIdx < lastChapterIdx {
-				<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx+1)) } class="flex min-h-11 items-center gap-1 px-2 hover:text-foreground" rel="next">
-					Next
-					@icon.ChevronRight(icon.Props{Class: "h-4 w-4"})
-				</a>
-			} else {
-				<span class="flex min-h-11 items-center gap-1 px-2 opacity-40" aria-disabled="true">
-					Next
-					@icon.ChevronRight(icon.Props{Class: "h-4 w-4"})
-				</span>
-			}
+			<span class="flex min-h-11 items-center gap-1 px-2 opacity-40" aria-disabled="true">
+				@icon.ChevronLeft(icon.Props{Class: "h-4 w-4"})
+				Previous
+			</span>
+		}
+		if currentChapterIdx < lastChapterIdx {
+			<a href={ templ.SafeURL("?chapter=" + strconv.Itoa(currentChapterIdx+1)) } class="flex min-h-11 items-center gap-1 px-2 hover:text-foreground" rel="next">
+				Next
+				@icon.ChevronRight(icon.Props{Class: "h-4 w-4"})
+			</a>
+		} else {
+			<span class="flex min-h-11 items-center gap-1 px-2 opacity-40" aria-disabled="true">
+				Next
+				@icon.ChevronRight(icon.Props{Class: "h-4 w-4"})
+			</span>
 		}
 	</nav>
 }
@@ -221,7 +212,7 @@ templ epubPrevNextRail(side string, targetChapterIdx int, enabled bool) {
 // fixed ID explicitly via TriggerProps.Target.
 const epubSidebarID = "epub-toc-sidebar"
 
-templ epubSidebar(epubTOC []views.EpubTOCEntry, currentChapterIdx int, full bool) {
+templ epubSidebar(epubTOC []views.EpubTOCEntry, currentChapterIdx int) {
 	@sidebar.Sidebar(sidebar.Props{
 		ID: epubSidebarID,
 		// The sticky site header (internal/templates/layout.templ) uses
@@ -238,7 +229,7 @@ templ epubSidebar(epubTOC []views.EpubTOCEntry, currentChapterIdx int, full bool
 		}
 		@sidebar.Content() {
 			@sidebar.Menu() {
-				@epubTOCItems(epubTOC, currentChapterIdx, full)
+				@epubTOCItems(epubTOC, currentChapterIdx)
 			}
 		}
 	}
@@ -295,18 +286,18 @@ templ highlightsPopover(highlights []domain.Highlight) {
 	<script type="module" src="/static/js/reader.js"></script>
 }
 
-templ readerEpubBody(document domain.Document, renderedHTML string, highlights []domain.Highlight, currentChapterIdx, lastChapterIdx int, full bool) {
+templ readerEpubBody(document domain.Document, renderedHTML string, highlights []domain.Highlight, currentChapterIdx, lastChapterIdx int) {
 	<div id="progress-bar"></div>
 	@highlightsPanel(highlights)
-	@epubPrevNext(currentChapterIdx, lastChapterIdx, full)
+	@epubPrevNext(currentChapterIdx, lastChapterIdx)
 	<div class="mx-auto flex w-full max-w-[calc(68ch+2*(2.25rem+1rem))] items-start justify-center gap-4 px-2">
-		@epubPrevNextRail("prev", currentChapterIdx-1, !full && currentChapterIdx > 0)
+		@epubPrevNextRail("prev", currentChapterIdx-1, currentChapterIdx > 0)
 		<article class="w-full max-w-[68ch] py-4 pb-24 overflow-x-auto">
-			<div id="reader" data-document-id={ document.ID } data-reading-progress={ document.ReadingProgress } data-current-chapter={ views.CurrentChapterAttr(currentChapterIdx, full) }>
+			<div id="reader" data-document-id={ document.ID } data-reading-progress={ document.ReadingProgress } data-current-chapter={ strconv.Itoa(currentChapterIdx) }>
 				@templ.Raw(renderedHTML)
 			</div>
 		</article>
-		@epubPrevNextRail("next", currentChapterIdx+1, !full && currentChapterIdx < lastChapterIdx)
+		@epubPrevNextRail("next", currentChapterIdx+1, currentChapterIdx < lastChapterIdx)
 	</div>
 	@highlightsPopover(highlights)
 }
@@ -320,19 +311,19 @@ templ readerHeadExtra() {
 // When epubTOC is non-empty, the page content is wrapped in a
 // sidebar.Layout/sidebar.Sidebar/sidebar.Inset composition; with an empty
 // TOC (the epub has no usable nav/NCX) no sidebar DOM/JS is emitted.
-templ Reader(document domain.Document, renderedHTML string, highlights []domain.Highlight, epubTOC []views.EpubTOCEntry, currentChapterIdx, lastChapterIdx int, full bool) {
+templ Reader(document domain.Document, renderedHTML string, highlights []domain.Highlight, epubTOC []views.EpubTOCEntry, currentChapterIdx, lastChapterIdx int) {
 	if len(epubTOC) > 0 {
 		@Layout(document.Filename, epubSidebarTrigger(), headerActions(highlights), readerHeadExtra(), "expanded", false) {
 			@sidebar.Layout() {
-				@epubSidebar(epubTOC, currentChapterIdx, full)
+				@epubSidebar(epubTOC, currentChapterIdx)
 				@sidebar.Inset() {
-					@readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full)
+					@readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx)
 				}
 			}
 		}
 	} else {
 		@Layout(document.Filename, NoAction(), headerActions(highlights), NoAction(), "", false) {
-			@readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx, full)
+			@readerEpubBody(document, renderedHTML, highlights, currentChapterIdx, lastChapterIdx)
 		}
 	}
 }

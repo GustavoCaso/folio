@@ -7,7 +7,9 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"net/url"
 	"os"
+	"path"
 	"path/filepath"
 	"strings"
 	"time"
@@ -16,6 +18,7 @@ import (
 	"github.com/GustavoCaso/folio/ui/internal/logging"
 	epubRender "github.com/GustavoCaso/folio/ui/internal/renderer/epub"
 	"github.com/raitucarp/epub"
+	"github.com/raitucarp/epub/pkg"
 	"golang.org/x/net/html"
 )
 
@@ -79,7 +82,7 @@ func (p *epubParser) Convert(ctx context.Context, documentID, requestID, filenam
 		if doc == nil {
 			continue
 		}
-		out, err := epubRender.Render(doc, i, resolveImage(&reader))
+		out, err := epubRender.Render(doc, i, resolveImage(&reader, item.Href), resolveLink(item.Href, i, spineIdxByHref))
 		if err != nil {
 			return p.fail(log, documentID, fmt.Sprintf("render chapter %d: %v", i, err), h)
 		}
@@ -144,7 +147,7 @@ func (p *epubParser) fail(log *slog.Logger, documentID, msg string, h *hub.Hub) 
 func spineIndexByHref(reader *epub.Reader) map[string]int {
 	idx := make(map[string]int)
 	for i, item := range reader.Spine() {
-		idx[normalizeHref(item.Href)] = i
+		idx[item.Href] = i
 	}
 	return idx
 }
@@ -155,6 +158,9 @@ func spineIndexByHref(reader *epub.Reader) map[string]int {
 // spineIdxByHref) rather than inheriting from its parent — in practice a
 // subsection's href usually matches the same spine file as its parent, but
 // nothing here assumes that.
+//
+// TOC hrefs are relative to the nav (or NCX) document they come from, so
+// each is resolved against tocBaseHref before the spine lookup.
 //
 // Anchor is the fragment portion of the node's Href (the substring after
 // "#"), or "" if the href has no fragment.
@@ -175,12 +181,15 @@ func buildTOCTree(reader *epub.Reader, spineIdxByHref map[string]int) []tocEntry
 		return nil
 	}
 
+	base := tocBaseHref(reader)
+
 	var walk func(items []epub.TOC) []tocEntry
 	walk = func(items []epub.TOC) []tocEntry {
 		var out []tocEntry
 		for _, item := range items {
-			idx, ok := spineIdxByHref[normalizeHref(item.Href)]
-			if !ok {
+			target, _, resolved := resolveRef(base, item.Href)
+			idx, inSpine := spineIdxByHref[target]
+			if !resolved || !inSpine {
 				// Broken/external link — skip this node (and, per the
 				// doc comment above, its children).
 				continue
@@ -206,23 +215,95 @@ func anchorFromHref(href string) string {
 	return anchor
 }
 
-// normalizeHref strips a "#fragment" suffix so TOC hrefs (which often point
-// at a specific anchor within a chapter document, e.g. "chapter1.xhtml#s1")
-// can be matched against a spine item's plain document href.
-func normalizeHref(href string) string {
-	base, _, _ := strings.Cut(href, "#")
-	return base
+// tocBaseHref returns the manifest href of the document TableOfContents
+// parses, so its hrefs can be resolved: the EPUB 3 nav document if there is
+// one, else the NCX (the same order epub.Reader.TableOfContents uses), else
+// "" (hrefs treated as OPF-relative).
+func tocBaseHref(reader *epub.Reader) string {
+	resources := reader.Resources()
+	for _, res := range resources {
+		if res.Properties == pkg.NavProperty {
+			return res.Href
+		}
+	}
+	for _, res := range resources {
+		if res.MIMEType == pkg.MediaTypeNCX {
+			return res.Href
+		}
+	}
+	return ""
+}
+
+// resolveRef resolves ref, a reference found inside the chapter at
+// chapterHref, to a manifest-relative path. EPUB references are relative to
+// the file containing them while manifest hrefs are relative to the OPF, so
+// "../images/fig.png" inside "OPS/xhtml/ch1.xhtml" becomes
+// "OPS/images/fig.png". Returns ok=false for references with a scheme
+// (external or data: URIs) or no path (a bare "#fragment").
+func resolveRef(chapterHref, ref string) (resolved string, fragment string, ok bool) {
+	u, err := url.Parse(ref)
+	if err != nil || u.Scheme != "" || u.Host != "" || u.Path == "" {
+		return "", "", false
+	}
+	return path.Join(path.Dir(chapterHref), u.Path), u.EscapedFragment(), true
 }
 
 // resolveImage returns an epubrender.ImageResolver backed by the epub's
-// manifest resources, keyed by href.
-func resolveImage(reader *epub.Reader) epubRender.ImageResolver {
-	return func(href string) ([]byte, string, bool) {
+// manifest resources, resolving each src against chapterHref first.
+func resolveImage(reader *epub.Reader, chapterHref string) epubRender.ImageResolver {
+	return func(src string) ([]byte, string, bool) {
+		href, _, ok := resolveRef(chapterHref, src)
+		if !ok {
+			return nil, "", false
+		}
 		res := reader.SelectResourceByHref(href)
 		if res == nil {
 			return nil, "", false
 		}
 		return res.Content, res.MIMEType, true
+	}
+}
+
+// externalSchemes are link schemes kept as-is. Any other scheme (e.g.
+// javascript:) is dropped.
+var externalSchemes = map[string]bool{"http": true, "https": true, "mailto": true}
+
+// resolveLink returns an epubrender.LinkResolver for the chapter at
+// chapterHref (spine index chapterIdx):
+//   - external http(s)/mailto links and bare "#fragment" links are kept;
+//   - links into another spine document become "?chapter=N#fragment";
+//   - links into this chapter become "#fragment" (or "?chapter=N" if no
+//     fragment);
+//   - anything else (unknown scheme, file outside the spine) is dropped so
+//     it doesn't render as a broken link.
+func resolveLink(chapterHref string, chapterIdx int, spineIdxByHref map[string]int) epubRender.LinkResolver {
+	return func(href string) (string, bool) {
+		u, err := url.Parse(href)
+		if err != nil {
+			return "", false
+		}
+		if u.Scheme != "" {
+			return href, externalSchemes[strings.ToLower(u.Scheme)]
+		}
+		if u.Path == "" && u.Host == "" {
+			return href, true
+		}
+		target, fragment, ok := resolveRef(chapterHref, href)
+		if !ok {
+			return "", false
+		}
+		idx, ok := spineIdxByHref[target]
+		if !ok {
+			return "", false
+		}
+		if idx == chapterIdx && fragment != "" {
+			return "#" + fragment, true
+		}
+		out := fmt.Sprintf("?chapter=%d", idx)
+		if fragment != "" {
+			out += "#" + fragment
+		}
+		return out, true
 	}
 }
 

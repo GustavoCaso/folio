@@ -131,57 +131,6 @@ func TestReadDocument_EPUB_RendersRequestedChapter(t *testing.T) {
 	}
 }
 
-func TestReadDocument_EPUB_FullConcatenatesAllChapters(t *testing.T) {
-	dir := t.TempDir()
-	if err := os.WriteFile(filepath.Join(dir, "chapter-0.html"), []byte(`<p data-block-id="ch0-p-1">Chapter zero content</p>`), 0644); err != nil {
-		t.Fatal(err)
-	}
-	if err := os.WriteFile(filepath.Join(dir, "chapter-1.html"), []byte(`<p data-block-id="ch1-p-1">Chapter one content marker XYZ</p>`), 0644); err != nil {
-		t.Fatal(err)
-	}
-	tocJSON := `[{"title":"Chapter Zero","chapter_idx":0,"anchor":"","items":[]},{"title":"Chapter One","chapter_idx":1,"anchor":"","items":[]}]`
-	if err := os.WriteFile(filepath.Join(dir, "toc.json"), []byte(tocJSON), 0644); err != nil {
-		t.Fatal(err)
-	}
-
-	store := newTestStore(t)
-	document, err := store.CreateDocument(context.Background(), "book.epub", []byte{}, "", "epub")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := store.MarkDocumentDone(context.Background(), document.ID, dir, "Test Book", "Test Author", nil); err != nil {
-		t.Fatal(err)
-	}
-
-	req := httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?full=1", nil)
-	rec := httptest.NewRecorder()
-	mux, _ := newTestMux(t, store)
-	mux.ServeHTTP(rec, req)
-
-	if rec.Code != http.StatusOK {
-		t.Fatalf("expected 200, got %d, body: %s", rec.Code, rec.Body.String())
-	}
-	body := rec.Body.String()
-	if !strings.Contains(body, "Chapter zero content") {
-		t.Errorf("expected chapter 0 content in response, got:\n%s", body)
-	}
-	if !strings.Contains(body, "Chapter one content marker XYZ") {
-		t.Errorf("expected chapter 1 content in response, got:\n%s", body)
-	}
-
-	// Full view: there is no single "current chapter", so no TOC menu item is
-	// marked active, and prev/next links are replaced by a static indicator.
-	if !strings.Contains(body, `>Full view</span>`) {
-		t.Errorf("expected static 'Full view' indicator span, got:\n%s", body)
-	}
-	if strings.Contains(body, `rel="prev"`) || strings.Contains(body, `rel="next"`) {
-		t.Errorf("did not expect prev/next chapter links in full view, got:\n%s", body)
-	}
-	if strings.Contains(body, `data-tui-sidebar-active="true"`) {
-		t.Errorf("did not expect any active sidebar menu item in full view, got:\n%s", body)
-	}
-}
-
 func TestReadDocument_EPUB_ChapterNav(t *testing.T) {
 	dir := t.TempDir()
 	if err := os.WriteFile(filepath.Join(dir, "chapter-0.html"), []byte(`<p data-block-id="ch0-p-1">Chapter zero content</p>`), 0644); err != nil {
@@ -398,12 +347,5 @@ func TestReadDocument_EPUB_OnlyLoadsCurrentChapterHighlights(t *testing.T) {
 	}
 	if strings.Contains(body, "HIGHLIGHT_ZERO") {
 		t.Errorf("chapter 0 highlight should not be loaded for chapter=1")
-	}
-
-	rec = httptest.NewRecorder()
-	mux.ServeHTTP(rec, httptest.NewRequest(http.MethodGet, "/read/"+document.ID+"?full=1", nil))
-	body = rec.Body.String()
-	if !strings.Contains(body, "HIGHLIGHT_ZERO") || !strings.Contains(body, "HIGHLIGHT_ONE") {
-		t.Errorf("full view should load every highlight")
 	}
 }
