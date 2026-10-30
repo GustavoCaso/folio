@@ -8,11 +8,11 @@ We added an indexed `highlights.chapter` column (migration 0012), keyed by `(doc
 
 - `chapter` is derived on the server from `start_block_id` when a highlight is created (`chapterFromBlockID` in `handlers/highlights.go`). The client never sends it, so it can't disagree with the block ID.
 - Block IDs keep the `ch{N}-{tag}-{M}` shape. The column is a copy of the prefix that the database can filter on. It does not replace the prefix.
-- A highlight that spans chapters belongs to the chapter it starts in. In single-chapter view it would only render partly anyway. The full-book view still loads every highlight.
+- A highlight that spans chapters belongs to the chapter it starts in. The reader only renders one chapter at a time, so it renders partly.
 - Migration 0012 backfills existing rows from the prefix. IDs without a `ch{N}-` prefix (old Markdown `kind-N` IDs on PDF documents, see [ADR 0008](0008-remove-markdown-renderer.md)) fall back to chapter 0.
 
 ## Consequences
 
-- `GET /read/{id}?chapter=N` calls `ListChapterHighlights`, and `?full=1` calls `ListHighlights`. The highlights panel and its count show only the current chapter in single-chapter view.
+- `GET /read/{id}?chapter=N` calls `ListChapterHighlights`. The highlights panel and its count show only the current chapter. (The `?full=1` view that called `ListHighlights` was removed in [ADR 0010](0010-clean-epub-output-remove-full-view.md).)
 - The client-side `filterHighlightsByChapter` was removed.
 - If the block ID scheme changes, the derivation and the backfill have to change with it.

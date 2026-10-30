@@ -10,7 +10,6 @@ import (
 	"path/filepath"
 	"regexp"
 	"strconv"
-	"strings"
 
 	"github.com/GustavoCaso/folio/ui/internal/domain"
 	"github.com/GustavoCaso/folio/ui/internal/logging"
@@ -75,36 +74,22 @@ func (h *Handlers) readEPUBChapter(w http.ResponseWriter, r *http.Request, docum
 	}
 	chapterCount := countChapterFiles(document.OutputPath)
 
-	full := r.URL.Query().Get("full") == "1"
-
-	var html string
-	var chapterIdx int
-	if full {
-		html, err = concatChapters(document.OutputPath, chapterCount)
-		chapterIdx = -1
-	} else {
-		chapterIdx = parseChapterParam(r.URL.Query().Get("chapter"), document.ReadingProgress)
-		html, err = readChapterFile(document.OutputPath, chapterIdx)
-	}
+	chapterIdx := parseChapterParam(r.URL.Query().Get("chapter"), document.ReadingProgress)
+	html, err := readChapterFile(document.OutputPath, chapterIdx)
 	if err != nil {
 		log.Error("read chapter failed", logging.Err(err))
 		renderErr(http.StatusInternalServerError, "Failed to read document. Please try again.")
 		return
 	}
 
-	var highlights []domain.Highlight
-	if full {
-		highlights, err = h.store.ListHighlights(r.Context(), document.ID)
-	} else {
-		highlights, err = h.store.ListChapterHighlights(r.Context(), document.ID, chapterIdx)
-	}
+	highlights, err := h.store.ListChapterHighlights(r.Context(), document.ID, chapterIdx)
 	if err != nil {
 		log.Error("list highlights failed", logging.Err(err))
 		renderErr(http.StatusInternalServerError, "Failed to load highlights. Please try again.")
 		return
 	}
 
-	if err := templates.Reader(document, html, highlights, tocEntries, chapterIdx, chapterCount-1, full).Render(r.Context(), w); err != nil {
+	if err := templates.Reader(document, html, highlights, tocEntries, chapterIdx, chapterCount-1).Render(r.Context(), w); err != nil {
 		log.Error("render reader failed", logging.Err(err))
 	}
 }
@@ -126,8 +111,7 @@ func loadTOC(outputDir string) ([]views.EpubTOCEntry, error) {
 }
 
 // countChapterFiles counts chapter-N.html files present in outputDir, to
-// determine the true chapter count for prev/next bounds and full-view
-// concatenation. This is independent of len(tocEntries), since the TOC tree
+// determine the true chapter count for prev/next bounds. This is independent of len(tocEntries), since the TOC tree
 // may have fewer top-level entries than spine chapters (nested subsections)
 // or, in principle, more (multiple top-level entries could theoretically
 // point at chapters already covered, though buildTOCTree in
@@ -150,23 +134,6 @@ func readChapterFile(outputDir string, chapterIdx int) (string, error) {
 		return "", fmt.Errorf("chapter %d not found: %w", chapterIdx, err)
 	}
 	return string(data), nil
-}
-
-// concatChapters reads chapter-0.html through chapter-{chapterCount-1}.html
-// in order and concatenates their contents.
-func concatChapters(outputDir string, chapterCount int) (string, error) {
-	var b strings.Builder
-	for i := range chapterCount {
-		content, err := readChapterFile(outputDir, i)
-		if err != nil {
-			return "", err
-		}
-		if i > 0 {
-			b.WriteString("<hr>")
-		}
-		b.WriteString(content)
-	}
-	return b.String(), nil
 }
 
 var readingProgressRe = regexp.MustCompile(`^ch(?P<idx>\d+)-[^-]+-[^-]+$`)

@@ -479,7 +479,7 @@ function bootstrap() {
   let pendingSelection = null;
   let popoverOpen = false;
   let suppressNextClick = false;
-  // The server only sends the current chapter's highlights (or all of them in full view).
+  // The server only sends the current chapter's highlights.
   if (highlights != null && highlights.length > 0) {
     applyHighlights(reader, highlights);
     console.log('[highlight.js] Highlights applied')
@@ -683,7 +683,7 @@ if (typeof document !== "undefined" && document.getElementById("reader")) {
 
   const readerEl = document.getElementById("reader");
   const currentChapterIdx = readerEl ? readerEl.dataset.currentChapter : undefined;
-  if (currentChapterIdx !== undefined && currentChapterIdx !== "-1") {
+  if (currentChapterIdx !== undefined) {
     setupTOCScrollTracking(readerEl, tocSidebar, currentChapterIdx);
   }
 }

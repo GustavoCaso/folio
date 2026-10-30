@@ -23,10 +23,10 @@ type EpubTOCEntry struct {
 
 // SubsectionHref reproduces the link logic previously in reader.go's
 // writeTOCList: a same-page "#anchor" jump when the subsection belongs to
-// the chapter currently being viewed and we're not in full-view mode;
-// otherwise a cross-chapter "?chapter=N#anchor" link.
-func SubsectionHref(item EpubTOCEntry, currentChapterIdx int, full bool) string {
-	if !full && item.ChapterIdx == currentChapterIdx {
+// the chapter currently being viewed; otherwise a cross-chapter
+// "?chapter=N#anchor" link.
+func SubsectionHref(item EpubTOCEntry, currentChapterIdx int) string {
+	if item.ChapterIdx == currentChapterIdx {
 		return "#" + item.Anchor
 	}
 	return "?chapter=" + strconv.Itoa(item.ChapterIdx) + "#" + item.Anchor
@@ -37,15 +37,4 @@ func RailLabel(side string) string {
 		return "Previous chapter"
 	}
 	return "Next chapter"
-}
-
-// CurrentChapterAttr renders the value for #reader's data-current-chapter
-// attribute: "-1" in full-book view (no single current chapter), otherwise
-// the chapter index. reader.js's TOC scroll tracker
-// reads this to know which chapter's headings to watch.
-func CurrentChapterAttr(currentChapterIdx int, full bool) string {
-	if full {
-		return "-1"
-	}
-	return strconv.Itoa(currentChapterIdx)
 }

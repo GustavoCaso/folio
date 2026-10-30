@@ -419,3 +419,167 @@ func TestRun_MarksFailedOnInvalidEpub(t *testing.T) {
 		t.Errorf("expected document-2 marked failed with an error, got %+v", store)
 	}
 }
+
+// buildTestEpubWithLinks builds an epub whose chapters live in a "xhtml/"
+// subdirectory, so image and link references are relative to the chapter
+// rather than the OPF (e.g. "../images/fig.png").
+func buildTestEpubWithLinks(t *testing.T) []byte {
+	t.Helper()
+
+	w := epub.New("urn:uuid:test-book-links")
+	w.Title("Links Book")
+	w.Author("Test Author")
+	w.Languages("en")
+
+	img := image.NewRGBA(image.Rect(0, 0, 1, 1))
+	img.Set(0, 0, color.White)
+	var pngBuf bytes.Buffer
+	if err := png.Encode(&pngBuf, img); err != nil {
+		t.Fatalf("png.Encode: %v", err)
+	}
+	if err := w.CoverPNG(img); err != nil {
+		t.Fatalf("CoverPNG: %v", err)
+	}
+	w.AddImage("fig.png", pngBuf.Bytes())
+
+	w.AddContent("xhtml/ch1.xhtml", []byte(`<html><body><h1 id="top">One</h1><p>`+
+		`<img src="../images/fig.png" alt="fig"/>`+
+		`<a href="ch2.xhtml#s2">next</a>`+
+		`<a href="ch2.xhtml">next-top</a>`+
+		`<a href="ch1.xhtml#top">self</a>`+
+		`<a href="#top">frag</a>`+
+		`<a href="https://example.com/x">ext</a>`+
+		`<a href="missing.xhtml#m">missing</a>`+
+		`<a href="javascript:alert(1)">js</a>`+
+		`</p></body></html>`))
+	w.AddContent("xhtml/ch2.xhtml", []byte(`<html><body><h1 id="s2">Two</h1></body></html>`))
+
+	if err := w.TableOfContents("toc", epub.TOC{
+		Title: "Links Book",
+		Items: []epub.TOC{
+			{Title: "One", Href: "xhtml/ch1.xhtml"},
+			{Title: "Two", Href: "xhtml/ch2.xhtml"},
+		},
+	}); err != nil {
+		t.Fatalf("TableOfContents: %v", err)
+	}
+
+	outPath := filepath.Join(t.TempDir(), "links.epub")
+	if err := w.Write(outPath); err != nil {
+		t.Fatalf("Write: %v", err)
+	}
+	data, err := os.ReadFile(outPath)
+	if err != nil {
+		t.Fatalf("ReadFile: %v", err)
+	}
+	return data
+}
+
+func TestRun_ResolvesImagesAndLinksRelativeToChapter(t *testing.T) {
+	dataDir := t.TempDir()
+	store := &fakeStore{}
+	p := parser.NewEPUB(store, dataDir)
+
+	if err := p.Convert(context.Background(), "document-links", "req-1", "links.epub", buildTestEpubWithLinks(t), nil); err != nil {
+		t.Fatalf("Convert: %v", err)
+	}
+
+	// Spine: chapter-0 is ch1.xhtml, chapter-1 is ch2.xhtml (the writer
+	// adds cover/nav outside the spine).
+	data, err := os.ReadFile(filepath.Join(dataDir, "document-links", "chapter-0.html"))
+	if err != nil {
+		t.Fatalf("read chapter-0: %v", err)
+	}
+	out := string(data)
+
+	for _, want := range []string{
+		`src="data:image/png;base64,`,
+		`<a href="?chapter=1#s2">next</a>`,
+		`<a href="?chapter=1">next-top</a>`,
+		`<a href="#top">self</a>`,
+		`<a href="#top">frag</a>`,
+		`<a href="https://example.com/x">ext</a>`,
+		`<a>missing</a>`,
+		`<a>js</a>`,
+	} {
+		if !strings.Contains(out, want) {
+			t.Errorf("chapter-0 missing %q\ngot: %s", want, out)
+		}
+	}
+}
+
+// zipEpub packs files into an epub container. mimetype is written first
+// and stored uncompressed, per the EPUB OCF spec.
+func zipEpub(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	var buf bytes.Buffer
+	zw := zip.NewWriter(&buf)
+	w, err := zw.CreateHeader(&zip.FileHeader{Name: "mimetype", Method: zip.Store})
+	if err != nil {
+		t.Fatalf("create mimetype: %v", err)
+	}
+	if _, err := w.Write([]byte("application/epub+zip")); err != nil {
+		t.Fatalf("write mimetype: %v", err)
+	}
+	for name, content := range files {
+		w, err := zw.Create(name)
+		if err != nil {
+			t.Fatalf("create %q: %v", name, err)
+		}
+		if _, err := w.Write([]byte(content)); err != nil {
+			t.Fatalf("write %q: %v", name, err)
+		}
+	}
+	if err := zw.Close(); err != nil {
+		t.Fatalf("zip close: %v", err)
+	}
+	return buf.Bytes()
+}
+
+// TestRun_TocResolvesHrefsRelativeToNavDocument covers EPUBs whose nav
+// document lives in a subdirectory of the OPF (OEBPS/xhtml/nav.xhtml), so
+// its hrefs ("ch1.xhtml") differ from the OPF-relative spine hrefs
+// ("xhtml/ch1.xhtml"). The raitucarp/epub writer always puts the nav next
+// to the OPF, so this epub is zipped by hand.
+func TestRun_TocResolvesHrefsRelativeToNavDocument(t *testing.T) {
+	epubBytes := zipEpub(t, map[string]string{
+		"META-INF/container.xml": `<?xml version="1.0"?>
+<container version="1.0" xmlns="urn:oasis:names:tc:opendocument:xmlns:container">
+<rootfiles><rootfile full-path="OEBPS/book.opf" media-type="application/oebps-package+xml"/></rootfiles>
+</container>`,
+		"OEBPS/book.opf": `<?xml version="1.0"?>
+<package xmlns="http://www.idpf.org/2007/opf" version="3.0" unique-identifier="id">
+<metadata xmlns:dc="http://purl.org/dc/elements/1.1/">
+<dc:identifier id="id">urn:uuid:nav-subdir</dc:identifier><dc:title>Nav Book</dc:title><dc:language>en</dc:language>
+</metadata>
+<manifest>
+<item id="nav" href="xhtml/nav.xhtml" media-type="application/xhtml+xml" properties="nav"/>
+<item id="ch1" href="xhtml/ch1.xhtml" media-type="application/xhtml+xml"/>
+<item id="ch2" href="xhtml/ch2.xhtml" media-type="application/xhtml+xml"/>
+</manifest>
+<spine><itemref idref="ch1"/><itemref idref="ch2"/></spine>
+</package>`,
+		"OEBPS/xhtml/nav.xhtml": `<html xmlns="http://www.w3.org/1999/xhtml" xmlns:epub="http://www.idpf.org/2007/ops"><body>
+<nav epub:type="toc"><ol>
+<li><a href="ch1.xhtml">One</a></li>
+<li><a href="ch2.xhtml">Two</a><ol><li><a href="ch2.xhtml#s2">Section</a></li></ol></li>
+</ol></nav></body></html>`,
+		"OEBPS/xhtml/ch1.xhtml": `<html><body><h1>One</h1></body></html>`,
+		"OEBPS/xhtml/ch2.xhtml": `<html><body><h1 id="s2">Two</h1></body></html>`,
+	})
+
+	entries := runAndReadTOC(t, epubBytes, "document-nav-subdir")
+
+	if len(entries) != 2 {
+		t.Fatalf("expected 2 top-level TOC entries, got %d: %+v", len(entries), entries)
+	}
+	if entries[0].Title != "One" || entries[0].ChapterIdx != 0 {
+		t.Errorf("entry 0: got %+v, want One at chapter 0", entries[0])
+	}
+	if entries[1].Title != "Two" || entries[1].ChapterIdx != 1 {
+		t.Errorf("entry 1: got %+v, want Two at chapter 1", entries[1])
+	}
+	if len(entries[1].Items) != 1 || entries[1].Items[0].ChapterIdx != 1 || entries[1].Items[0].Anchor != "s2" {
+		t.Errorf("subsection: got %+v, want Section at chapter 1 anchor s2", entries[1].Items)
+	}
+}

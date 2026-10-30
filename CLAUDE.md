@@ -60,7 +60,7 @@ Browser uploads EPUB
           → hub.Publish(DONE) → SSE → browser
 ```
 
-`GET /read/{documentID}?chapter=N&full=1` serves one chapter or the whole book concatenated. Documents with any other `Document.Format` get a 422 "Unsupported document format" page.
+`GET /read/{documentID}?chapter=N` serves one chapter. Chapter HTML is body-only and cleaned at conversion (ADR 0010). Documents with any other `Document.Format` get a 422 "Unsupported document format" page.
 
 ## Rules
 
